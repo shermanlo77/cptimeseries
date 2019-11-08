@@ -1,14 +1,33 @@
 import tensorflow as tf
+from netCDF4 import 
+import netCDF4
+class Generator():
 
-def Generator():
-
-    def __init__(self, generator_params):
+    def __init__(self, fn = "", all_at_once=False, train_size=0.75 ):
         self.generator = None
-    pass
+        self.all_at_once = all_at_once
+        self.fn = fn
+        self.train_size = train_size
+    
+    def __call__(self):
+        pass
+    
 
-    def create_generator(self):
+class Generator_rain(Generator):
 
-        return self.generator
+    def __init__(self, **generator_params):
+        super(Generator_rain, self).__init__(**generator_params)
 
     def __call__(self):
-        return self.create_generator()
+        with netCDF4.Dataset(self.fn, "r", format="NETCDF4") as f:
+            for chunk in f.variables['rr']
+                yield chunk
+
+class Generator_(Generator):
+
+    def __init__(self, **generator_params):
+        super(Generator_rain, self).__init__(**generator_params)
+
+    def __call__(self):
+
+
