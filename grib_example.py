@@ -14,7 +14,7 @@ import pupygrib
 #print(channel)
 
 #open the grib file using pupygrib
-file_stream = open('Data/Rain_Data/ana_coarse.grib','rb')
+file_stream = open('Data/Rain_Data_Oct19/ana_coarse.grib','rb')
 grib_iterator = pupygrib.read(file_stream)
 #for each variable
 for i, message in enumerate(grib_iterator):
@@ -30,7 +30,9 @@ for i, message in enumerate(grib_iterator):
     im = ax.pcolor(longitude, latitude, values)
     ax.coastlines()
     plt.colorbar(im)
+    plt.title("Message "+str(i))
     ax.set_aspect('auto', adjustable=None)
+    plt.savefig("Figure_"+str(i)+".png")
     plt.show()
 
 file_stream.close()

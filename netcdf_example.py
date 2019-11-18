@@ -5,7 +5,6 @@
 #plot the mean daily rainfall for each point in space
 #for London, plot the time series rainfall 
 
-import cartopy.crs as ccrs
 import gdal
 import numpy as np
 import seaborn as sb
@@ -21,7 +20,7 @@ register_matplotlib_converters()
 print("==========")
 
 #load the .nc file using netCDF4
-file_name = "Data/Rain_Data/rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_djf_uk.nc"
+file_name = "Data/Rain_Data_Oct19/rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_djf_uk.nc"
 print("Look into the data in " + file_name + "\n")
 dataset = Dataset(file_name, "r", format="NETCDF4")
 data = dataset.variables
@@ -46,12 +45,12 @@ mean_rainfall = np.mean(data['rr'][:],0)
 x_grid, y_grid = np.meshgrid(data['longitude'], data['latitude'])
 
 #heatmap plot the mean rainfall
-ax = plt.axes(projection=ccrs.PlateCarree())
-im = ax.pcolor(x_grid, y_grid, mean_rainfall)
-ax.coastlines()
-plt.colorbar(im)
+plt.figure()
+plt.pcolor(x_grid, y_grid, mean_rainfall)
 plt.title("Mean rainfall (mm)")
-ax.set_aspect('auto', adjustable=None)
+plt.xlabel("longitude (degree)")
+plt.ylabel("latitude (degree)")
+cbar = plt.colorbar()
 plt.show()
 
 #get rain data for London (select a specific longitude and latitude)
