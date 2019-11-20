@@ -4,23 +4,32 @@ from netCDF4 import Dataset
 import gdal
 import numpy as np
 
-"""
-Example of how to use
-import Generators
-
-rr_ens file 
-_filename = "Data/Rain_Data/rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_djf_uk.nc"
-rain_gen = Generator_rain(_filename, all_at_once=True)
-data = next(iter(grib_gen))
-
-Grib Files
-_filename = 'Data/Rain_Data/ana_coarse.grib'
-grib_gen = Generators.Generator_grib(fn=_filename, all_at_once=True)
-data = next(iter(grib_gen))
+#TODO:(akanni-ade): add ability to return long/lat variable  implement long/lat
 
 """
+    Example of how to use
+    import Generators
+
+    rr_ens file 
+    _filename = "Data/Rain_Data/rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_djf_uk.nc"
+    rain_gen = Generator_rain(_filename, all_at_once=True)
+    data = next(iter(grib_gen))
+
+    Grib Files
+    _filename = 'Data/Rain_Data/ana_coarse.grib'
+    grib_gen = Generators.Generator_grib(fn=_filename, all_at_once=True)
+    data = next(iter(grib_gen))
+
+    Grib Files Location:
+    _filename = 'Data/Rain_Data/ana_coarse.grib'
+    grib_gen = Generators.Generator_grib(fn=_filename, all_at_once=True)
+    arr_long, arr_lat = grib_gen.locaiton()
+    #now say you are investingating the datum x = data[15,125]
+    #   to get the longitude and latitude you must do
+    long, lat = arr_long(15,125), arr_lat(15,125)
 
 
+"""
 class Generator():
     
     def __init__(self, fn = "", all_at_once=False, train_size=0.75, channel=None ):
@@ -33,6 +42,9 @@ class Generator():
         pass
 
     def yield_iter(self):
+        pass
+
+    def long_lat(self):
         pass
 
     def __call__(self):
@@ -57,13 +69,12 @@ class Generator_rain(Generator):
                 yield chunk
         
 
-
 class Generator_grib(Generator):
     """
         Creates a generator for the various grib files
     
         :param all_at_once: whether to return all data, or return data in batches
-        
+
         :param channel: the desired channel of information in the grib file
             Default None, then concatenate all channels together and return
             If an integer return this band
@@ -88,11 +99,30 @@ class Generator_grib(Generator):
         else:
             channel_data = self.ds.GetRasterBand(self.channel).ReadAsArray()
             yield channel_data
-            
     
     def yield_iter(self):
         raise NotImplementedError
         #TODO:(akanni-ade) Consider implementing if the grib files become significantly larger when Peter's add more data
+
+    def location(self):
+        """
+        Returns a 2 1D arrays
+            arr_long: Longitudes
+            arr_lat: Latitdues
+        Example of how to use:
+
+
+        """
+        GT = self.ds.GetGeoTransform()
+        indices = np.indices( self.ds.GetRasterBand(1).ReadAsArray().shape )
+        xp = GT[0] + indices[1]*GT[1] + indices[0]*GT[2]   
+        yp = GT[3] + indices[0]*GT[4] + indices[1]*GT[5] 
+
+        #shifting to centre of pixel
+        xp += GT[1]/2
+        yp += GT[4]/2
+        return xp, yp
+         
 
 
     
