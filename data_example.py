@@ -52,12 +52,14 @@ for i, latitude in enumerate(latitude_array):
 
 #heatmap plot the mean rainfall
 plt.figure()
-plt.pcolor(longitude_grid, latitude_grid, mean_rainfall)
+ax = plt.axes(projection=ccrs.PlateCarree())
+im = ax.pcolor(longitude_grid, latitude_grid, mean_rainfall)
+ax.coastlines(resolution='50m')
+plt.colorbar(im)
+ax.set_aspect('auto', adjustable=None)
 plt.title("Mean "+rain_data['rr'].long_name+" ("+rain_data['rr'].units+")")
-plt.xlabel("longitude (degree)")
-plt.ylabel("latitude (degree)")
-cbar = plt.colorbar()
-plt.show()
+plt.savefig("figures/rainfall_mean.png")
+plt.close()
 
 #plot the rainfall in London
 rainfall_series = rain_data['rr'][:,latitude_index,longitude_index]
@@ -66,7 +68,8 @@ plt.plot(time, rainfall_series)
 plt.title("London")
 plt.xlabel("Time (calendar year)")
 plt.ylabel(rain_data['rr'].long_name+" ("+rain_data['rr'].units+")")
-plt.show()
+plt.savefig("figures/rainfall_london.png")
+plt.close()
 
 ##########          MODEL FIELDS          ##########
 
@@ -124,11 +127,11 @@ for key, model_field in model_fields_data.items():
         plt.figure()
         ax = plt.axes(projection=ccrs.PlateCarree())
         im = ax.pcolor(longitude_grid, latitude_grid, model_field_mean)
-        ax.coastlines()
+        ax.coastlines(resolution='50m')
         plt.colorbar(im)
         ax.set_aspect('auto', adjustable=None)
         plt.title("mean " + model_field_name)
-        plt.show()
+        plt.savefig("figures/"+model_field_name+"_mean.png")
         plt.close()
         
         #plot the model field in London as a time series
@@ -137,5 +140,5 @@ for key, model_field in model_fields_data.items():
         plt.title("London")
         plt.xlabel("Time (calendar year)")
         plt.ylabel(model_field_name)
-        plt.show()
+        plt.savefig("figures/"+model_field_name+"_london.png")
         plt.close()
