@@ -4,9 +4,11 @@ import numpy as np
 import numpy.random as random
 import statsmodels.tsa.stattools as stats
 
+from scipy.special import loggamma
+
 class Parameters:
-    """Contains regressive, autoregressive, moving average and constant parameters
-        for the compound Poisson time series model
+    """Contains regressive, autoregressive, moving average and constant
+        parameters for the compound Poisson time series model
     
     Attributes:
         poisson_rate: dictionary with keys "reg", "AR", "MA", "const" with
@@ -53,9 +55,15 @@ class CompoundPoissonTimeSeries:
         poisson_rate_array: poisson rate at each time step
         gamma_mean_array: gamma mean at each time step
         gamma_dispersion_array: gamma dispersion at each time step
-        z: latent poisson variables at each time step
-        y: compound poisson variables at each time step
+        z_array: latent poisson variables at each time step
+        y_array: compound poisson variables at each time step
+        _tweedie_p_array: index parameter for each time step, a reparametrize
+            using Tweedie
+        _tweedie_phi_array: dispersion parameter for each time step, a
+            reparametrize using Tweedie
     """
+    
+    _cp_sum_threshold = -37
     
     def __init__(self, x, parameters):
         """
@@ -70,8 +78,10 @@ class CompoundPoissonTimeSeries:
         self.poisson_rate_array = np.zeros(self.n)
         self.gamma_mean_array = np.zeros(self.n)
         self.gamma_dispersion_array = np.zeros(self.n)
-        self.z = np.zeros(self.n)
-        self.y = np.zeros(self.n)
+        self.z_array = np.zeros(self.n)
+        self.y_array = np.zeros(self.n)
+        self._tweedie_p_array = np.zeros(self.n)
+        self._tweedie_phi_array = np.zeros(self.n)
     
     def simulate(self, rng):
         """Simulate a whole time series
@@ -79,8 +89,8 @@ class CompoundPoissonTimeSeries:
         Simulate a time series given the model fields self.x, parameters
             and self.parameters. Modify the member variables poisson_rate_array,
             gamma_mean_array and gamma_dispersion_array with the parameters at
-            each time step. Also modifies self.z and self.y with the simulated 
-            values.
+            each time step. Also modifies self.z_array and self.y_array with the
+            simulated values.
         
         Args:
             rng: numpy.random.RandomState object
@@ -88,64 +98,257 @@ class CompoundPoissonTimeSeries:
         
         #simulate n times
         for i in range(self.n):
-            
-            #regressive on the model fields and constant
-            self.poisson_rate_array[i] = (
-                np.dot(self.parameters.poisson_rate["reg"], self.x[i,:])
-                + self.parameters.poisson_rate["const"])
-            self.gamma_mean_array[i] = (
-                np.dot(self.parameters.gamma_mean["reg"], self.x[i,:])
-                + self.parameters.gamma_mean["const"])
-            self.gamma_dispersion_array[i] = (
-                np.dot(self.parameters.gamma_dispersion["reg"], self.x[i,:])
-                + self.parameters.gamma_dispersion["const"])
-            
-            #for the second step and beyond, add AR and MA terms
-            #the AR terms regress on its log self (subtracted from itself when
-                #all the parameters are zero)
-            #the MA terms regress on the difference of the previous value of the
-                #variable with the expected value, normalised to the sqrt
-                #variance of the variable
-            if i > 0:
-                
-                #poisson rate
-                self.poisson_rate_array[i] += (
-                    self.parameters.poisson_rate["AR"]
-                    *(math.log(self.poisson_rate_array[i-1])
-                    - self.parameters.poisson_rate["const"]))
-                self.poisson_rate_array[i] += (
-                    self.parameters.poisson_rate["MA"]
-                    * (self.z[i-1] - self.poisson_rate_array[i-1])
-                    / math.sqrt(self.poisson_rate_array[i-1]))
-                
-                #gamma mean
-                self.gamma_mean_array[i] += (
-                    self.parameters.gamma_mean["AR"]
-                    * (math.log(self.gamma_mean_array[i-1])
-                    - self.parameters.gamma_mean["const"]))
-                #when z is zero, y is zero, giving an error term of zero
-                    #therefore, do not add any z=0 terms
-                if self.z[i-1] > 0:
-                    self.gamma_mean_array[i] += (
-                        self.parameters.gamma_mean["MA"]
-                        * (self.y[i-1]/self.z[i-1]- self.gamma_mean_array[i-1])
-                        / self.gamma_mean_array[i-1]
-                        / math.sqrt(
-                            self.gamma_dispersion_array[i-1]
-                            * self.z[i-1])
-                    )
-            
-            #exp link function, make it positive
-            self.poisson_rate_array[i] = math.exp(self.poisson_rate_array[i])
-            self.gamma_mean_array[i] = math.exp(self.gamma_mean_array[i])
-            self.gamma_dispersion_array[i] = (
-                math.exp(self.gamma_dispersion_array[i]))
-            
+            #get the parameters of the compound Poisson at this time step
+            self.update_poisson_gamma(i)
             #simulate this compound Poisson
-            self.y[i], self.z[i] = simulate_cp(
+            self.y_array[i], self.z_array[i] = simulate_cp(
                 self.poisson_rate_array[i], self.gamma_mean_array[i],
                 self.gamma_dispersion_array[i], rng)
+    
+    
+    def update_poisson_gamma(self, index):
+        """Update the variables of the Poisson and gamma random variables
+        
+        Updates the Poisson rate, gamma mean and gama dispersion parameters for
+            a given time step and all the z before that time step. Modifies the
+            member variables poisson_rate_array, gamma_mean_array and
+            gamma_dispersion_array
+        
+        Args:
+            index: the time step to update the parameters at
+        
+        """
+        
+        #regressive on the model fields and constant
+        self.poisson_rate_array[index] = (
+            np.dot(self.parameters.poisson_rate["reg"], self.x[index,:])
+            + self.parameters.poisson_rate["const"])
+        self.gamma_mean_array[index] = (
+            np.dot(self.parameters.gamma_mean["reg"], self.x[index,:])
+            + self.parameters.gamma_mean["const"])
+        self.gamma_dispersion_array[index] = (
+            np.dot(self.parameters.gamma_dispersion["reg"], self.x[index,:])
+            + self.parameters.gamma_dispersion["const"])
+        
+        #for the second step and beyond, add AR and MA terms
+        #the AR terms regress on its log self (subtracted from itself when
+            #all the parameters are zero)
+        #the MA terms regress on the difference of the previous value of the
+            #variable with the expected value, normalised to the sqrt
+            #variance of the variable
+        if index > 0:
+            
+            #poisson rate
+            self.poisson_rate_array[index] += (
+                self.parameters.poisson_rate["AR"]
+                *(math.log(self.poisson_rate_array[index-1])
+                - self.parameters.poisson_rate["const"]))
+            self.poisson_rate_array[index] += (
+                self.parameters.poisson_rate["MA"]
+                * (self.z_array[index-1] - self.poisson_rate_array[index-1])
+                / math.sqrt(self.poisson_rate_array[index-1]))
+            
+            #gamma mean
+            self.gamma_mean_array[index] += (
+                self.parameters.gamma_mean["AR"]
+                * (math.log(self.gamma_mean_array[index-1])
+                - self.parameters.gamma_mean["const"]))
+            #when z is zero, y is zero, giving an error term of zero
+                #therefore, do not add any z=0 terms
+            if self.z_array[index-1] > 0:
+                self.gamma_mean_array[index] += (
+                    self.parameters.gamma_mean["MA"]
+                    * (
+                        self.y_array[index-1]/self.z_array[index-1]
+                        - self.gamma_mean_array[index-1])
+                    / self.gamma_mean_array[index-1]
+                    / math.sqrt(
+                        self.gamma_dispersion_array[index-1]
+                        * self.z_array[index-1])
+                )
+        
+        #exp link function, make it positive
+        self.poisson_rate_array[index] = math.exp(
+            self.poisson_rate_array[index])
+        self.gamma_mean_array[index] = math.exp(self.gamma_mean_array[index])
+        self.gamma_dispersion_array[index] = (
+            math.exp(self.gamma_dispersion_array[index]))
+    
+    def e_step(self):
+        """Does the E step of the EM algorithm
+        
+        Make estimates of the z and updates the poisson rate, gamma mean and
+            gamma dispersion parameters for each time step. Modifies the member
+            variables z_array, poisson_rate_array, gamma_mean_array,
+            gamma_dispersion_array
+        """
+        
+        #for each data point (forwards in time)
+        for i in range(self.n):
+            
+            #update the parameter at this time step
+            self.update_poisson_gamma(i)
+            
+            #get the parameters
+            poisson_rate = self.poisson_rate_array[i]
+            gamma_mean = self.gamma_mean_array[i]
+            gamma_dispersion = self.gamma_dispersion_array[i]
+            #save the Tweedie parameters
+            p = (1+2*gamma_dispersion) / (1+gamma_dispersion)
+            phi = (
+                (gamma_dispersion+1) * math.pow(poisson_rate, 1-p)
+                / math.pow(gamma_mean, p-2))
+            self._tweedie_p_array[i] = p
+            self._tweedie_phi_array[i] = phi
+            
+            #if the rainfall is zero, then z is zero (it has not rained)
+            if self.y_array[i] == 0:
+                self.z_array[i] = 0
+            else:
+                #work out the normalisation constant for the expectation
+                normalisation_constant = self.ln_sum_w(i, 0)
+                #work out the expectation
+                self.z_array[i] = math.exp(
+                    self.ln_sum_w(i, 1) - normalisation_constant)
+    
+    def z_max(self, index):
+        """Gets the index of the biggest term in the compound Poisson sum
+        
+        Args:
+            index: time step, y[index] must be positive
+        
+        Returns:
+            z_max: positive integer, index of the biggest term in the compound
+                Poisson sum
+        """
+        #get the optima with respect to the sum index, then round it to get an
+            #integer
+        y = self.y_array[index]
+        p = self._tweedie_p_array[index]
+        phi = self._tweedie_phi_array[index]
+        z_max = round(math.exp((2-p)*math.log(y)-math.log(phi)-math.log(2-p)))
+        #if the integer is 0, then set the index to 1
+        if z_max == 0:
+            z_max = 1
+        return z_max
+    
+    def ln_wz(self, index, z):
+        """Return a log term from the compound Poisson sum
+        
+        Args:
+            index: time step, y[index] must be positive
+            z: Poisson variable or index of the sum element
+        
+        Returns:
+            ln_wz: log compopund Poisson term
+        """
+        
+        #declare array of terms to be summed to work out ln_wz
+        terms = np.zeros(6)
+        #retrieve variables
+        y = self.y_array[index]
+        alpha = 1/self.gamma_dispersion_array[index]
+        p = self._tweedie_p_array[index]
+        phi = self._tweedie_phi_array[index]
 
+        #work out each individual term
+        terms[0] = -z*alpha*math.log(p-1)
+        terms[1] = z*alpha*math.log(y)
+        terms[2] = -z*(1+alpha)*math.log(phi)
+        terms[3] = -z*math.log(2-p)
+        terms[4] = -loggamma(1+z)
+        terms[5] = -loggamma(alpha*z)
+        #sum the terms to get the log compound Poisson sum term
+        ln_wz = np.sum(terms)
+        return ln_wz
+    
+    def ln_sum_w(self, index, z_pow):
+        """Works out the compound Poisson sum, only important terms are summed
+        
+        Args:
+            index: time step, y[index] must be positive
+            z_pow: 0,1,2,..., used for taking the sum for y^yPow * Wy which is
+                used for taking expectations
+        
+        Returns:
+            ln_sum_w: log compound Poisson sum
+        """
+        
+        y = self.y_array[index]
+        
+        #get the y with the biggest term in the compound Poisson sum
+        z_max = self.z_max(index)
+        #get the biggest log compound Poisson term + any expectation terms
+        ln_w_max = self.ln_wz(index, z_max) + z_pow*math.log(z_max)
+        
+        #declare array of compound poisson terms
+        #each term is a ratio of the compound poisson term with the maximum 
+            #compound poisson term
+        #the first term is 1, that is exp[ln(W_ymax)-ln(W_ymax)] = 1;
+        terms = [1]
+        
+        #declare booleans is_got_z_l and is_got_z_u
+        #these are true if we got the lower and upper bound respectively for
+            #the compound Poisson sum
+        is_got_z_l = False
+        is_got_z_u = False
+        
+        #declare the summation bounds, z_l for the lower bound, z_u for the
+            #upper bound
+        z_l = z_max
+        z_u = z_max
+        
+        #calculate the compound poisson terms starting at yL and working
+            #downwards if the lower bound is 1, can't go any lower and set
+            #is_got_z_l to be true
+        if z_l == 1:
+            is_got_z_l = True
+        
+        #while we haven't got a lower bound
+        while not is_got_z_l:
+            #lower the lower bound
+            z_l -= 1
+            #if the lower bound is 0, then set is_got_z_l to be true and raise
+                #the lower bound back by one
+            if z_l == 0:
+                is_got_z_l = True
+                z_l += 1
+            else: #else the lower bound is not 0
+                #calculate the log ratio of the compound poisson term with the
+                    #maximum compound poisson term
+                log_ratio = np.sum(
+                    [self.ln_wz(index, z_l), z_pow*math.log(z_l), -ln_w_max])
+                #if this log ratio is bigger than the threshold
+                if log_ratio > CompoundPoissonTimeSeries._cp_sum_threshold:
+                    #append the ratio to the array of terms
+                    terms.append(math.exp(log_ratio))
+                else:
+                    #else the log ratio is smaller than the threshold
+                    #set is_got_z_l to be true and raise the lower bound by 1
+                    is_got_z_l = True
+                    z_l += 1
+
+        #while we haven't got an upper bound
+        while not is_got_z_u:
+            #raise the upper bound by 1
+            z_u += 1;
+            #calculate the log ratio of the compound poisson term with the
+                #maximum compound poisson term
+            log_ratio = np.sum(
+                [self.ln_wz(index, z_u), z_pow*math.log(z_u), -ln_w_max])
+            #if this log ratio is bigger than the threshold
+            if log_ratio > CompoundPoissonTimeSeries._cp_sum_threshold:
+                #append the ratio to the array of terms
+                terms.append(math.exp(log_ratio))
+            else:
+                #else the log ratio is smaller than the threshold
+                #set is_got_z_u to be true and lower the upper bound by 1
+                is_got_z_u = True
+                z_u -= 1
+
+        #work out the compound Poisson sum 
+        ln_sum_w = ln_w_max + math.log(np.sum(terms))
+        return ln_sum_w
 
 def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
     """Simulate a single compound poisson random variable
@@ -169,7 +372,7 @@ def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
     else:
         scale = 0
     y = rng.gamma(shape, scale=scale) #gamma random variable
-    return(y, z)
+    return (y, z)
 
 def main():
     
@@ -193,7 +396,7 @@ def main():
     
     compound_poisson_time_series = CompoundPoissonTimeSeries(x, parameters)
     compound_poisson_time_series.simulate(rng)
-    y = compound_poisson_time_series.y
+    y = compound_poisson_time_series.y_array
     poisson_rate_array = compound_poisson_time_series.poisson_rate_array
     gamma_mean_array = compound_poisson_time_series.gamma_mean_array
     gamma_dispersion_array = compound_poisson_time_series.gamma_dispersion_array
@@ -256,5 +459,39 @@ def main():
     plt.savefig("../figures/simulation_dispersion.png")
     plt.show()
     plt.close()
+    
+    plt.figure()
+    plt.plot(range(n),compound_poisson_time_series.z_array)
+    plt.xlabel("Time (day)")
+    plt.ylabel("Z")
+    plt.savefig("../figures/simulation_z.png")
+    plt.show()
+    plt.close()
+    
+    compound_poisson_time_series.e_step()
+    
+    plt.figure()
+    plt.plot(poisson_rate_array)
+    plt.xlabel("Time (day)")
+    plt.ylabel("Poisson rate")
+    plt.savefig("../figures/simulation_lambda_estimate.png")
+    plt.show()
+    plt.close()
 
+    plt.figure()
+    plt.plot(gamma_mean_array)
+    plt.xlabel("Time (day)")
+    plt.ylabel("Mean of gamma")
+    plt.savefig("../figures/simulation_mu_estimate.png")
+    plt.show()
+    plt.close()
+    
+    plt.figure()
+    plt.plot(range(n),compound_poisson_time_series.z_array)
+    plt.xlabel("Time (day)")
+    plt.ylabel("Z")
+    plt.savefig("../figures/simulation_z_estimate.png")
+    plt.show()
+    plt.close()
+    
 main()
