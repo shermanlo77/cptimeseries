@@ -9,6 +9,10 @@ from scipy.special import loggamma, digamma
 class CompoundPoissonTimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
     
+    Initalise by passing initial parameters vai the constructor.
+    The time series can be simulated
+    The parameters can be estimated
+    
     Attributes:
         x: design matrix of the model fields, shape (n, n_dim)
         n: length of time series
@@ -44,9 +48,9 @@ class CompoundPoissonTimeSeries:
         self.x = x
         self.n = x.shape[0]
         self.n_dim = x.shape[1]
-        self.poisson_rate_parameter = poisson_rate_parameter
-        self.gamma_mean_parameter = gamma_mean_parameter
-        self.gamma_dispersion_parameter = gamma_dispersion_parameter
+        self.poisson_rate_parameter = None
+        self.gamma_mean_parameter = None
+        self.gamma_dispersion_parameter = None
         self.poisson_rate_array = np.zeros(self.n)
         self.gamma_mean_array = np.zeros(self.n)
         self.gamma_dispersion_array = np.zeros(self.n)
@@ -54,6 +58,25 @@ class CompoundPoissonTimeSeries:
         self.y_array = np.zeros(self.n)
         self._tweedie_p_array = np.zeros(self.n)
         self._tweedie_phi_array = np.zeros(self.n)
+        
+        self.set_parameters(poisson_rate_parameter, gamma_mean_parameter,
+            gamma_dispersion_parameter)
+    
+    def set_parameters(self, poisson_rate_parameter, gamma_mean_parameter,
+        gamma_dispersion_parameter):
+        """Set the member variables of _parameter
+        
+        Set the member variables of _parameter, assign their parents and convert
+            all parameters to numpy array
+        
+        Args:
+            poisson_rate_parameter:
+            gamma_mean_parameter:
+            gamma_dispersion_parameter:
+        """
+        self.poisson_rate_parameter = poisson_rate_parameter
+        self.gamma_mean_parameter = gamma_mean_parameter
+        self.gamma_dispersion_parameter = gamma_dispersion_parameter
         #assign the parameters parents as self, this is so that the parameter
             #objects has access to the data 
         self.poisson_rate_parameter.assign_parent(self)
@@ -63,6 +86,14 @@ class CompoundPoissonTimeSeries:
         self.poisson_rate_parameter.convert_all_to_np()
         self.gamma_mean_parameter.convert_all_to_np()
         self.gamma_dispersion_parameter.convert_all_to_np()
+    
+    def set_observables(self, y_array):
+        """Set the observed rainfall
+        
+        Args:
+            y_array: rainfall for each day (vector)
+        """
+        self.y_array = y_array
     
     def simulate(self, rng):
         """Simulate a whole time series
@@ -76,7 +107,6 @@ class CompoundPoissonTimeSeries:
         Args:
             rng: numpy.random.RandomState object
         """
-        
         #simulate n times
         for i in range(self.n):
             #get the parameters of the compound Poisson at this time step
@@ -85,7 +115,6 @@ class CompoundPoissonTimeSeries:
             self.y_array[i], self.z_array[i] = simulate_cp(
                 self.poisson_rate_array[i], self.gamma_mean_array[i],
                 self.gamma_dispersion_array[i], rng)
-    
     
     def update_poisson_gamma(self, index):
         """Update the variables of the Poisson and gamma random variables
@@ -97,9 +126,7 @@ class CompoundPoissonTimeSeries:
         
         Args:
             index: the time step to update the parameters at
-        
         """
-        
         #regressive on the model fields and constant
         #exp link function, make it positive
         self.poisson_rate_array[index] = math.exp(
@@ -129,10 +156,8 @@ class CompoundPoissonTimeSeries:
             variables z_array, poisson_rate_array, gamma_mean_array,
             gamma_dispersion_array
         """
-        
         #for each data point (forwards in time)
         for i in range(self.n):
-            
             #update the parameter at this time step
             self.update_poisson_gamma(i)
             
@@ -165,8 +190,8 @@ class CompoundPoissonTimeSeries:
             index: time step, y[index] must be positive
         
         Returns:
-            z_max: positive integer, index of the biggest term in the compound
-                Poisson sum
+            positive integer, index of the biggest term in the compound Poisson
+                sum
         """
         #get the optima with respect to the sum index, then round it to get an
             #integer
@@ -187,7 +212,7 @@ class CompoundPoissonTimeSeries:
             z: Poisson variable or index of the sum element
         
         Returns:
-            ln_wz: log compopund Poisson term
+            log compopund Poisson term
         """
         
         #declare array of terms to be summed to work out ln_wz
@@ -218,7 +243,7 @@ class CompoundPoissonTimeSeries:
                 used for taking expectations
         
         Returns:
-            ln_sum_w: log compound Poisson sum
+            log compound Poisson sum
         """
         
         y = self.y_array[index]
@@ -297,6 +322,42 @@ class CompoundPoissonTimeSeries:
         ln_sum_w = ln_w_max + math.log(np.sum(terms))
         return ln_sum_w
     
+    def m_step(self):
+        """Does the M step of the EM algorithm
+        
+        Estimates the parameters given the observed rainfall y and the latent
+            variable z using gradient descent. The objective function is the log
+            likelihood assuming the latent variables are observed
+        """
+        #set their member variables containing the gradients to be zero, they
+            #are calculated in the next step
+        self.poisson_rate_parameter.reset_d_parameter_self_array()
+        self.gamma_mean_parameter.reset_d_parameter_self_array()
+        self.gamma_dispersion_parameter.reset_d_parameter_self_array()
+        #for each time step, work out d itself / d parameter where itself can be
+            #poisson_rate or gamma_mean for example and parameter can be the AR
+            #or MA parameters
+        #gradient at time step i depends on gradient at time step i-1, therefore
+            #use loop over range(n)
+        for i in range(self.n):
+            self.update_poisson_gamma(i)
+            self.poisson_rate_parameter.calculate_d_parameter_self_i(i)
+            self.gamma_mean_parameter.calculate_d_parameter_self_i(i)
+            self.gamma_dispersion_parameter.calculate_d_parameter_self_i(i)
+        #get the gradient of the log likelihood
+        grad_poisson_rate = self.poisson_rate_parameter.d_parameter_ln_l()
+        grad_gamma_mean = self.gamma_mean_parameter.d_parameter_ln_l()
+        grad_gamma_dispersion = (
+            self.gamma_dispersion_parameter.d_parameter_ln_l())
+        #multiply the gradient by a factor to be used for gradient descent
+        grad_poisson_rate *= 0.1/self.n
+        grad_gamma_mean *= 0.1/self.n
+        grad_gamma_dispersion *= 0.1/self.n
+        #do gradient descent
+        self.poisson_rate_parameter += grad_poisson_rate
+        self.gamma_mean_parameter += grad_gamma_mean
+        self.gamma_dispersion_parameter += grad_gamma_dispersion
+    
     class Parameters:
         """Contains regressive, autoregressive, moving average and constant
             parameters for the compound Poisson time series model
@@ -304,6 +365,8 @@ class CompoundPoissonTimeSeries:
         Attributes:
             parameters: dictionary with keys "reg", "AR", "MA", "const" with
                 corresponding values regression parameters
+            _parent: CompoundPoissonTimeSeries object containing this
+            _d_parameter_self_array: array of derivates of itself wrt parameter
         """
         
         def __init__(self, n_dim):
@@ -318,12 +381,25 @@ class CompoundPoissonTimeSeries:
             }
             self._parent = None
             self._self_array = None
+            self._d_parameter_self_array = None
         
         def convert_all_to_np(self):
+            """Convert all values in self.parameters to be numpy array
+            """
             for key, value in self.parameters.items():
                 self.parameters[key] = np.asarray(value)
+                if key == "reg":
+                    self.parameters[key] = np.reshape(
+                        self.parameters[key], self._parent.n_dim)
+                else:
+                    self.parameters[key] = np.reshape(self.parameters[key], 1)
         
         def d_self_ln_l(self):
+            """Derivate of the log likelihood wrt itself for each time step
+            
+            Returns:
+                vector of gradients
+            """
             pass
         
         def copy(self):
@@ -338,9 +414,24 @@ class CompoundPoissonTimeSeries:
             return copy
         
         def assign_parent(self, parent):
+            """Assign parent
+            
+            Assign the member variable _parent which points to the
+                CompoundPoissonTimeSeries object with owns self
+            """
             self._parent = parent
         
         def ar_term(self, index):
+            """AR term at a time step
+            
+            Returns the autoregressive term, log(self[index-1]) - constant term
+            
+            Args:
+                index: time step
+            
+            Returns:
+                the AR term at a time step
+            """
             if index > 0:
                 return (math.log(self._self_array[index-1])
                     - self.parameters["const"])
@@ -348,81 +439,111 @@ class CompoundPoissonTimeSeries:
                 return 0.0
         
         def ma_term(self, index):
+            """MA term at a time step
+            
+            Returns the moving average term, (self[index-1] -
+                expected(self[index-1])) / std(self[index-1])
+            
+            Args:
+                index: time step
+            
+            Returns:
+                the MA term at a time step
+            """
             pass
         
-        def d_parameter_ma(self, index, d_parameter_self):
+        def d_parameter_ma(self, index, key):
+            """Derivate of the MA term at a time step
+            
+            Args:
+                index: time e_step
+                key: name of the parameter to derivate wrt
+            
+            Returns:
+                derivate of the MA term
+            
+            """
             pass
         
-        def d_parameter_ln_l(self):
-            d_self_ln_l = self.d_self_ln_l()
-            d_parameter_self_array = {}
+        def reset_d_parameter_self_array(self):
+            """Reset _d_parameter_self_array
+            
+            Set all values in _d_parameter_self_array to be numpy zeros
+            
+            """
+            self._d_parameter_self_array = {}
             keys = self.parameters.keys()
             for key, value in self.parameters.items():
-                d_parameter_self_array[key] = np.zeros(
+                self._d_parameter_self_array[key] = np.zeros(
                     (self._parent.n, value.size))
-            for i in range(self._parent.n):
-                parameter_i = self._self_array[i]
-                if i != 0:
-                    parameter_i_1 = self._self_array[i-1]
-                for key in self.parameters.keys():
-                    d_parameter_self = d_parameter_self_array[key]
-                    if i == 0:
-                        if key == "reg":
-                            d_parameter_self[i,:] = (
-                                parameter_i * self._parent.x[i,:])
-                        elif key == "const":
-                            if "AR" in keys:
-                                d_parameter_self[i] = (
-                                    parameter_i * (1 - self.parameters["AR"]))
-                            else:
-                                d_parameter_self[i] = parameter_i
-                        else:
-                            d_parameter_self[i] = 0
-                    elif i == 1 and key == "AR":
-                        d_parameter_self[i] = (parameter_i
-                            * (math.log(parameter_i_1)
-                                - self.parameters["const"]))
-                    elif i == 1 and key == "MA":
-                        d_parameter_self[i] = (parameter_i * self.ma_term(i))
-                    else:
-                        if "AR" in keys:
-                            d_parameter_self[i] += (
-                                self.parameters["AR"] * d_parameter_self[i-1]
-                                / parameter_i_1)
-                        if "MA" in keys:
-                            d_parameter_self[i] += (
-                                self.parameters["MA"]
-                                * self.d_parameter_ma(
-                                    i, key, d_parameter_self_array))
-                        if key == "reg":
-                            d_parameter_self[i] +=  self._parent.x[i,:]
-                        elif key == "AR":
-                            d_parameter_self[i] += (math.log(parameter_i_1)
-                                - self.parameters["const"])
-                        elif key == "MA":
-                            d_parameter_self[i] += self.ma_term(i)
-                        elif key == "const":
-                            if "AR" in keys:
-                                d_parameter_self[i] += 1 - self.parameters["AR"]
-                            else:
-                                d_parameter_self[i] += 1
-                        d_parameter_self[i] *= parameter_i
-                for key in self.parameters.keys():
-                    d_parameter_self_array[key][i] *= d_self_ln_l[i]
+        
+        def calculate_d_parameter_self_i(self, index):
+            """Calculates the derivate of itself wrt parameter
+            
+            Modifies the member variable _d_parameter_self_array
+            """
+            parameter_i = self._self_array[index]
+            keys = self._d_parameter_self_array.keys()
+            if index > 0:
+                parameter_i_1 = self._self_array[index-1]
             for key in self.parameters.keys():
+                d_parameter_self = self._d_parameter_self_array[key]
+                if index > 0:
+                    #AR and MA terms
+                    if "AR" in keys:
+                        d_parameter_self[index] += (
+                            self.parameters["AR"] * d_parameter_self[index-1]
+                            / parameter_i_1)
+                    if "MA" in keys:
+                        d_parameter_self[index] += (
+                            self.parameters["MA"]
+                            * self.d_parameter_ma(index, key))
+                if key == "reg":
+                    d_parameter_self[index] +=  self._parent.x[index,:]
+                elif key == "AR":
+                    d_parameter_self[index] += self.ar_term(index)
+                elif key == "MA":
+                    d_parameter_self[index] += self.ma_term(index)
+                elif key == "const":
+                    d_parameter_self[index] += 1
+                    if "AR" in keys:
+                        d_parameter_self[index] -= self.parameters["AR"]
+                d_parameter_self[index] *= parameter_i
+        
+        def d_parameter_ln_l(self):
+            """The derivate of the log likelihood wrt parameters
+            """
+            d_self_ln_l = self.d_self_ln_l()
+            for key in self._d_parameter_self_array.keys():
+                for i in range(self._parent.n):
+                    self._d_parameter_self_array[key][i] *= d_self_ln_l[i]
+                value = self._d_parameter_self_array[key]
                 if value.ndim == 1:
-                    d_parameter_self_array[key] = np.sum(
-                        d_parameter_self_array[key])
+                    self._d_parameter_self_array[key] = np.sum(value)
                 else:
-                    d_parameter_self_array[key] = np.sum(
-                        d_parameter_self_array[key], 0)
-            return d_parameter_self_array
+                    self._d_parameter_self_array[key] = np.sum(value, 0)
+            gradient = CompoundPoissonTimeSeries.Parameters(self._parent.n_dim)
+            gradient.parameters = self._d_parameter_self_array
+            return gradient
+        
+        def __str__(self):
+            return self.parameters.__str__()
         
         def __getitem__(self, key):
             return self.parameters[key]
         
         def __setitem__(self, key, value):
             self.parameters[key] = value
+        
+        def __iadd__(self, other):
+            for key in self.parameters.keys():
+                self.parameters[key] += other.parameters[key]
+            return self
+        
+        def __imul__(self, other):
+            for key in self.parameters.keys():
+                self.parameters[key] *= other
+            return self
 
     class PoissonRateParameters(Parameters):
         def __init__(self, n_dim):
@@ -443,11 +564,11 @@ class CompoundPoissonTimeSeries:
             z = self._parent.z_array
             poisson_rate = self._parent.poisson_rate_array
             return z/poisson_rate - 1
-        def d_parameter_ma(self, index, key, d_parameter_self_array):
+        def d_parameter_ma(self, index, key):
             poisson_rate_before = self._parent.poisson_rate_array[index-1]
             return (-0.5*math.sqrt(poisson_rate_before)
                 *(1+self._parent.z_array[index-1]/poisson_rate_before)
-                *d_parameter_self_array[key][index-1])
+                *self._d_parameter_self_array[key][index-1])
 
     class GammaMeanParameters(Parameters):
         def __init__(self, n_dim):
@@ -474,12 +595,32 @@ class CompoundPoissonTimeSeries:
             mu = self._self_array
             phi = self._parent.gamma_dispersion_array
             return (y-z*mu) / (phi*mu*mu)
-        def d_parameter_ma(self, index, key, d_parameter_self_array):
+        def d_parameter_ma(self, index, key):
             y = self._parent.y_array[index-1]
             z = self._parent.z_array[index-1]
-            gamma_mean = self._self_array[index-1]
-            gamma_dispersion = self._parent.gamma_dispersion_array[index-1]
-            return (-(y * d_parameter_self_array[""]))
+            if z > 0:
+                gamma_mean = self._self_array[index-1]
+                gamma_dispersion = self._parent.gamma_dispersion_array[index-1]
+                d_parameter_gamma_mean = (
+                    self._d_parameter_self_array[key][index-1])
+                gamma_dispersion_parameter = (self
+                    ._parent.gamma_dispersion_parameter
+                    ._d_parameter_self_array)
+                if key in gamma_dispersion_parameter.keys():
+                    d_parameter_gamma_dispersion = (self
+                        ._parent.gamma_dispersion_parameter
+                        ._d_parameter_self_array[key][index-1])
+                else:
+                    d_parameter_gamma_dispersion = 0.0
+                return ( ( -(y * d_parameter_gamma_mean)
+                        - 0.5*(y-z*gamma_mean)*gamma_mean
+                        *d_parameter_gamma_dispersion
+                        / gamma_dispersion
+                    )
+                    / ( math.pow(gamma_mean,2) * math.pow(z,3/2)
+                        * math.sqrt(gamma_dispersion)))
+            else:
+                return 0.0
 
     class GammaDispersionParameters(Parameters):
         def __init__(self, n_dim):
@@ -498,7 +639,7 @@ class CompoundPoissonTimeSeries:
                     mu = self._self_array[i]
                     phi = self._parent.gamma_dispersion_array[i]
                     d_self_ln_l[i] = (z*(math.log(mu*phi/y)-1) + y/mu
-                        +digamma(z/phi)) / math.pow(phi,2)
+                        + digamma(z/phi)) / math.pow(phi,2)
             return d_self_ln_l
 
 def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
@@ -511,8 +652,8 @@ def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
         rng: numpy.random.RandomState object
     
     Returns:
-        y: compound Poisson random variable
-        z: latent Poisson random variable
+        tuple contain vectors of y (compound Poisson random variable) and z
+            (latent Poisson random variable)
     """
     
     z = rng.poisson(poisson_rate) #poisson random variable
@@ -551,6 +692,22 @@ def main():
     compound_poisson_time_series = CompoundPoissonTimeSeries(
         x, poisson_rate_parameters, gamma_mean_parameters,
         gamma_dispersion_parameters)
+    compound_poisson_time_series.simulate(rng)
+    
+    compound_poisson_time_series.set_parameters(
+        CompoundPoissonTimeSeries.PoissonRateParameters(1),
+        CompoundPoissonTimeSeries.GammaMeanParameters(1),
+        CompoundPoissonTimeSeries.GammaDispersionParameters(1))
+    
+    for i in range(10):
+        print(i)
+        compound_poisson_time_series.e_step()
+        compound_poisson_time_series.m_step()
+    compound_poisson_time_series.e_step()
+    print(compound_poisson_time_series.poisson_rate_parameter)
+    print(compound_poisson_time_series.gamma_mean_parameter)
+    print(compound_poisson_time_series.gamma_dispersion_parameter)
+    
     compound_poisson_time_series.simulate(rng)
     
     y = compound_poisson_time_series.y_array
@@ -625,30 +782,4 @@ def main():
     plt.show()
     plt.close()
     
-    compound_poisson_time_series.e_step()
-    
-    plt.figure()
-    plt.plot(poisson_rate_array)
-    plt.xlabel("Time (day)")
-    plt.ylabel("Poisson rate")
-    plt.savefig("../figures/simulation_lambda_estimate.png")
-    plt.show()
-    plt.close()
-
-    plt.figure()
-    plt.plot(gamma_mean_array)
-    plt.xlabel("Time (day)")
-    plt.ylabel("Mean of gamma")
-    plt.savefig("../figures/simulation_mu_estimate.png")
-    plt.show()
-    plt.close()
-    
-    plt.figure()
-    plt.plot(range(n),compound_poisson_time_series.z_array)
-    plt.xlabel("Time (day)")
-    plt.ylabel("Z")
-    plt.savefig("../figures/simulation_z_estimate.png")
-    plt.show()
-    plt.close()
-
 main()
