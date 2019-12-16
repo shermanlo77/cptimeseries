@@ -103,9 +103,9 @@ class CompoundPoissonTimeSeries:
     def simulate(self, rng):
         """Simulate a whole time series
         
-        Simulate a time series given the model fields self.x and parameters.
+        Simulate a time series given the model fields self.x and cp parameters.
             Modify the member variables poisson_rate, gamma_mean and
-            gamma_dispersion by updating it's values at each time step.
+            gamma_dispersion by updating its values at each time step.
             Also modifies self.z_array and self.y_array with the
             simulated values.
         
@@ -121,6 +121,15 @@ class CompoundPoissonTimeSeries:
                 self.poisson_rate[i], self.gamma_mean[i],
                 self.gamma_dispersion[i], rng)
     
+    def update_all_cp_parameters(self):
+        """Update all the member variables of the cp variables for all time
+        steps
+        
+        See the method update_cp_parameters(self, index)
+        """
+        for i in range(self.n):
+            self.update_cp_parameters(i)
+    
     def update_cp_parameters(self, index):
         """Update the variables of the cp variables
         
@@ -133,13 +142,42 @@ class CompoundPoissonTimeSeries:
         for parameter in self.cp_parameter_array.values():
             parameter.update_value_array(index)
     
+    def joint_log_likelihood(self):
+        """Joint log likelihood
+        
+        Returns the joint log likelihood of the compound Poisson time series
+            assuming the latent variable z are observed (via simulation or
+            estimating using the E step)
+        
+        Returns:
+            log likelihood
+        """
+        ln_l_array = np.zeros(self.n)
+        for i in range(self.n):
+            ln_l_array[i] = -self.poisson_rate[i]
+            z = self.z_array[i]
+            if z > 0:
+                y = self.y_array[i]
+                gamma_mean = self.gamma_mean[i]
+                gamma_dispersion = self.gamma_dispersion[i]
+                terms = np.zeros(6)
+                terms[0] = (-z *
+                    (math.log(gamma_mean) + math.log(gamma_dispersion))
+                    /gamma_dispersion)
+                terms[1] = -loggamma(z/gamma_dispersion)
+                terms[2] = (z/gamma_dispersion-1)*math.log(y)
+                terms[3] = -y/gamma_mean/gamma_dispersion
+                terms[4] = z*math.log(self.poisson_rate[i])
+                terms[5] = -loggamma(z+1)
+                ln_l_array[i] += np.sum(terms)
+        return np.sum(ln_l_array)
+    
     def e_step(self):
         """Does the E step of the EM algorithm
         
         Make estimates of the z and updates the poisson rate, gamma mean and
             gamma dispersion parameters for each time step. Modifies the member
-            variables z_array, poisson_rate_array, gamma_mean_array,
-            gamma_dispersion_array
+            variables z_array, poisson_rate, gamma_mean, and gamma_dispersion
         """
         #for each data point (forwards in time)
         for i in range(self.n):
@@ -152,9 +190,8 @@ class CompoundPoissonTimeSeries:
             gamma_dispersion = self.gamma_dispersion[i]
             #save the Tweedie parameters
             p = (1+2*gamma_dispersion) / (1+gamma_dispersion)
-            phi = (
-                (gamma_dispersion+1) * math.pow(poisson_rate, 1-p)
-                / math.pow(gamma_mean, p-2))
+            phi = ((gamma_dispersion+1) * math.pow(poisson_rate, 1-p)
+                * math.pow(gamma_mean, 2-p))
             self._tweedie_p_array[i] = p
             self._tweedie_phi_array[i] = phi
             
@@ -167,6 +204,30 @@ class CompoundPoissonTimeSeries:
                 #work out the expectation
                 self.z_array[i] = math.exp(
                     self.ln_sum_w(i, 1) - normalisation_constant)
+    
+    def m_step(self):
+        """Does the M step of the EM algorithm
+        
+        Estimates the parameters given the observed rainfall y and the latent
+            variable z using gradient descent. The objective function is the log
+            likelihood assuming the latent variables are observed
+        """
+        #set their member variables containing the gradients to be zero, they
+            #are calculated in the next step
+        for parameter in self.cp_parameter_array.values():
+            parameter.reset_d_parameter_self_array()
+        #for each time step, work out d itself / d parameter where itself can be
+            #poisson_rate or gamma_mean for example and parameter can be the AR
+            #or MA parameters
+        #gradient at time step i depends on gradient at time step i-1, therefore
+            #use loop over range(n)
+        for i in range(self.n):
+            self.update_cp_parameters(i)
+            for parameter in self.cp_parameter_array.values():
+                parameter.calculate_d_parameter_self_i(i)
+        for parameter in self.cp_parameter_array.values():
+            #do gradient descent
+            parameter.gradient_descent(0.1)
     
     def z_max(self, index):
         """Gets the index of the biggest term in the compound Poisson sum
@@ -220,11 +281,12 @@ class CompoundPoissonTimeSeries:
         return ln_wz
     
     def ln_sum_w(self, index, z_pow):
-        """Works out the compound Poisson sum, only important terms are summed
+        """Works out the compound Poisson sum, only important terms are summed.
+            See Dynn, Smyth (2005)
         
         Args:
             index: time step, y[index] must be positive
-            z_pow: 0,1,2,..., used for taking the sum for y^yPow * Wy which is
+            z_pow: 0,1,2,..., used for taking the sum for z^z_pow * Wy which is
                 used for taking expectations
         
         Returns:
@@ -241,7 +303,7 @@ class CompoundPoissonTimeSeries:
         #declare array of compound poisson terms
         #each term is a ratio of the compound poisson term with the maximum 
             #compound poisson term
-        #the first term is 1, that is exp[ln(W_ymax)-ln(W_ymax)] = 1;
+        #the first term is 1, that is exp[ln(w_z_max)-ln(w_z_max)] = 1;
         terms = [1]
         
         #declare booleans is_got_z_l and is_got_z_u
@@ -255,7 +317,7 @@ class CompoundPoissonTimeSeries:
         z_l = z_max
         z_u = z_max
         
-        #calculate the compound poisson terms starting at yL and working
+        #calculate the compound poisson terms starting at z_l and working
             #downwards if the lower bound is 1, can't go any lower and set
             #is_got_z_l to be true
         if z_l == 1:
@@ -307,30 +369,6 @@ class CompoundPoissonTimeSeries:
         ln_sum_w = ln_w_max + math.log(np.sum(terms))
         return ln_sum_w
     
-    def m_step(self):
-        """Does the M step of the EM algorithm
-        
-        Estimates the parameters given the observed rainfall y and the latent
-            variable z using gradient descent. The objective function is the log
-            likelihood assuming the latent variables are observed
-        """
-        #set their member variables containing the gradients to be zero, they
-            #are calculated in the next step
-        for parameter in self.cp_parameter_array.values():
-            parameter.reset_d_parameter_self_array()
-        #for each time step, work out d itself / d parameter where itself can be
-            #poisson_rate or gamma_mean for example and parameter can be the AR
-            #or MA parameters
-        #gradient at time step i depends on gradient at time step i-1, therefore
-            #use loop over range(n)
-        for i in range(self.n):
-            self.update_cp_parameters(i)
-            for parameter in self.cp_parameter_array.values():
-                parameter.calculate_d_parameter_self_i(i)
-        for parameter in self.cp_parameter_array.values():
-            #do gradient descent
-            parameter.gradient_descent(0.1)
-    
     class CompoundPoissonParameter:
         """Dynamic parameters of the compound Poisson
         
@@ -342,6 +380,12 @@ class CompoundPoissonTimeSeries:
             integer representing the time step
         Reg parameters can be obtained or set using self[key] where key can be
             "reg", "AR", "MA" or "const"
+        
+        This is an abstract class with the following methods need to be
+            implemented:
+            -ma_term(self, index)
+            -d_self_ln_l(self)
+            -d_parameter_ma(self, index, key)
         
         Attributes:
             n: number of time steps
@@ -370,6 +414,28 @@ class CompoundPoissonTimeSeries:
             self._parent = None
             self._d_reg_self_array = None
         
+        def assign_parent(self, parent):
+            """Assign parent
+            
+            Assign the member variable _parent which points to the
+                CompoundPoissonTimeSeries object which owns self
+            """
+            self._parent = parent
+            self.n = parent.n
+            self.value_array = np.zeros(self.n)
+        
+        def copy(self):
+            """Return deep copy of itself
+            """
+            copy = Parameters(self.n_dim)
+            for key, value in self.reg_parameters.items():
+                if type(value) is np.ndarray:
+                    copy[key] = value.copy()
+                else:
+                    copy[key] = value
+            copy.value_array = self.value_array.copy()
+            return copy
+        
         def convert_all_to_np(self):
             """Convert all values in self.reg_parameters to be numpy array
             """
@@ -380,35 +446,25 @@ class CompoundPoissonTimeSeries:
                 else:
                     self[key] = np.reshape(self[key], 1)
         
-        def d_self_ln_l(self):
-            """Derivate of the log likelihood wrt itself for each time step
+        def update_value_array(self, index):
+            """Update the variables of value_array
             
-            Returns:
-                vector of gradients
-            """
-            pass
-        
-        def copy(self):
-            """Return deep copy of itself
-            """
-            copy = Parameters(self.n_dim)
-            for key, value in self.reg_parameters.items():
-                if key == "reg":
-                    copy[key] = value.copy()
-                else:
-                    copy[key] = value
-            copy.value_array = self.value_array.copy()
-            return copy
-        
-        def assign_parent(self, parent):
-            """Assign parent
+            Updates and modifies the value_array at a given time step given all
+                the z before that time step.
             
-            Assign the member variable _parent which points to the
-                CompoundPoissonTimeSeries object with owns self
+            Args:
+                index: the time step to update the parameters at
             """
-            self._parent = parent
-            self.n = parent.n
-            self.value_array = np.zeros(self.n)
+            #regressive on the model fields and constant
+            exponent = 0.0
+            exponent += self["const"]
+            exponent += np.dot(self["reg"], self._parent.x[index,:])
+            if "AR" in self.reg_parameters.keys():
+                exponent += self["AR"] * self.ar_term(index)
+            if "MA" in self.reg_parameters.keys():
+                exponent += self["MA"] * self.ma_term(index)
+            #exp link function, make it positive
+            self[index] = math.exp(exponent)
         
         def ar_term(self, index):
             """AR term at a time step
@@ -440,36 +496,67 @@ class CompoundPoissonTimeSeries:
             """
             pass
         
-        def update_value_array(self, index):
-            """Update the variables of value_array
+        def gradient_descent(self, step_size):
+            """Update itself using gradient gradient_descent
             
-            Updates and modifies the value_array at a given time step given all
-                the z before that time step.
+            Modifies self.reg_parameters using gradient_descent given the model
+                fields and z_array
             
             Args:
-                index: the time step to update the parameters at
+                step_size: the size of the gradient to update the reg parameters
             """
-            #regressive on the model fields and constant
-            exponent = 0.0
-            exponent += self["const"]
-            exponent += np.dot(self["reg"], self._parent.x[index,:])
-            if "AR" in self.reg_parameters.keys():
-                exponent += self["AR"] * self.ar_term(index)
-            if "MA" in self.reg_parameters.keys():
-                exponent += self["MA"] * self.ma_term(index)
-            #exp link function, make it positive
-            self[index] = math.exp(exponent)
+            gradient = self.d_reg_ln_l()
+            for key in self.reg_parameters.keys():
+                self[key] += (step_size/self.n)*gradient[key]
         
-        def d_parameter_ma(self, index, key):
-            """Derivate of the MA term at a time step
+        def d_reg_ln_l(self):
+            """Returns the derivate of the log likelihood wrt reg parameters
             
-            Args:
-                index: time e_step
-                key: name of the parameter to derivate wrt
+            Returns a dictionary of the derivate of the log likelihood wrt reg
+                parameters. Requires the following methods to be called
+                beforehand:
+                -reset_d_parameter_self_array()
+                -calculate_d_parameter_self_i(index) where the outer loop is
+                    for each time step and the inner loop is for each reg
+                    parameter. This is required because the derivate of
+                    GammaMean.ma_term[index] depends on
+                    GammaDispersion._d_reg_self_array[index-1]. As a result, the
+                    derivate of all reg parameters must be found together for
+                    each time step
+                See the method CompoundPoissonTimeSeries.m_step(self) to see
+                example on how to call this method
             
             Returns:
-                derivate of the MA term
+                dictionary of the derivate of the log likelihood wrt reg
+                    parameters with keys "reg", "const" as well as if available
+                    "AR" and "MA"
+            """
+            d_self_ln_l = self.d_self_ln_l()
+            d_reg_ln_l = self._d_reg_self_array
+            for key in self._d_reg_self_array.keys():
+                for i in range(self.n):
+                    #chain rule
+                    d_reg_ln_l[key][i] = (
+                        self._d_reg_self_array[key][i] * d_self_ln_l[i])
+                #sum over all time steps (chain rule for partial diff)
+                value = d_reg_ln_l[key]
+                if value.ndim == 1:
+                    self._d_reg_self_array[key] = np.sum(value)
+                else:
+                    self._d_reg_self_array[key] = np.sum(value, 0)
+            #put the gradient in a CompoundPoissonParameter object and return it
+            gradient = (
+                CompoundPoissonTimeSeries.CompoundPoissonParameter(self.n_dim))
+            gradient.reg_parameters = self._d_reg_self_array
+            return gradient
+        
+        def d_self_ln_l(self):
+            """Derivate of the log likelihood wrt itself for each time step
             
+            TO BE IMPLEMENTED
+            
+            Returns:
+                vector of gradients
             """
             pass
         
@@ -477,7 +564,6 @@ class CompoundPoissonTimeSeries:
             """Reset _d_parameter_self_array
             
             Set all values in _d_parameter_self_array to be numpy zeros
-            
             """
             self._d_reg_self_array = {}
             for key, value in self.reg_parameters.items():
@@ -487,7 +573,13 @@ class CompoundPoissonTimeSeries:
         def calculate_d_parameter_self_i(self, index):
             """Calculates the derivate of itself wrt parameter
             
-            Modifies the member variable _d_parameter_self_array
+            Modifies the member variable _d_parameter_self_array with the
+                gradient of itself wrt a reg parameter. Before an iteration,
+                call the method reset_d_parameter_self_array(self) to set
+                everything in _d_parameter_self_array to be zeros
+            
+            Args:
+                index: time step to modify the array _d_parameter_self_array
             """
             parameter_i = self[index]
             keys = self._d_reg_self_array.keys()    
@@ -514,37 +606,23 @@ class CompoundPoissonTimeSeries:
                         d_parameter_self[index] -= self["AR"]
                 d_parameter_self[index] *= parameter_i
         
-        def d_parameter_ln_l(self):
-            """The derivate of the log likelihood wrt parameters
-            """
-            d_self_ln_l = self.d_self_ln_l()
-            for key in self._d_reg_self_array.keys():
-                for i in range(self.n):
-                    self._d_reg_self_array[key][i] *= d_self_ln_l[i]
-                value = self._d_reg_self_array[key]
-                if value.ndim == 1:
-                    self._d_reg_self_array[key] = np.sum(value)
-                else:
-                    self._d_reg_self_array[key] = np.sum(value, 0)
-            gradient = (
-                CompoundPoissonTimeSeries.CompoundPoissonParameter(self.n_dim))
-            gradient.reg_parameters = self._d_reg_self_array
-            return gradient
-        
-        def gradient_descent(self, step_size):
-            """Update itself using gradient gradient_descent
+        def d_parameter_ma(self, index, key):
+            """Derivate of the MA term at a time step
             
-            Modifies self.reg_parameters using gradient_descent given the model
-                fields and z_array
+            TO BE IMPLEMENTED
             
             Args:
-                step_size: the size of the gradient to update the reg parameters
+                index: time step
+                key: name of the parameter to derivate wrt
+            
+            Returns:
+                derivate of the MA term
+            
             """
-            gradient = self.d_parameter_ln_l()
-            for key in self.reg_parameters.keys():
-                self[key] += (step_size/self.n)*gradient[key]
+            pass
         
         def __str__(self):
+            #print reg_parameters
             return self.reg_parameters.__str__()
         
         def __getitem__(self, key):
@@ -705,16 +783,20 @@ def main():
     compound_poisson_time_series = CompoundPoissonTimeSeries(
         x, poisson_rate, gamma_mean, gamma_dispersion)
     compound_poisson_time_series.simulate(rng)
-    
+    print("Target", compound_poisson_time_series.joint_log_likelihood())
     
     compound_poisson_time_series.set_parameters(
         CompoundPoissonTimeSeries.PoissonRate(1),
         CompoundPoissonTimeSeries.GammaMean(1),
         CompoundPoissonTimeSeries.GammaDispersion(1))
+    compound_poisson_time_series.update_all_cp_parameters()
+    print("Start", compound_poisson_time_series.joint_log_likelihood())
     for i in range(10):
-        print(i)
         compound_poisson_time_series.e_step()
+        print("E step", compound_poisson_time_series.joint_log_likelihood())
         compound_poisson_time_series.m_step()
+        compound_poisson_time_series.update_all_cp_parameters()
+        print("M step", compound_poisson_time_series.joint_log_likelihood())
     compound_poisson_time_series.e_step()
     print(compound_poisson_time_series.poisson_rate)
     print(compound_poisson_time_series.gamma_mean)
