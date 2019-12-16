@@ -37,6 +37,9 @@ class CompoundPoissonTimeSeries:
     """
     
     _cp_sum_threshold = -37
+    _step_size = 0.1
+    _n_em = 100
+    _min_ln_l_ratio = 0.0001
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
         """
@@ -121,6 +124,35 @@ class CompoundPoissonTimeSeries:
                 self.poisson_rate[i], self.gamma_mean[i],
                 self.gamma_dispersion[i], rng)
     
+    def fit(self):
+        """Fit model
+        
+        Fit the Compound Poisson time series to the data (model fields) and y.
+            The z_array is estimated using the E step. The reg parameters are
+            estimated using the M step. The compound Poisson parameters updates
+            between each E and M step.
+        
+        Returns:
+            joint log likelihood at each EM step
+        """
+        self.e_step()
+        ln_l_array = [self.joint_log_likelihood()]
+        for i in range(CompoundPoissonTimeSeries._n_em):
+            print("step", i)
+            #do EM
+            self.m_step()
+            self.e_step()
+            #get the log liklihood before and after the EM step
+            ln_l_before = ln_l_array[i]
+            ln_l_after = self.joint_log_likelihood()
+            #save the log likelihood
+            ln_l_array.append(ln_l_after)
+            #check if the log likelihood has decreased small enough
+            if ((ln_l_before - ln_l_after)/ln_l_before
+                < CompoundPoissonTimeSeries._min_ln_l_ratio):
+                break
+        return ln_l_array
+    
     def update_all_cp_parameters(self):
         """Update all the member variables of the cp variables for all time
         steps
@@ -147,7 +179,11 @@ class CompoundPoissonTimeSeries:
         
         Returns the joint log likelihood of the compound Poisson time series
             assuming the latent variable z are observed (via simulation or
-            estimating using the E step)
+            estimating using the E step). Requires the method
+            update_all_cp_parameters() to be called beforehand or
+            update_cp_parameters(index) for index in range(self.n). Note that
+            this is done after calling e_step(), thus this method can be called
+            without any prerequisites afer calling e_step(). 
         
         Returns:
             log likelihood
@@ -208,9 +244,9 @@ class CompoundPoissonTimeSeries:
     def m_step(self):
         """Does the M step of the EM algorithm
         
-        Estimates the parameters given the observed rainfall y and the latent
-            variable z using gradient descent. The objective function is the log
-            likelihood assuming the latent variables are observed
+        Estimates the reg parameters given the observed rainfall y and the
+            latent variable z using gradient descent. The objective function is
+            the log likelihood assuming the latent variables are observed
         """
         #set their member variables containing the gradients to be zero, they
             #are calculated in the next step
@@ -222,12 +258,11 @@ class CompoundPoissonTimeSeries:
         #gradient at time step i depends on gradient at time step i-1, therefore
             #use loop over range(n)
         for i in range(self.n):
-            self.update_cp_parameters(i)
             for parameter in self.cp_parameter_array.values():
                 parameter.calculate_d_parameter_self_i(i)
         for parameter in self.cp_parameter_array.values():
             #do gradient descent
-            parameter.gradient_descent(0.1)
+            parameter.gradient_descent(CompoundPoissonTimeSeries._step_size)
     
     def z_max(self, index):
         """Gets the index of the biggest term in the compound Poisson sum
@@ -268,7 +303,7 @@ class CompoundPoissonTimeSeries:
         alpha = 1/self.gamma_dispersion[index]
         p = self._tweedie_p_array[index]
         phi = self._tweedie_phi_array[index]
-
+        
         #work out each individual term
         terms[0] = -z*alpha*math.log(p-1)
         terms[1] = z*alpha*math.log(y)
@@ -301,7 +336,7 @@ class CompoundPoissonTimeSeries:
         ln_w_max = self.ln_wz(index, z_max) + z_pow*math.log(z_max)
         
         #declare array of compound poisson terms
-        #each term is a ratio of the compound poisson term with the maximum 
+        #each term is a ratio of the compound poisson term with the maximum
             #compound poisson term
         #the first term is 1, that is exp[ln(w_z_max)-ln(w_z_max)] = 1;
         terms = [1]
@@ -346,7 +381,7 @@ class CompoundPoissonTimeSeries:
                     #set is_got_z_l to be true and raise the lower bound by 1
                     is_got_z_l = True
                     z_l += 1
-
+        
         #while we haven't got an upper bound
         while not is_got_z_u:
             #raise the upper bound by 1
@@ -364,8 +399,8 @@ class CompoundPoissonTimeSeries:
                 #set is_got_z_u to be true and lower the upper bound by 1
                 is_got_z_u = True
                 z_u -= 1
-
-        #work out the compound Poisson sum 
+        
+        #work out the compound Poisson sum
         ln_sum_w = ln_w_max + math.log(np.sum(terms))
         return ln_sum_w
     
@@ -582,7 +617,7 @@ class CompoundPoissonTimeSeries:
                 index: time step to modify the array _d_parameter_self_array
             """
             parameter_i = self[index]
-            keys = self._d_reg_self_array.keys()    
+            keys = self._d_reg_self_array.keys()
             for key in self.reg_parameters.keys():
                 d_parameter_self = self._d_reg_self_array[key]
                 if index > 0:
@@ -642,7 +677,7 @@ class CompoundPoissonTimeSeries:
                 self.reg_parameters[key] = value
             else:
                 self.value_array[key] = value
-
+    
     class PoissonRate(CompoundPoissonParameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
@@ -665,7 +700,7 @@ class CompoundPoissonTimeSeries:
             return (-0.5*math.sqrt(poisson_rate_before)
                 *(1+self._parent.z_array[index-1]/poisson_rate_before)
                 *self._d_reg_self_array[key][index-1])
-
+    
     class GammaMean(CompoundPoissonParameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
@@ -716,7 +751,7 @@ class CompoundPoissonTimeSeries:
                         * math.sqrt(gamma_dispersion)))
             else:
                 return 0.0
-
+    
     class GammaDispersion(CompoundPoissonParameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
@@ -762,48 +797,57 @@ def main():
     
     rng = random.RandomState(np.uint32(372625178))
     n = 10000
-    x = np.zeros((n,1))
+    n_dim = 2
+    x = np.zeros((n,n_dim))
     for i in range(n):
-        x[i] = 0.8*math.sin(2*math.pi/365 * i) + rng.normal()
+        for i_dim in range(n_dim):
+            x[i, i_dim] = (0.8*math.sin(2*math.pi/365 * i)
+                + (i_dim+1)*rng.normal())
     
-    poisson_rate = CompoundPoissonTimeSeries.PoissonRate(1)
-    poisson_rate["reg"] = 0.098
+    poisson_rate = CompoundPoissonTimeSeries.PoissonRate(n_dim)
+    poisson_rate["reg"] = [0.098, 0.001]
     poisson_rate["AR"] = 0.713
     poisson_rate["MA"] = 0.11
     poisson_rate["const"] = 0.355
-    gamma_mean = CompoundPoissonTimeSeries.GammaMean(1)
-    gamma_mean["reg"] = 0.066
+    gamma_mean = CompoundPoissonTimeSeries.GammaMean(n_dim)
+    gamma_mean["reg"] = [0.066, 0.002]
     gamma_mean["AR"] = 0.4
     gamma_mean["MA"] = 0.24
     gamma_mean["const"] = 1.3
-    gamma_dispersion = CompoundPoissonTimeSeries.GammaDispersion(1)
-    gamma_dispersion["reg"] = 0.07
+    gamma_dispersion = CompoundPoissonTimeSeries.GammaDispersion(n_dim)
+    gamma_dispersion["reg"] = [0.07, 0.007]
     gamma_dispersion["const"] = 0.373
     
     compound_poisson_time_series = CompoundPoissonTimeSeries(
         x, poisson_rate, gamma_mean, gamma_dispersion)
     compound_poisson_time_series.simulate(rng)
-    print("Target", compound_poisson_time_series.joint_log_likelihood())
+    
+    poisson_rate_guess = math.log(
+        n/(n- np.count_nonzero(compound_poisson_time_series.z_array)))
+    gamma_mean_guess = (np.mean(compound_poisson_time_series.y_array)
+        / poisson_rate_guess)
+    gamma_dispersion_guess = (
+        np.var(compound_poisson_time_series.y_array, ddof=1)
+        /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
+    
+    poisson_rate = CompoundPoissonTimeSeries.PoissonRate(n_dim)
+    gamma_mean = CompoundPoissonTimeSeries.GammaMean(n_dim)
+    gamma_dispersion = CompoundPoissonTimeSeries.GammaDispersion(n_dim)
+    poisson_rate["const"] = math.log(poisson_rate_guess)
+    gamma_mean["const"] = math.log(gamma_mean_guess)
+    gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
     
     compound_poisson_time_series.set_parameters(
-        CompoundPoissonTimeSeries.PoissonRate(1),
-        CompoundPoissonTimeSeries.GammaMean(1),
-        CompoundPoissonTimeSeries.GammaDispersion(1))
-    compound_poisson_time_series.update_all_cp_parameters()
-    print("Start", compound_poisson_time_series.joint_log_likelihood())
-    for i in range(10):
-        compound_poisson_time_series.e_step()
-        print("E step", compound_poisson_time_series.joint_log_likelihood())
-        compound_poisson_time_series.m_step()
-        compound_poisson_time_series.update_all_cp_parameters()
-        print("M step", compound_poisson_time_series.joint_log_likelihood())
-    compound_poisson_time_series.e_step()
+        poisson_rate, gamma_mean, gamma_dispersion)
+    print(compound_poisson_time_series.poisson_rate)
+    print(compound_poisson_time_series.gamma_mean)
+    print(compound_poisson_time_series.gamma_dispersion)
+    ln_l_array = compound_poisson_time_series.fit()
     print(compound_poisson_time_series.poisson_rate)
     print(compound_poisson_time_series.gamma_mean)
     print(compound_poisson_time_series.gamma_dispersion)
     
     compound_poisson_time_series.simulate(rng)
-    
     
     y = compound_poisson_time_series.y_array
     poisson_rate_array = compound_poisson_time_series.poisson_rate.value_array
@@ -815,21 +859,30 @@ def main():
     pacf = stats.pacf(y, nlags=10)
     
     plt.figure()
+    plt.plot(ln_l_array)
+    plt.xlabel("Number of EM steps")
+    plt.ylabel("log-likelihood")
+    plt.savefig("../figures/simulation_ln_l.png")
+    plt.show()
+    plt.close()
+    
+    plt.figure()
     plt.plot(y)
     plt.xlabel("Time (day)")
     plt.ylabel("Rainfall (mm)")
     plt.savefig("../figures/simulation_rain.png")
     plt.show()
     plt.close()
-
-    plt.figure()
-    plt.plot(x)
-    plt.xlabel("Time (day)")
-    plt.ylabel("Model field")
-    plt.savefig("../figures/simulation_model_field.png")
-    plt.show()
-    plt.close()
-
+    
+    for i_dim in range(n_dim):
+        plt.figure()
+        plt.plot(x[:,i_dim])
+        plt.xlabel("Time (day)")
+        plt.ylabel("Model field "+str(i_dim))
+        plt.savefig("../figures/simulation_model_field_"+str(i_dim)+".png")
+        plt.show()
+        plt.close()
+    
     plt.figure()
     plt.bar(np.asarray(range(acf.size)), acf)
     plt.xlabel("Time (day)")
@@ -837,7 +890,7 @@ def main():
     plt.savefig("../figures/simulation_acf.png")
     plt.show()
     plt.close()
-
+    
     plt.figure()
     plt.bar(np.asarray(range(pacf.size)), pacf)
     plt.xlabel("Time (day)")
@@ -845,7 +898,7 @@ def main():
     plt.savefig("../figures/simulation_pacf.png")
     plt.show()
     plt.close()
-
+    
     plt.figure()
     plt.plot(poisson_rate_array)
     plt.xlabel("Time (day)")
@@ -853,7 +906,7 @@ def main():
     plt.savefig("../figures/simulation_lambda.png")
     plt.show()
     plt.close()
-
+    
     plt.figure()
     plt.plot(gamma_mean_array)
     plt.xlabel("Time (day)")
@@ -861,7 +914,7 @@ def main():
     plt.savefig("../figures/simulation_mu.png")
     plt.show()
     plt.close()
-
+    
     plt.figure()
     plt.plot(gamma_dispersion_array)
     plt.xlabel("Time (day)")
