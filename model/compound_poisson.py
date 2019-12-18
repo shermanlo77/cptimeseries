@@ -26,7 +26,7 @@ class CompoundPoissonTimeSeries:
             parameters for the regressive and ARMA parameters elements
         gamma_dispersion:  GammaDispersion containing the parameter at each time 
             step and parameters for the regressive and ARMA parameters elements
-        cp_parameter_array: dictionary pointing to poisson_rate, gamma_mean and
+        cp_parameter_array: array pointing to poisson_rate, gamma_mean and
             gamma_dispersion
         z_array: latent poisson variables at each time step
         y_array: compound poisson variables at each time step
@@ -36,9 +36,15 @@ class CompoundPoissonTimeSeries:
             reparametrize using Tweedie
     """
     
+    #negative number, determines the smallest term to add in the compound
+        #Possion sum, see the method ln_sum_w, used in the E step
     _cp_sum_threshold = -37
+    #the step size for gradient descent, used in the M step
     _step_size = 0.1
+    #maximum number of EM steps
     _n_em = 100
+    #determines when to stop the EM algorithm if the log likelihood increases
+        #not very much
     _min_ln_l_ratio = 0.0001
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
@@ -55,7 +61,7 @@ class CompoundPoissonTimeSeries:
         self.poisson_rate = None
         self.gamma_mean = None
         self.gamma_dispersion = None
-        #dictionary containing poisson_rate, gamma_mean and gamma_dispersion
+        #array containing poisson_rate, gamma_mean and gamma_dispersion
         self.cp_parameter_array = None
         self.z_array = np.zeros(self.n)
         self.y_array = np.zeros(self.n)
@@ -82,12 +88,9 @@ class CompoundPoissonTimeSeries:
         self.gamma_mean = gamma_mean
         self.gamma_dispersion = gamma_dispersion
         #make dictionary of these variables
-        self.cp_parameter_array = {
-            "poisson_rate": poisson_rate,
-            "gamma_mean": gamma_mean,
-            "gamma_dispersion": gamma_dispersion
-        }
-        for parameter in self.cp_parameter_array.values():
+        self.cp_parameter_array = [poisson_rate, gamma_mean, gamma_dispersion]
+        
+        for parameter in self.cp_parameter_array:
             #assign the parameters parents as self, this is so that the
                 #parameter objects has access to all member variables and
                 #methods
@@ -171,7 +174,7 @@ class CompoundPoissonTimeSeries:
         Args:
             index: the time step to update the parameters at
         """
-        for parameter in self.cp_parameter_array.values():
+        for parameter in self.cp_parameter_array:
             parameter.update_value_array(index)
     
     def joint_log_likelihood(self):
@@ -250,17 +253,17 @@ class CompoundPoissonTimeSeries:
         """
         #set their member variables containing the gradients to be zero, they
             #are calculated in the next step
-        for parameter in self.cp_parameter_array.values():
-            parameter.reset_d_parameter_self_array()
+        for parameter in self.cp_parameter_array:
+            parameter.reset_d_reg_self_array()
         #for each time step, work out d itself / d parameter where itself can be
             #poisson_rate or gamma_mean for example and parameter can be the AR
             #or MA parameters
         #gradient at time step i depends on gradient at time step i-1, therefore
             #use loop over range(n)
         for i in range(self.n):
-            for parameter in self.cp_parameter_array.values():
-                parameter.calculate_d_parameter_self_i(i)
-        for parameter in self.cp_parameter_array.values():
+            for parameter in self.cp_parameter_array:
+                parameter.calculate_d_reg_self_i(i)
+        for parameter in self.cp_parameter_array:
             #do gradient descent
             parameter.gradient_descent(CompoundPoissonTimeSeries._step_size)
     
@@ -407,6 +410,7 @@ class CompoundPoissonTimeSeries:
     class CompoundPoissonParameter:
         """Dynamic parameters of the compound Poisson
         
+        An abstract class
         Contains the parameter at each time step as it envolves. Objects from
             this class also contains regressive parameters, such as regressive,
             autoregressive, moving average and constant for the compound
@@ -430,7 +434,7 @@ class CompoundPoissonTimeSeries:
                 names of the reg parameters
             value_array: array of values of the parameter for each time step
             _parent: CompoundPoissonTimeSeries object containing this
-            _d_parameter_self_array: dictionary containing arrays of derivates
+            _d_reg_self_array: dictionary containing arrays of derivates
                 of itself wrt reg parameters
         """
         
@@ -550,8 +554,8 @@ class CompoundPoissonTimeSeries:
             Returns a dictionary of the derivate of the log likelihood wrt reg
                 parameters. Requires the following methods to be called
                 beforehand:
-                -reset_d_parameter_self_array()
-                -calculate_d_parameter_self_i(index) where the outer loop is
+                -reset_d_reg_self_array()
+                -calculate_d_reg_self_i(index) where the outer loop is
                     for each time step and the inner loop is for each reg
                     parameter. This is required because the derivate of
                     GammaMean.ma_term[index] depends on
@@ -588,63 +592,63 @@ class CompoundPoissonTimeSeries:
         def d_self_ln_l(self):
             """Derivate of the log likelihood wrt itself for each time step
             
-            TO BE IMPLEMENTED
+            Abstract method - subclasses to implement
             
             Returns:
                 vector of gradients
             """
             pass
         
-        def reset_d_parameter_self_array(self):
-            """Reset _d_parameter_self_array
+        def reset_d_reg_self_array(self):
+            """Reset _d_reg_self_array
             
-            Set all values in _d_parameter_self_array to be numpy zeros
+            Set all values in _d_reg_self_array to be numpy zeros
             """
             self._d_reg_self_array = {}
             for key, value in self.reg_parameters.items():
                 self._d_reg_self_array[key] = np.zeros(
                     (self.n, value.size))
         
-        def calculate_d_parameter_self_i(self, index):
+        def calculate_d_reg_self_i(self, index):
             """Calculates the derivate of itself wrt parameter
             
-            Modifies the member variable _d_parameter_self_array with the
+            Modifies the member variable _d_reg_self_array with the
                 gradient of itself wrt a reg parameter. Before an iteration,
-                call the method reset_d_parameter_self_array(self) to set
-                everything in _d_parameter_self_array to be zeros
+                call the method reset_d_reg_self_array(self) to set
+                everything in _d_reg_self_array to be zeros
             
             Args:
-                index: time step to modify the array _d_parameter_self_array
+                index: time step to modify the array _d_reg_self_array
             """
             parameter_i = self[index]
             keys = self._d_reg_self_array.keys()
             for key in self.reg_parameters.keys():
-                d_parameter_self = self._d_reg_self_array[key]
+                d_reg_self = self._d_reg_self_array[key]
                 if index > 0:
                     #AR and MA terms
                     parameter_i_1 = self[index-1]
                     if "AR" in keys:
-                        d_parameter_self[index] += (self["AR"]
-                            * d_parameter_self[index-1] / parameter_i_1)
+                        d_reg_self[index] += (self["AR"]
+                            * d_reg_self[index-1] / parameter_i_1)
                     if "MA" in keys:
-                        d_parameter_self[index] += (self["MA"]
+                        d_reg_self[index] += (self["MA"]
                             * self.d_parameter_ma(index, key))
                 if key == "reg":
-                    d_parameter_self[index] +=  self._parent.x[index,:]
+                    d_reg_self[index] +=  self._parent.x[index,:]
                 elif key == "AR":
-                    d_parameter_self[index] += self.ar_term(index)
+                    d_reg_self[index] += self.ar_term(index)
                 elif key == "MA":
-                    d_parameter_self[index] += self.ma_term(index)
+                    d_reg_self[index] += self.ma_term(index)
                 elif key == "const":
-                    d_parameter_self[index] += 1
+                    d_reg_self[index] += 1
                     if "AR" in keys:
-                        d_parameter_self[index] -= self["AR"]
-                d_parameter_self[index] *= parameter_i
+                        d_reg_self[index] -= self["AR"]
+                d_reg_self[index] *= parameter_i
         
         def d_parameter_ma(self, index, key):
             """Derivate of the MA term at a time step
             
-            TO BE IMPLEMENTED
+            Abstract method - subclasses to implement
             
             Args:
                 index: time step
