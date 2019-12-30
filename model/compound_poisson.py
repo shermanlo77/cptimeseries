@@ -4,7 +4,7 @@ import numpy as np
 import numpy.random as random
 import statsmodels.tsa.stattools as stats
 
-from scipy.special import loggamma, digamma
+from scipy.special import loggamma, digamma, polygamma
 
 class CompoundPoissonTimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
@@ -45,7 +45,7 @@ class CompoundPoissonTimeSeries:
     _n_em = 100
     #determines when to stop the EM algorithm if the log likelihood increases
         #not very much
-    _min_ln_l_ratio = 0.0001
+    _min_ln_l_ratio = 0.00001
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
         """
@@ -64,6 +64,7 @@ class CompoundPoissonTimeSeries:
         #array containing poisson_rate, gamma_mean and gamma_dispersion
         self.cp_parameter_array = None
         self.z_array = np.zeros(self.n)
+        self.z_var_array = np.zeros(self.n)
         self.y_array = np.zeros(self.n)
         #array of compound poisson parameters in Tweedie form
         self._tweedie_phi_array = np.zeros(self.n)
@@ -197,17 +198,20 @@ class CompoundPoissonTimeSeries:
             z = self.z_array[i]
             if z > 0:
                 y = self.y_array[i]
+                z_var = self.z_var_array[i]
                 gamma_mean = self.gamma_mean[i]
                 gamma_dispersion = self.gamma_dispersion[i]
-                terms = np.zeros(6)
+                terms = np.zeros(7)
                 terms[0] = (-z *
                     (math.log(gamma_mean) + math.log(gamma_dispersion))
                     /gamma_dispersion)
                 terms[1] = -loggamma(z/gamma_dispersion)
-                terms[2] = (z/gamma_dispersion-1)*math.log(y)
-                terms[3] = -y/gamma_mean/gamma_dispersion
-                terms[4] = z*math.log(self.poisson_rate[i])
-                terms[5] = -loggamma(z+1)
+                terms[2] = (-0.5*z_var*polygamma(1,z/gamma_dispersion)
+                    /math.pow(gamma_dispersion,2))
+                terms[3] = (z/gamma_dispersion-1)*math.log(y)
+                terms[4] = -y/gamma_mean/gamma_dispersion
+                terms[5] = z*math.log(self.poisson_rate[i])
+                terms[6] = -loggamma(z+1)
                 ln_l_array[i] += np.sum(terms)
         return np.sum(ln_l_array)
     
@@ -243,6 +247,9 @@ class CompoundPoissonTimeSeries:
                 #work out the expectation
                 self.z_array[i] = math.exp(
                     self.ln_sum_w(i, 1) - normalisation_constant)
+                self.z_var_array[i] = (math.exp(
+                    self.ln_sum_w(i, 2) - normalisation_constant)
+                    - math.pow(self.z_array[i],2))
     
     def m_step(self):
         """Does the M step of the EM algorithm
@@ -769,8 +776,14 @@ class CompoundPoissonTimeSeries:
                     y = self._parent.y_array[i]
                     mu = self[i]
                     phi = self._parent.gamma_dispersion[i]
-                    d_self_ln_l[i] = (z*(math.log(mu*phi/y)-1) + y/mu
-                        + digamma(z/phi)) / math.pow(phi,2)
+                    z_var = self._parent.z_var_array[i]
+                    terms = np.zeros(5)
+                    terms[0] = z*math.log(mu*phi/y)
+                    terms[1] = y/mu - z
+                    terms[2] = z*digamma(z/phi)
+                    terms[3] = z_var*polygamma(1,z/phi)/phi
+                    terms[4] = 0.5*z*z_var*polygamma(2,z/phi)/ math.pow(phi,2)
+                    d_self_ln_l[i] = np.sum(terms) / math.pow(phi,2)
             return d_self_ln_l
 
 def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
