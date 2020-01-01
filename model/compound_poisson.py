@@ -37,10 +37,6 @@ class CompoundPoissonTimeSeries:
         n_em: number of EM steps
         min_ln_l_ratio: determines when to stop the EM algorithm if the log
             likelihood increases not very much
-        _tweedie_p_array: index parameter for each time step, a reparametrize
-            using Tweedie
-        _tweedie_phi_array: dispersion parameter for each time step, a
-            reparametrize using Tweedie
     """
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
@@ -67,10 +63,6 @@ class CompoundPoissonTimeSeries:
         self.step_size = 0.1
         self.n_em = 10
         self.min_ln_l_ratio = 0.0001
-        
-        #array of compound poisson parameters in Tweedie form
-        self._tweedie_phi_array = np.zeros(self.n)
-        self._tweedie_p_array = np.zeros(self.n)
         
         self.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
     
@@ -243,17 +235,6 @@ class CompoundPoissonTimeSeries:
             #update the parameter at this time step
             self.update_cp_parameters(i)
             
-            #get the parameters
-            poisson_rate = self.poisson_rate[i]
-            gamma_mean = self.gamma_mean[i]
-            gamma_dispersion = self.gamma_dispersion[i]
-            #save the Tweedie parameters
-            p = (1+2*gamma_dispersion) / (1+gamma_dispersion)
-            phi = ((gamma_dispersion+1) * math.pow(poisson_rate, 1-p)
-                * math.pow(gamma_mean, 2-p))
-            self._tweedie_p_array[i] = p
-            self._tweedie_phi_array[i] = phi
-            
             #if the rainfall is zero, then z is zero (it has not rained)
             if self.y_array[i] == 0:
                 self.z_array[i] = 0
@@ -289,57 +270,6 @@ class CompoundPoissonTimeSeries:
         for parameter in self.cp_parameter_array:
             #do gradient descent
             parameter.gradient_descent()
-    
-    def z_max(self, index):
-        """Gets the index of the biggest term in the compound Poisson sum
-        
-        Args:
-            index: time step, y[index] must be positive
-        
-        Returns:
-            positive integer, index of the biggest term in the compound Poisson
-                sum
-        """
-        #get the optima with respect to the sum index, then round it to get an
-            #integer
-        y = self.y_array[index]
-        p = self._tweedie_p_array[index]
-        phi = self._tweedie_phi_array[index]
-        z_max = round(math.exp((2-p)*math.log(y)-math.log(phi)-math.log(2-p)))
-        #if the integer is 0, then set the index to 1
-        if z_max == 0:
-            z_max = 1
-        return z_max
-    
-    def ln_wz(self, index, z):
-        """Return a log term from the compound Poisson sum
-        
-        Args:
-            index: time step, y[index] must be positive
-            z: Poisson variable or index of the sum element
-        
-        Returns:
-            log compopund Poisson term
-        """
-        
-        #declare array of terms to be summed to work out ln_wz
-        terms = np.zeros(6)
-        #retrieve variables
-        y = self.y_array[index]
-        alpha = 1/self.gamma_dispersion[index]
-        p = self._tweedie_p_array[index]
-        phi = self._tweedie_phi_array[index]
-        
-        #work out each individual term
-        terms[0] = -z*alpha*math.log(p-1)
-        terms[1] = z*alpha*math.log(y)
-        terms[2] = -z*(1+alpha)*math.log(phi)
-        terms[3] = -z*math.log(2-p)
-        terms[4] = -loggamma(1+z)
-        terms[5] = -loggamma(alpha*z)
-        #sum the terms to get the log compound Poisson sum term
-        ln_wz = np.sum(terms)
-        return ln_wz
     
     def ln_sum_w(self, index, z_pow):
         """Works out the compound Poisson sum, only important terms are summed.
@@ -429,6 +359,63 @@ class CompoundPoissonTimeSeries:
         #work out the compound Poisson sum
         ln_sum_w = ln_w_max + math.log(np.sum(terms))
         return ln_sum_w
+    
+    def z_max(self, index):
+        """Gets the index of the biggest term in the compound Poisson sum
+        
+        Args:
+            index: time step, y[index] must be positive
+        
+        Returns:
+            positive integer, index of the biggest term in the compound Poisson
+                sum
+        """
+        #get the optima with respect to the sum index, then round it to get an
+            #integer
+        y = self.y_array[index]
+        poisson_rate = self.poisson_rate[index]
+        gamma_mean = self.gamma_mean[index]
+        gamma_dispersion = self.gamma_dispersion[index]
+        terms = np.zeros(3)
+        terms[0] = math.log(y)
+        terms[1] = math.pow(poisson_rate, gamma_dispersion)
+        terms[2] = -math.log(gamma_mean)
+        z_max = math.exp(np.sum(terms)/(gamma_dispersion+1))
+        z_max = round(z_max)
+        #if the integer is 0, then set the index to 1
+        if z_max == 0:
+            z_max = 1
+        return z_max
+    
+    def ln_wz(self, index, z):
+        """Return a log term from the compound Poisson sum
+        
+        Args:
+            index: time step, y[index] must be positive
+            z: Poisson variable or index of the sum element
+        
+        Returns:
+            log compopund Poisson term
+        """
+        
+        #declare array of terms to be summed to work out ln_wz
+        terms = np.zeros(6)
+        #retrieve variables
+        y = self.y_array[index]
+        poisson_rate = self.poisson_rate[index]
+        gamma_mean = self.gamma_mean[index]
+        gamma_dispersion = self.gamma_dispersion[index]
+        
+        #work out each individual term
+        terms[0] = -z*math.log(gamma_dispersion)/gamma_dispersion
+        terms[1] = -z*math.log(gamma_mean)/gamma_dispersion
+        terms[2] = -loggamma(z/gamma_dispersion)
+        terms[3] = z*math.log(y)/gamma_dispersion
+        terms[4] = z*math.log(poisson_rate)
+        terms[5] = -loggamma(1+z)
+        #sum the terms to get the log compound Poisson sum term
+        ln_wz = np.sum(terms)
+        return ln_wz
     
     class CompoundPoissonParameter:
         """Dynamic parameters of the compound Poisson
