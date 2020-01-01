@@ -30,22 +30,18 @@ class CompoundPoissonTimeSeries:
             gamma_dispersion
         z_array: latent poisson variables at each time step
         y_array: compound poisson variables at each time step
+        cp_sum_threshold: negative number, determines the smallest term to add
+            in the compound #Possion sum, see the method ln_sum_w, used in the E
+            step
+        step_size: the step size for gradient descent, used in the M step
+        n_em: number of EM steps
+        min_ln_l_ratio: determines when to stop the EM algorithm if the log
+            likelihood increases not very much
         _tweedie_p_array: index parameter for each time step, a reparametrize
             using Tweedie
         _tweedie_phi_array: dispersion parameter for each time step, a
             reparametrize using Tweedie
     """
-    
-    #negative number, determines the smallest term to add in the compound
-        #Possion sum, see the method ln_sum_w, used in the E step
-    _cp_sum_threshold = -37
-    #the step size for gradient descent, used in the M step
-    _step_size = 0.1
-    #maximum number of EM steps
-    _n_em = 100
-    #determines when to stop the EM algorithm if the log likelihood increases
-        #not very much
-    _min_ln_l_ratio = 0.00001
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
         """
@@ -66,6 +62,12 @@ class CompoundPoissonTimeSeries:
         self.z_array = np.zeros(self.n)
         self.z_var_array = np.zeros(self.n)
         self.y_array = np.zeros(self.n)
+        
+        self.cp_sum_threshold = -37
+        self.step_size = 0.1
+        self.n_em = 10
+        self.min_ln_l_ratio = 0.0001
+        
         #array of compound poisson parameters in Tweedie form
         self._tweedie_phi_array = np.zeros(self.n)
         self._tweedie_p_array = np.zeros(self.n)
@@ -141,21 +143,35 @@ class CompoundPoissonTimeSeries:
         """
         self.e_step()
         ln_l_array = [self.joint_log_likelihood()]
-        for i in range(CompoundPoissonTimeSeries._n_em):
+        for i in range(self.n_em):
             print("step", i)
             #do EM
             self.m_step()
             self.e_step()
-            #get the log liklihood before and after the EM step
-            ln_l_before = ln_l_array[i]
-            ln_l_after = self.joint_log_likelihood()
             #save the log likelihood
-            ln_l_array.append(ln_l_after)
+            ln_l_array.append(self.joint_log_likelihood())
             #check if the log likelihood has decreased small enough
-            if ((ln_l_before - ln_l_after)/ln_l_before
-                < CompoundPoissonTimeSeries._min_ln_l_ratio):
+            if self.has_converge(ln_l_array):
                 break
         return ln_l_array
+    
+    def has_converge(self, ln_l_array):
+        """Set convergence criterion from the likelihood
+        
+        During the EM algorithm, the algorithm may stop if the log likelihood
+            does not increase any more. This function returns True if this is
+            the case
+        
+        Args:
+            ln_l_array: array of log likelihoods at each step, does not include
+                future steps
+        
+        Returns:
+            boolean, True if the likelihood is considered converged
+        """
+        ln_l_before = ln_l_array[len(ln_l_array)-2]
+        ln_l_after = ln_l_array[len(ln_l_array)-1]
+        return (ln_l_before - ln_l_after)/ln_l_before < self.min_ln_l_ratio
     
     def update_all_cp_parameters(self):
         """Update all the member variables of the cp variables for all time
@@ -272,7 +288,7 @@ class CompoundPoissonTimeSeries:
                 parameter.calculate_d_reg_self_i(i)
         for parameter in self.cp_parameter_array:
             #do gradient descent
-            parameter.gradient_descent(CompoundPoissonTimeSeries._step_size)
+            parameter.gradient_descent()
     
     def z_max(self, index):
         """Gets the index of the biggest term in the compound Poisson sum
@@ -383,7 +399,7 @@ class CompoundPoissonTimeSeries:
                 log_ratio = np.sum(
                     [self.ln_wz(index, z_l), z_pow*math.log(z_l), -ln_w_max])
                 #if this log ratio is bigger than the threshold
-                if log_ratio > CompoundPoissonTimeSeries._cp_sum_threshold:
+                if log_ratio > self.cp_sum_threshold:
                     #append the ratio to the array of terms
                     terms.append(math.exp(log_ratio))
                 else:
@@ -401,7 +417,7 @@ class CompoundPoissonTimeSeries:
             log_ratio = np.sum(
                 [self.ln_wz(index, z_u), z_pow*math.log(z_u), -ln_w_max])
             #if this log ratio is bigger than the threshold
-            if log_ratio > CompoundPoissonTimeSeries._cp_sum_threshold:
+            if log_ratio > self.cp_sum_threshold:
                 #append the ratio to the array of terms
                 terms.append(math.exp(log_ratio))
             else:
@@ -542,18 +558,34 @@ class CompoundPoissonTimeSeries:
             """
             pass
         
-        def gradient_descent(self, step_size):
-            """Update itself using gradient gradient_descent
+        def gradient_descent(self):
+            """Update itself using gradient descent
             
             Modifies self.reg_parameters using gradient_descent given the model
-                fields and z_array
-            
-            Args:
-                step_size: the size of the gradient to update the reg parameters
+                fields and z_array. Requires calculate_d_reg_self_i() to be
+                called for all index. See the method m_step in
+                CompoundPoissonTimeSeries
             """
             gradient = self.d_reg_ln_l()
             for key in self.reg_parameters.keys():
-                self[key] += (step_size/self.n)*gradient[key]
+                self[key] += (self._parent.step_size/self.n)*gradient[key]
+        
+        def stochastic_gradient_descent(self, index):
+            """Update itself using stochastic gradient descent
+            
+            Modifies self.reg_parameters using gradient_descent given the model
+                fields and z_array. Requires calculate_d_reg_self_i() to be
+                called for all index up to the args index. See the method m_step
+                in CompoundPoissonTimeSeriesSgd
+            
+            Args:
+                index: the point in the time series to be used for stochastic
+                    gradient descent
+            """
+            d_self_ln_l = self.d_self_ln_l(index)
+            for key in self._d_reg_self_array.keys():
+                self[key] += (self._parent.step_size
+                    * (self._d_reg_self_array[key][index]* d_self_ln_l))
         
         def d_reg_ln_l(self):
             """Returns the derivate of the log likelihood wrt reg parameters
@@ -577,7 +609,7 @@ class CompoundPoissonTimeSeries:
                     parameters with keys "reg", "const" as well as if available
                     "AR" and "MA"
             """
-            d_self_ln_l = self.d_self_ln_l()
+            d_self_ln_l = self.d_self_ln_l_all()
             d_reg_ln_l = self._d_reg_self_array
             for key in self._d_reg_self_array.keys():
                 for i in range(self.n):
@@ -596,13 +628,29 @@ class CompoundPoissonTimeSeries:
             gradient.reg_parameters = self._d_reg_self_array
             return gradient
         
-        def d_self_ln_l(self):
-            """Derivate of the log likelihood wrt itself for each time step
+        def d_self_ln_l_all(self):
+            """Derivate of the log likelihood wrt itself for all time steps
             
-            Abstract method - subclasses to implement
+            Seethe method d_reg_ln_l() for any requirements
             
             Returns:
                 vector of gradients
+            """
+            d_self_ln_l = np.zeros(self.n)
+            for i in range(self.n):
+                d_self_ln_l[i] = self.d_self_ln_l(i)
+            return d_self_ln_l
+            
+        def d_self_ln_l(self, index):
+            """Derivate of the log likelihood wrt itself for a given time step
+            
+            Abstract method - subclasses to implement
+            
+            Args:
+                index: time step
+            
+            Returns:
+                gradient
             """
             pass
         
@@ -702,13 +750,13 @@ class CompoundPoissonTimeSeries:
                     / math.sqrt(poisson_rate_before))
             else:
                 return 0.0
-        def d_self_ln_l(self):
-            z = self._parent.z_array
-            poisson_rate = self.value_array
+        def d_self_ln_l(self, index):
+            z = self._parent.z_array[index]
+            poisson_rate = self.value_array[index]
             return z/poisson_rate - 1
         def d_parameter_ma(self, index, key):
             poisson_rate_before = self[index-1]
-            return (-0.5*math.sqrt(poisson_rate_before)
+            return (-0.5*math.pow(poisson_rate_before, -0.5)
                 *(1+self._parent.z_array[index-1]/poisson_rate_before)
                 *self._d_reg_self_array[key][index-1])
     
@@ -724,7 +772,7 @@ class CompoundPoissonTimeSeries:
                     y_before = self._parent.y_array[index-1]
                     self_before = self[index-1]
                     return (
-                        (y_before/z_before - self_before)
+                        (y_before - z_before*self_before)
                         / self_before
                         / math.sqrt(
                             self._parent.gamma_dispersion[index-1]
@@ -733,12 +781,12 @@ class CompoundPoissonTimeSeries:
                     return 0.0
             else:
                 return 0.0
-        def d_self_ln_l(self):
-            y = self._parent.y_array
-            z = self._parent.z_array
-            mu = self.value_array
-            phi = self._parent.gamma_dispersion.value_array
-            return (y-z*mu) / (phi*mu*mu)
+        def d_self_ln_l(self, index):
+            y = self._parent.y_array[index]
+            z = self._parent.z_array[index]
+            mu = self[index]
+            phi = self._parent.gamma_dispersion[index]
+            return (y-z*mu) / (phi*math.pow(mu,2))
         def d_parameter_ma(self, index, key):
             y = self._parent.y_array[index-1]
             z = self._parent.z_array[index-1]
@@ -753,38 +801,95 @@ class CompoundPoissonTimeSeries:
                 else:
                     d_reg_gamma_dispersion = 0.0
                 gamma_dispersion = gamma_dispersion[index-1]
-                return ( ( -(y * d_reg_gamma_mean)
+                return (
+                    (
+                        -(y * d_reg_gamma_mean)
                         - 0.5*(y-z*gamma_mean)*gamma_mean
-                        *d_reg_gamma_dispersion
-                        / gamma_dispersion
+                        * math.sqrt(z/gamma_dispersion)
+                        * d_reg_gamma_dispersion
                     )
-                    / ( math.pow(gamma_mean,2) * math.pow(z,3/2)
-                        * math.sqrt(gamma_dispersion)))
+                    /
+                    (
+                        math.pow(gamma_mean,2)*z*gamma_dispersion
+                    )
+                )
             else:
                 return 0.0
     
     class GammaDispersion(CompoundPoissonParameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
-        def d_self_ln_l(self):
-            d_self_ln_l = np.zeros(self.n)
-            for i in range(self.n):
-                z = self._parent.z_array[i]
-                if z == 0:
-                    d_self_ln_l[i] = 0
-                else:
-                    y = self._parent.y_array[i]
-                    mu = self[i]
-                    phi = self._parent.gamma_dispersion[i]
-                    z_var = self._parent.z_var_array[i]
-                    terms = np.zeros(5)
-                    terms[0] = z*math.log(mu*phi/y)
-                    terms[1] = y/mu - z
-                    terms[2] = z*digamma(z/phi)
-                    terms[3] = z_var*polygamma(1,z/phi)/phi
-                    terms[4] = 0.5*z*z_var*polygamma(2,z/phi)/ math.pow(phi,2)
-                    d_self_ln_l[i] = np.sum(terms) / math.pow(phi,2)
-            return d_self_ln_l
+        def d_self_ln_l(self, index):
+            z = self._parent.z_array[index]
+            if z == 0:
+                return 0
+            else:
+                y = self._parent.y_array[index]
+                mu = self._parent.gamma_mean[index]
+                phi = self[index]
+                z_var = self._parent.z_var_array[index]
+                terms = np.zeros(5)
+                terms[0] = z*math.log(mu*phi/y)
+                terms[1] = y/mu - z
+                terms[2] = z*digamma(z/phi)
+                terms[3] = z_var*polygamma(1,z/phi)/phi
+                terms[4] = 0.5*z*z_var*polygamma(2,z/phi)/ math.pow(phi,2)
+                return np.sum(terms) / math.pow(phi,2)
+
+class CompoundPoissonTimeSeriesSgd(CompoundPoissonTimeSeries):
+    """Compound Poisson Time Series which uses stochastic gradient descent for
+        optimisation
+    
+    Attributes:
+        _rng: random number generator to generate a random permutation to select
+            time points at random
+        _permutation_iter: iterator for the permutation of index
+    """
+    
+    def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
+        super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
+        self.step_size = 0.01
+        self.n_em = 50
+        self._rng = random.RandomState(np.uint32(672819639))
+        self._permutation_iter = self._rng.permutation(self.n).__iter__()
+    
+    def has_converge(self, ln_l_array):
+        #likelihood is stochastic, no covergence criterion
+        return False
+    
+    def m_step(self):
+        """Does the M step of the EM algorithm
+        
+        Estimates the reg parameters given the observed rainfall y and the
+            latent variable z using stochastic gradient descent.
+        """
+        #set their member variables containing the gradients to be zero, they
+            #are calculated in the next step
+        for parameter in self.cp_parameter_array:
+            parameter.reset_d_reg_self_array()
+        index = self.get_next_permutation()
+        #work out the gradients for all points up to index
+        for i in range(index+1):
+            for parameter in self.cp_parameter_array:
+                parameter.calculate_d_reg_self_i(i)
+        for parameter in self.cp_parameter_array:
+            #do stochastic gradient descent
+            parameter.stochastic_gradient_descent(index)
+    
+    def get_next_permutation(self):
+        """Returns a index from a random permutation
+        
+        Returns an interger which is from a random permutation. Once all index
+            has been used, a new permutation is generated
+        
+        Returns:
+            integer, index from random permutation
+        """
+        try:
+            return self._permutation_iter.__next__()
+        except StopIteration:
+            self._permutation_iter = self._rng.permutation(self.n).__iter__()
+            return self._permutation_iter.__next__()
 
 def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
     """Simulate a single compound poisson random variable
@@ -802,11 +907,7 @@ def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
     
     z = rng.poisson(poisson_rate) #poisson random variable
     shape = z / gamma_dispersion #gamma shape parameter
-    #if z is zero, set the parameters of the gamma distribution to be zero
-    if z > 0:
-        scale = gamma_mean/shape
-    else:
-        scale = 0
+    scale = gamma_mean * gamma_dispersion #gamma scale parameter
     y = rng.gamma(shape, scale=scale) #gamma random variable
     return (y, z)
 
@@ -823,17 +924,17 @@ def main():
     
     poisson_rate = CompoundPoissonTimeSeries.PoissonRate(n_dim)
     poisson_rate["reg"] = [0.098, 0.001]
-    poisson_rate["AR"] = 0.713
-    poisson_rate["MA"] = 0.11
-    poisson_rate["const"] = 0.355
+    poisson_rate["AR"] = 0.13
+    poisson_rate["MA"] = 0.19
+    poisson_rate["const"] = 0.42
     gamma_mean = CompoundPoissonTimeSeries.GammaMean(n_dim)
     gamma_mean["reg"] = [0.066, 0.002]
-    gamma_mean["AR"] = 0.4
-    gamma_mean["MA"] = 0.24
-    gamma_mean["const"] = 1.3
+    gamma_mean["AR"] = 0.1
+    gamma_mean["MA"] = 0.1
+    gamma_mean["const"] = 0.89
     gamma_dispersion = CompoundPoissonTimeSeries.GammaDispersion(n_dim)
     gamma_dispersion["reg"] = [0.07, 0.007]
-    gamma_dispersion["const"] = 0.373
+    gamma_dispersion["const"] = 0.12
     
     compound_poisson_time_series = CompoundPoissonTimeSeries(
         x, poisson_rate, gamma_mean, gamma_dispersion)
