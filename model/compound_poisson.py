@@ -61,7 +61,7 @@ class CompoundPoissonTimeSeries:
         
         self.cp_sum_threshold = -37
         self.step_size = 0.1
-        self.n_em = 10
+        self.n_em = 100
         self.min_ln_l_ratio = 0.0001
         
         self.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
@@ -207,19 +207,19 @@ class CompoundPoissonTimeSeries:
             if z > 0:
                 y = self.y_array[i]
                 z_var = self.z_var_array[i]
+                poisson_rate = self.poisson_rate[i]
                 gamma_mean = self.gamma_mean[i]
                 gamma_dispersion = self.gamma_dispersion[i]
                 terms = np.zeros(7)
-                terms[0] = (-z *
-                    (math.log(gamma_mean) + math.log(gamma_dispersion))
-                    /gamma_dispersion)
+                terms[0] = (-z/gamma_dispersion *
+                    (math.log(gamma_mean) + math.log(gamma_dispersion)))
                 terms[1] = -loggamma(z/gamma_dispersion)
-                terms[2] = (-0.5*z_var*polygamma(1,z/gamma_dispersion)
-                    /math.pow(gamma_dispersion,2))
-                terms[3] = (z/gamma_dispersion-1)*math.log(y)
-                terms[4] = -y/gamma_mean/gamma_dispersion
-                terms[5] = z*math.log(self.poisson_rate[i])
-                terms[6] = -loggamma(z+1)
+                terms[2] = (z/gamma_dispersion-1)*math.log(y)
+                terms[3] = -y/gamma_mean/gamma_dispersion
+                terms[4] = z*math.log(poisson_rate)
+                terms[5] = -loggamma(z+1)
+                terms[6] = -(0.5*z_var*polygamma(1, z/gamma_dispersion)
+                    /math.pow(gamma_dispersion, 2))
                 ln_l_array[i] += np.sum(terms)
         return np.sum(ln_l_array)
     
@@ -676,14 +676,14 @@ class CompoundPoissonTimeSeries:
                         d_reg_self[index] += (self["MA"]
                             * self.d_parameter_ma(index, key))
                 if key == "reg":
-                    d_reg_self[index] +=  self._parent.x[index,:]
+                    d_reg_self[index] += self._parent.x[index,:]
                 elif key == "AR":
                     d_reg_self[index] += self.ar_term(index)
                 elif key == "MA":
                     d_reg_self[index] += self.ma_term(index)
                 elif key == "const":
                     d_reg_self[index] += 1
-                    if "AR" in keys:
+                    if "AR" in keys and index > 0:
                         d_reg_self[index] -= self["AR"]
                 d_reg_self[index] *= parameter_i
         
@@ -742,9 +742,9 @@ class CompoundPoissonTimeSeries:
             poisson_rate = self.value_array[index]
             return z/poisson_rate - 1
         def d_parameter_ma(self, index, key):
-            poisson_rate_before = self[index-1]
-            return (-0.5*math.pow(poisson_rate_before, -0.5)
-                *(1+self._parent.z_array[index-1]/poisson_rate_before)
+            poisson_rate = self[index-1]
+            z = self._parent.z_array[index-1]
+            return (-0.5*(z+poisson_rate) / math.pow(poisson_rate, 3/2)
                 *self._d_reg_self_array[key][index-1])
     
     class GammaMean(CompoundPoissonParameter):
@@ -780,8 +780,7 @@ class CompoundPoissonTimeSeries:
             if z > 0:
                 gamma_mean = self[index-1]
                 gamma_dispersion = self._parent.gamma_dispersion
-                d_reg_gamma_mean = (
-                    self._d_reg_self_array[key][index-1])
+                d_reg_gamma_mean = self._d_reg_self_array[key][index-1]
                 if key in gamma_dispersion.reg_parameters.keys():
                     d_reg_gamma_dispersion = (gamma_dispersion
                         ._d_reg_self_array[key][index-1])
@@ -791,13 +790,12 @@ class CompoundPoissonTimeSeries:
                 return (
                     (
                         -(y * d_reg_gamma_mean)
-                        - 0.5*(y-z*gamma_mean)*gamma_mean
-                        * math.sqrt(z/gamma_dispersion)
+                        - 0.5*(y-z*gamma_mean)*gamma_mean/gamma_dispersion
                         * d_reg_gamma_dispersion
                     )
                     /
                     (
-                        math.pow(gamma_mean,2)*z*gamma_dispersion
+                        math.pow(gamma_mean,2)*math.sqrt(z*gamma_dispersion)
                     )
                 )
             else:
@@ -815,12 +813,14 @@ class CompoundPoissonTimeSeries:
                 mu = self._parent.gamma_mean[index]
                 phi = self[index]
                 z_var = self._parent.z_var_array[index]
-                terms = np.zeros(5)
-                terms[0] = z*math.log(mu*phi/y)
-                terms[1] = y/mu - z
-                terms[2] = z*digamma(z/phi)
-                terms[3] = z_var*polygamma(1,z/phi)/phi
-                terms[4] = 0.5*z*z_var*polygamma(2,z/phi)/ math.pow(phi,2)
+                terms = np.zeros(7)
+                terms[0] = z*math.log(mu)
+                terms[1] = z*math.log(phi)
+                terms[2] = -z*math.log(y)
+                terms[3] = y/mu - z
+                terms[4] = z*digamma(z/phi)
+                terms[5] = z_var*polygamma(1,z/phi)/phi
+                terms[6] = 0.5*z*z_var*polygamma(2,z/phi)/ math.pow(phi,2)
                 return np.sum(terms) / math.pow(phi,2)
 
 class CompoundPoissonTimeSeriesSgd(CompoundPoissonTimeSeries):
