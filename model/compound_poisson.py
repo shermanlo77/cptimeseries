@@ -59,9 +59,8 @@ class CompoundPoissonTimeSeries:
         self.z_var_array = np.zeros(self.n)
         self.y_array = np.zeros(self.n)
         
-        self.cp_sum_threshold = -37
         self.step_size = 0.1
-        self.n_em = 100
+        self.n_em = 10
         self.min_ln_l_ratio = 0.0001
         
         self.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
@@ -240,12 +239,15 @@ class CompoundPoissonTimeSeries:
                 self.z_array[i] = 0
             else:
                 #work out the normalisation constant for the expectation
-                normalisation_constant = self.ln_sum_w(i, 0)
+                sum = CompoundPoissonTimeSeries.Sum(self, i)
+                normalisation_constant = sum.ln_sum_w()
                 #work out the expectation
+                sum = CompoundPoissonTimeSeries.SumZ(self, i)
                 self.z_array[i] = math.exp(
-                    self.ln_sum_w(i, 1) - normalisation_constant)
+                    sum.ln_sum_w() - normalisation_constant)
+                sum = CompoundPoissonTimeSeries.SumZ2(self, i)
                 self.z_var_array[i] = (math.exp(
-                    self.ln_sum_w(i, 2) - normalisation_constant)
+                    sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
     
     def m_step(self):
@@ -271,151 +273,183 @@ class CompoundPoissonTimeSeries:
             #do gradient descent
             parameter.gradient_descent()
     
-    def ln_sum_w(self, index, z_pow):
+    class Sum:
+        
         """Works out the compound Poisson sum, only important terms are summed.
             See Dynn, Smyth (2005)
         
-        Args:
-            index: time step, y[index] must be positive
-            z_pow: 0,1,2,..., used for taking the sum for z^z_pow * Wy which is
-                used for taking expectations
-        
-        Returns:
-            log compound Poisson sum
+        Attributes:
+            y
+            poisson_rate
+            gamma_mean
+            gamma_dispersion
         """
         
-        y = self.y_array[index]
+        cp_sum_threshold = -37
         
-        #get the y with the biggest term in the compound Poisson sum
-        z_max = self.z_max(index)
-        #get the biggest log compound Poisson term + any expectation terms
-        ln_w_max = self.ln_wz(index, z_max) + z_pow*math.log(z_max)
+        def __init__(self, parent, index):
+            self.y = parent.y_array[index]
+            self.poisson_rate = parent.poisson_rate[index]
+            self.gamma_mean = parent.gamma_mean[index]
+            self.gamma_dispersion = parent.gamma_dispersion[index]
         
-        #declare array of compound poisson terms
-        #each term is a ratio of the compound poisson term with the maximum
-            #compound poisson term
-        #the first term is 1, that is exp[ln(w_z_max)-ln(w_z_max)] = 1;
-        terms = [1]
+        def log_expectation_term(self, z):
+            """Multiple each term in the sum by exp(this return value)
+            
+            Can be override if want to take for example expectation
+            """
+            return 0
         
-        #declare booleans is_got_z_l and is_got_z_u
-        #these are true if we got the lower and upper bound respectively for
-            #the compound Poisson sum
-        is_got_z_l = False
-        is_got_z_u = False
-        
-        #declare the summation bounds, z_l for the lower bound, z_u for the
-            #upper bound
-        z_l = z_max
-        z_u = z_max
-        
-        #calculate the compound poisson terms starting at z_l and working
-            #downwards if the lower bound is 1, can't go any lower and set
-            #is_got_z_l to be true
-        if z_l == 1:
-            is_got_z_l = True
-        
-        #while we haven't got a lower bound
-        while not is_got_z_l:
-            #lower the lower bound
-            z_l -= 1
-            #if the lower bound is 0, then set is_got_z_l to be true and raise
-                #the lower bound back by one
-            if z_l == 0:
+        def ln_sum_w(self):
+            """Works out the compound Poisson sum, only important terms are
+                summed. See Dynn, Smyth (2005).
+                
+            Returns:
+                log compound Poisson sum
+            """
+            
+            #get the y with the biggest term in the compound Poisson sum
+            z_max = self.z_max()
+            #get the biggest log compound Poisson term + any expectation terms
+            ln_w_max = self.ln_wz(z_max) + self.log_expectation_term(z_max)
+            
+            #declare array of compound poisson terms
+            #each term is a ratio of the compound poisson term with the maximum
+                #compound poisson term
+            #the first term is 1, that is exp[ln(w_z_max)-ln(w_z_max)] = 1;
+            terms = [1]
+            
+            #declare booleans is_got_z_l and is_got_z_u
+            #these are true if we got the lower and upper bound respectively for
+                #the compound Poisson sum
+            is_got_z_l = False
+            is_got_z_u = False
+            
+            #declare the summation bounds, z_l for the lower bound, z_u for the
+                #upper bound
+            z_l = z_max
+            z_u = z_max
+            
+            #calculate the compound poisson terms starting at z_l and working
+                #downwards if the lower bound is 1, can't go any lower and set
+                #is_got_z_l to be true
+            if z_l == 1:
                 is_got_z_l = True
-                z_l += 1
-            else: #else the lower bound is not 0
+            
+            #while we haven't got a lower bound
+            while not is_got_z_l:
+                #lower the lower bound
+                z_l -= 1
+                #if the lower bound is 0, then set is_got_z_l to be true and
+                    #raise the lower bound back by one
+                if z_l == 0:
+                    is_got_z_l = True
+                    z_l += 1
+                else: #else the lower bound is not 0
+                    #calculate the log ratio of the compound poisson term with
+                        #the maximum compound poisson term
+                    log_ratio = np.sum(
+                        [self.ln_wz(z_l), 
+                        self.log_expectation_term(z_l), 
+                        -ln_w_max])
+                    #if this log ratio is bigger than the threshold
+                    if (log_ratio
+                        > CompoundPoissonTimeSeries.Sum.cp_sum_threshold):
+                        #append the ratio to the array of terms
+                        terms.append(math.exp(log_ratio))
+                    else:
+                        #else the log ratio is smaller than the threshold
+                        #set is_got_z_l to be true and raise the lower bound by
+                            #1
+                        is_got_z_l = True
+                        z_l += 1
+            
+            #while we haven't got an upper bound
+            while not is_got_z_u:
+                #raise the upper bound by 1
+                z_u += 1;
                 #calculate the log ratio of the compound poisson term with the
                     #maximum compound poisson term
                 log_ratio = np.sum(
-                    [self.ln_wz(index, z_l), z_pow*math.log(z_l), -ln_w_max])
+                    [self.ln_wz(z_u),
+                    self.log_expectation_term(z_u),
+                    -ln_w_max])
                 #if this log ratio is bigger than the threshold
-                if log_ratio > self.cp_sum_threshold:
+                if log_ratio > CompoundPoissonTimeSeries.Sum.cp_sum_threshold:
                     #append the ratio to the array of terms
                     terms.append(math.exp(log_ratio))
                 else:
                     #else the log ratio is smaller than the threshold
-                    #set is_got_z_l to be true and raise the lower bound by 1
-                    is_got_z_l = True
-                    z_l += 1
+                    #set is_got_z_u to be true and lower the upper bound by 1
+                    is_got_z_u = True
+                    z_u -= 1
+            
+            #work out the compound Poisson sum
+            ln_sum_w = ln_w_max + math.log(np.sum(terms))
+            return ln_sum_w
         
-        #while we haven't got an upper bound
-        while not is_got_z_u:
-            #raise the upper bound by 1
-            z_u += 1;
-            #calculate the log ratio of the compound poisson term with the
-                #maximum compound poisson term
-            log_ratio = np.sum(
-                [self.ln_wz(index, z_u), z_pow*math.log(z_u), -ln_w_max])
-            #if this log ratio is bigger than the threshold
-            if log_ratio > self.cp_sum_threshold:
-                #append the ratio to the array of terms
-                terms.append(math.exp(log_ratio))
-            else:
-                #else the log ratio is smaller than the threshold
-                #set is_got_z_u to be true and lower the upper bound by 1
-                is_got_z_u = True
-                z_u -= 1
+        def z_max(self):
+            """Gets the index of the biggest term in the compound Poisson sum
+            
+            Returns:
+                positive integer, index of the biggest term in the compound
+                    Poisson sum
+            """
+            #get the optima with respect to the sum index, then round it to get
+                #an integer
+            terms = np.zeros(3)
+            terms[0] = math.log(self.y)
+            terms[1] = math.pow(self.poisson_rate, self.gamma_dispersion)
+            terms[2] = -math.log(self.gamma_mean)
+            z_max = math.exp(np.sum(terms)/(self.gamma_dispersion+1))
+            z_max = round(z_max)
+            #if the integer is 0, then set the index to 1
+            if z_max == 0:
+                z_max = 1
+            return z_max
         
-        #work out the compound Poisson sum
-        ln_sum_w = ln_w_max + math.log(np.sum(terms))
-        return ln_sum_w
+        def ln_wz(self, z):
+            """Return a log term from the compound Poisson sum
+            
+            Args:
+                index: time step, y[index] must be positive
+                z: Poisson variable or index of the sum element
+            
+            Returns:
+                log compopund Poisson term
+            """
+            
+            #declare array of terms to be summed to work out ln_wz
+            terms = np.zeros(6)
+            
+            #work out each individual term
+            terms[0] = -z*math.log(self.gamma_dispersion)/self.gamma_dispersion
+            terms[1] = -z*math.log(self.gamma_mean)/self.gamma_dispersion
+            terms[2] = -loggamma(z/self.gamma_dispersion)
+            terms[3] = z*math.log(self.y)/self.gamma_dispersion
+            terms[4] = z*math.log(self.poisson_rate)
+            terms[5] = -loggamma(1+z)
+            #sum the terms to get the log compound Poisson sum term
+            ln_wz = np.sum(terms)
+            return ln_wz
     
-    def z_max(self, index):
-        """Gets the index of the biggest term in the compound Poisson sum
-        
-        Args:
-            index: time step, y[index] must be positive
-        
-        Returns:
-            positive integer, index of the biggest term in the compound Poisson
-                sum
-        """
-        #get the optima with respect to the sum index, then round it to get an
-            #integer
-        y = self.y_array[index]
-        poisson_rate = self.poisson_rate[index]
-        gamma_mean = self.gamma_mean[index]
-        gamma_dispersion = self.gamma_dispersion[index]
-        terms = np.zeros(3)
-        terms[0] = math.log(y)
-        terms[1] = math.pow(poisson_rate, gamma_dispersion)
-        terms[2] = -math.log(gamma_mean)
-        z_max = math.exp(np.sum(terms)/(gamma_dispersion+1))
-        z_max = round(z_max)
-        #if the integer is 0, then set the index to 1
-        if z_max == 0:
-            z_max = 1
-        return z_max
+    class SumZ(Sum):
+        def __init__(self, parent, index):
+            super().__init__(parent, index)
+        def log_expectation_term(self, z):
+            return math.log(z)
     
-    def ln_wz(self, index, z):
-        """Return a log term from the compound Poisson sum
-        
-        Args:
-            index: time step, y[index] must be positive
-            z: Poisson variable or index of the sum element
-        
-        Returns:
-            log compopund Poisson term
-        """
-        
-        #declare array of terms to be summed to work out ln_wz
-        terms = np.zeros(6)
-        #retrieve variables
-        y = self.y_array[index]
-        poisson_rate = self.poisson_rate[index]
-        gamma_mean = self.gamma_mean[index]
-        gamma_dispersion = self.gamma_dispersion[index]
-        
-        #work out each individual term
-        terms[0] = -z*math.log(gamma_dispersion)/gamma_dispersion
-        terms[1] = -z*math.log(gamma_mean)/gamma_dispersion
-        terms[2] = -loggamma(z/gamma_dispersion)
-        terms[3] = z*math.log(y)/gamma_dispersion
-        terms[4] = z*math.log(poisson_rate)
-        terms[5] = -loggamma(1+z)
-        #sum the terms to get the log compound Poisson sum term
-        ln_wz = np.sum(terms)
-        return ln_wz
+    class SumZ2(Sum):
+        def __init__(self, parent, index):
+            super().__init__(parent, index)
+        def log_expectation_term(self, z):
+            return 2*math.log(z)
+    
+    class SumZDigamma(Sum):
+        def __init__(self, parent, index):
+            super().__init__(parent, index)
+        def log_expectation_term(self, z):
+            return math.log(z) + math.log(digamma(z/self.gamma_dispersion))
     
     class CompoundPoissonParameter:
         """Dynamic parameters of the compound Poisson
