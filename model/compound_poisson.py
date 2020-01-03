@@ -6,7 +6,7 @@ import statsmodels.tsa.stattools as stats
 
 from scipy.special import loggamma, digamma, polygamma
 
-class CompoundPoissonTimeSeries:
+class TimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
     
     A time series distribued as compound Poisson with dynamic varying
@@ -30,9 +30,6 @@ class CompoundPoissonTimeSeries:
             gamma_dispersion
         z_array: latent poisson variables at each time step
         y_array: compound poisson variables at each time step
-        cp_sum_threshold: negative number, determines the smallest term to add
-            in the compound #Possion sum, see the method ln_sum_w, used in the E
-            step
         step_size: the step size for gradient descent, used in the M step
         n_em: number of EM steps
         min_ln_l_ratio: determines when to stop the EM algorithm if the log
@@ -60,7 +57,7 @@ class CompoundPoissonTimeSeries:
         self.y_array = np.zeros(self.n)
         
         self.step_size = 0.1
-        self.n_em = 10
+        self.n_em = 100
         self.min_ln_l_ratio = 0.0001
         
         self.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
@@ -237,15 +234,16 @@ class CompoundPoissonTimeSeries:
             #if the rainfall is zero, then z is zero (it has not rained)
             if self.y_array[i] == 0:
                 self.z_array[i] = 0
+                self.z_var_array[i] = 0
             else:
                 #work out the normalisation constant for the expectation
-                sum = CompoundPoissonTimeSeries.Sum(self, i)
+                sum = TimeSeries.Sum(self, i)
                 normalisation_constant = sum.ln_sum_w()
                 #work out the expectation
-                sum = CompoundPoissonTimeSeries.SumZ(self, i)
+                sum = TimeSeries.SumZ(self, i)
                 self.z_array[i] = math.exp(
                     sum.ln_sum_w() - normalisation_constant)
-                sum = CompoundPoissonTimeSeries.SumZ2(self, i)
+                sum = TimeSeries.SumZ2(self, i)
                 self.z_var_array[i] = (math.exp(
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
@@ -284,7 +282,8 @@ class CompoundPoissonTimeSeries:
             gamma_mean
             gamma_dispersion
         """
-        
+        #negative number, determines the smallest term to add in the compound
+            #Poisson sum
         cp_sum_threshold = -37
         
         def __init__(self, parent, index):
@@ -354,7 +353,7 @@ class CompoundPoissonTimeSeries:
                         -ln_w_max])
                     #if this log ratio is bigger than the threshold
                     if (log_ratio
-                        > CompoundPoissonTimeSeries.Sum.cp_sum_threshold):
+                        > TimeSeries.Sum.cp_sum_threshold):
                         #append the ratio to the array of terms
                         terms.append(math.exp(log_ratio))
                     else:
@@ -375,7 +374,7 @@ class CompoundPoissonTimeSeries:
                     self.log_expectation_term(z_u),
                     -ln_w_max])
                 #if this log ratio is bigger than the threshold
-                if log_ratio > CompoundPoissonTimeSeries.Sum.cp_sum_threshold:
+                if log_ratio > TimeSeries.Sum.cp_sum_threshold:
                     #append the ratio to the array of terms
                     terms.append(math.exp(log_ratio))
                 else:
@@ -451,7 +450,7 @@ class CompoundPoissonTimeSeries:
         def log_expectation_term(self, z):
             return math.log(z) + math.log(digamma(z/self.gamma_dispersion))
     
-    class CompoundPoissonParameter:
+    class Parameter:
         """Dynamic parameters of the compound Poisson
         
         An abstract class
@@ -477,7 +476,7 @@ class CompoundPoissonTimeSeries:
                 with keys "reg", "AR", "MA", "const" which corresponds to the
                 names of the reg parameters
             value_array: array of values of the parameter for each time step
-            _parent: CompoundPoissonTimeSeries object containing this
+            _parent: TimeSeries object containing this
             _d_reg_self_array: dictionary containing arrays of derivates
                 of itself wrt reg parameters
         """
@@ -501,7 +500,7 @@ class CompoundPoissonTimeSeries:
             """Assign parent
             
             Assign the member variable _parent which points to the
-                CompoundPoissonTimeSeries object which owns self
+                TimeSeries object which owns self
             """
             self._parent = parent
             self.n = parent.n
@@ -584,8 +583,7 @@ class CompoundPoissonTimeSeries:
             
             Modifies self.reg_parameters using gradient_descent given the model
                 fields and z_array. Requires calculate_d_reg_self_i() to be
-                called for all index. See the method m_step in
-                CompoundPoissonTimeSeries
+                called for all index. See the method m_step in TimeSeries
             """
             gradient = self.d_reg_ln_l()
             for key in self.reg_parameters.keys():
@@ -597,7 +595,7 @@ class CompoundPoissonTimeSeries:
             Modifies self.reg_parameters using gradient_descent given the model
                 fields and z_array. Requires calculate_d_reg_self_i() to be
                 called for all index up to the args index. See the method m_step
-                in CompoundPoissonTimeSeriesSgd
+                in TimeSeriesSgd
             
             Args:
                 index: the point in the time series to be used for stochastic
@@ -622,7 +620,7 @@ class CompoundPoissonTimeSeries:
                     GammaDispersion._d_reg_self_array[index-1]. As a result, the
                     derivate of all reg parameters must be found together for
                     each time step
-                See the method CompoundPoissonTimeSeries.m_step(self) to see
+                See the method TimeSeries.m_step(self) to see
                 example on how to call this method
             
             Returns:
@@ -643,9 +641,8 @@ class CompoundPoissonTimeSeries:
                     self._d_reg_self_array[key] = np.sum(value)
                 else:
                     self._d_reg_self_array[key] = np.sum(value, 0)
-            #put the gradient in a CompoundPoissonParameter object and return it
-            gradient = (
-                CompoundPoissonTimeSeries.CompoundPoissonParameter(self.n_dim))
+            #put the gradient in a Parameter object and return it
+            gradient = TimeSeries.Parameter(self.n_dim)
             gradient.reg_parameters = self._d_reg_self_array
             return gradient
         
@@ -758,7 +755,7 @@ class CompoundPoissonTimeSeries:
             else:
                 self.value_array[key] = value
     
-    class PoissonRate(CompoundPoissonParameter):
+    class PoissonRate(Parameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
             self.reg_parameters["AR"] = 0.0
@@ -781,7 +778,7 @@ class CompoundPoissonTimeSeries:
             return (-0.5*(z+poisson_rate) / math.pow(poisson_rate, 3/2)
                 *self._d_reg_self_array[key][index-1])
     
-    class GammaMean(CompoundPoissonParameter):
+    class GammaMean(Parameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
             self.reg_parameters["AR"] = 0.0
@@ -835,7 +832,7 @@ class CompoundPoissonTimeSeries:
             else:
                 return 0.0
     
-    class GammaDispersion(CompoundPoissonParameter):
+    class GammaDispersion(Parameter):
         def __init__(self, n_dim):
             super().__init__(n_dim)
         def d_self_ln_l(self, index):
@@ -857,7 +854,7 @@ class CompoundPoissonTimeSeries:
                 terms[6] = 0.5*z*z_var*polygamma(2,z/phi)/ math.pow(phi,2)
                 return np.sum(terms) / math.pow(phi,2)
 
-class CompoundPoissonTimeSeriesSgd(CompoundPoissonTimeSeries):
+class TimeSeriesSgd(TimeSeries):
     """Compound Poisson Time Series which uses stochastic gradient descent for
         optimisation
     
@@ -869,8 +866,8 @@ class CompoundPoissonTimeSeriesSgd(CompoundPoissonTimeSeries):
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
         super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
-        self.step_size = 0.01
-        self.n_em = 50
+        self.step_size = 0.001
+        self.n_em = 2500
         self._rng = random.RandomState(np.uint32(672819639))
         self._permutation_iter = self._rng.permutation(self.n).__iter__()
     
@@ -943,74 +940,74 @@ def main():
             x[i, i_dim] = (0.8*math.sin(2*math.pi/365 * i)
                 + (i_dim+1)*rng.normal())
     
-    poisson_rate = CompoundPoissonTimeSeries.PoissonRate(n_dim)
+    poisson_rate = TimeSeries.PoissonRate(n_dim)
     poisson_rate["reg"] = [0.098, 0.001]
     poisson_rate["AR"] = 0.13
     poisson_rate["MA"] = 0.19
     poisson_rate["const"] = 0.42
-    gamma_mean = CompoundPoissonTimeSeries.GammaMean(n_dim)
+    gamma_mean = TimeSeries.GammaMean(n_dim)
     gamma_mean["reg"] = [0.066, 0.002]
     gamma_mean["AR"] = 0.1
     gamma_mean["MA"] = 0.1
     gamma_mean["const"] = 0.89
-    gamma_dispersion = CompoundPoissonTimeSeries.GammaDispersion(n_dim)
+    gamma_dispersion = TimeSeries.GammaDispersion(n_dim)
     gamma_dispersion["reg"] = [0.07, 0.007]
     gamma_dispersion["const"] = 0.12
     
-    compound_poisson_time_series = CompoundPoissonTimeSeries(
-        x, poisson_rate, gamma_mean, gamma_dispersion)
-    compound_poisson_time_series.simulate(rng)
+    time_series = TimeSeriesSgd(x, poisson_rate, gamma_mean, gamma_dispersion)
+    time_series.simulate(rng)
+    print_figures(time_series, "simulation")
     
-    poisson_rate_guess = math.log(
-        n/(n- np.count_nonzero(compound_poisson_time_series.z_array)))
-    gamma_mean_guess = (np.mean(compound_poisson_time_series.y_array)
-        / poisson_rate_guess)
+    poisson_rate_guess = math.log(n/(n- np.count_nonzero(time_series.z_array)))
+    gamma_mean_guess = np.mean(time_series.y_array) / poisson_rate_guess
     gamma_dispersion_guess = (
-        np.var(compound_poisson_time_series.y_array, ddof=1)
+        np.var(time_series.y_array, ddof=1)
         /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
     
-    poisson_rate = CompoundPoissonTimeSeries.PoissonRate(n_dim)
-    gamma_mean = CompoundPoissonTimeSeries.GammaMean(n_dim)
-    gamma_dispersion = CompoundPoissonTimeSeries.GammaDispersion(n_dim)
+    poisson_rate = TimeSeries.PoissonRate(n_dim)
+    gamma_mean = TimeSeries.GammaMean(n_dim)
+    gamma_dispersion = TimeSeries.GammaDispersion(n_dim)
     poisson_rate["const"] = math.log(poisson_rate_guess)
     gamma_mean["const"] = math.log(gamma_mean_guess)
     gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
     
-    compound_poisson_time_series.set_parameters(
-        poisson_rate, gamma_mean, gamma_dispersion)
-    print(compound_poisson_time_series.poisson_rate)
-    print(compound_poisson_time_series.gamma_mean)
-    print(compound_poisson_time_series.gamma_dispersion)
-    ln_l_array = compound_poisson_time_series.fit()
-    print(compound_poisson_time_series.poisson_rate)
-    print(compound_poisson_time_series.gamma_mean)
-    print(compound_poisson_time_series.gamma_dispersion)
+    time_series.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
+    print(time_series.poisson_rate)
+    print(time_series.gamma_mean)
+    print(time_series.gamma_dispersion)
+    ln_l_array = time_series.fit()
+    plt.figure()
+    plt.plot(ln_l_array)
+    plt.xlabel("Number of EM steps")
+    plt.ylabel("log-likelihood")
+    plt.savefig("../figures/fit_ln_l.png")
+    plt.close()
+    print(time_series.poisson_rate)
+    print(time_series.gamma_mean)
+    print(time_series.gamma_dispersion)
     
-    compound_poisson_time_series.simulate(rng)
+    time_series.simulate(rng)
+    print_figures(time_series, "fitted")
+
+def print_figures(time_series, prefix):
     
-    y = compound_poisson_time_series.y_array
-    poisson_rate_array = compound_poisson_time_series.poisson_rate.value_array
-    gamma_mean_array = compound_poisson_time_series.gamma_mean.value_array
-    gamma_dispersion_array = (
-        compound_poisson_time_series.gamma_dispersion.value_array)
+    x = time_series.x
+    y = time_series.y_array
+    z = time_series.z_array
+    n = time_series.n
+    n_dim = time_series.n_dim
+    poisson_rate_array = time_series.poisson_rate.value_array
+    gamma_mean_array = time_series.gamma_mean.value_array
+    gamma_dispersion_array = time_series.gamma_dispersion.value_array
     
     acf = stats.acf(y, nlags=100, fft=True)
     pacf = stats.pacf(y, nlags=10)
     
     plt.figure()
-    plt.plot(ln_l_array)
-    plt.xlabel("Number of EM steps")
-    plt.ylabel("log-likelihood")
-    plt.savefig("../figures/simulation_ln_l.png")
-    plt.show()
-    plt.close()
-    
-    plt.figure()
     plt.plot(y)
     plt.xlabel("Time (day)")
     plt.ylabel("Rainfall (mm)")
-    plt.savefig("../figures/simulation_rain.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_rain.png")
     plt.close()
     
     for i_dim in range(n_dim):
@@ -1018,56 +1015,49 @@ def main():
         plt.plot(x[:,i_dim])
         plt.xlabel("Time (day)")
         plt.ylabel("Model field "+str(i_dim))
-        plt.savefig("../figures/simulation_model_field_"+str(i_dim)+".png")
-        plt.show()
+        plt.savefig("../figures/"+prefix+"_model_field_"+str(i_dim)+".png")
         plt.close()
     
     plt.figure()
     plt.bar(np.asarray(range(acf.size)), acf)
     plt.xlabel("Time (day)")
     plt.ylabel("Autocorrelation")
-    plt.savefig("../figures/simulation_acf.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_acf.png")
     plt.close()
     
     plt.figure()
     plt.bar(np.asarray(range(pacf.size)), pacf)
     plt.xlabel("Time (day)")
     plt.ylabel("Partial autocorrelation")
-    plt.savefig("../figures/simulation_pacf.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_pacf.png")
     plt.close()
     
     plt.figure()
     plt.plot(poisson_rate_array)
     plt.xlabel("Time (day)")
     plt.ylabel("Poisson rate")
-    plt.savefig("../figures/simulation_lambda.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_lambda.png")
     plt.close()
     
     plt.figure()
     plt.plot(gamma_mean_array)
     plt.xlabel("Time (day)")
     plt.ylabel("Mean of gamma")
-    plt.savefig("../figures/simulation_mu.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_mu.png")
     plt.close()
     
     plt.figure()
     plt.plot(gamma_dispersion_array)
     plt.xlabel("Time (day)")
     plt.ylabel("Dispersion")
-    plt.savefig("../figures/simulation_dispersion.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_dispersion.png")
     plt.close()
     
     plt.figure()
-    plt.plot(range(n),compound_poisson_time_series.z_array)
+    plt.plot(range(n), z)
     plt.xlabel("Time (day)")
     plt.ylabel("Z")
-    plt.savefig("../figures/simulation_z.png")
-    plt.show()
+    plt.savefig("../figures/"+prefix+"_z.png")
     plt.close()
     
 main()
