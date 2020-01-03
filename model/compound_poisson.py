@@ -32,6 +32,7 @@ class TimeSeries:
         y_array: compound poisson variables at each time step
         step_size: the step size for gradient descent, used in the M step
         n_em: number of EM steps
+        n_gradient_descent: number of steps in a M step
         min_ln_l_ratio: determines when to stop the EM algorithm if the log
             likelihood increases not very much
     """
@@ -58,6 +59,7 @@ class TimeSeries:
         
         self.step_size = 0.1
         self.n_em = 100
+        self.n_gradient_descent = 100
         self.min_ln_l_ratio = 0.0001
         
         self.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
@@ -134,7 +136,7 @@ class TimeSeries:
         for i in range(self.n_em):
             print("step", i)
             #do EM
-            self.m_step()
+            self.m_step(ln_l_array[len(ln_l_array)-1])
             self.e_step()
             #save the log likelihood
             ln_l_array.append(self.joint_log_likelihood())
@@ -248,28 +250,36 @@ class TimeSeries:
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
     
-    def m_step(self):
+    def m_step(self, ln_l):
         """Does the M step of the EM algorithm
         
         Estimates the reg parameters given the observed rainfall y and the
             latent variable z using gradient descent. The objective function is
             the log likelihood assuming the latent variables are observed
         """
-        #set their member variables containing the gradients to be zero, they
-            #are calculated in the next step
-        for parameter in self.cp_parameter_array:
-            parameter.reset_d_reg_self_array()
-        #for each time step, work out d itself / d parameter where itself can be
-            #poisson_rate or gamma_mean for example and parameter can be the AR
-            #or MA parameters
-        #gradient at time step i depends on gradient at time step i-1, therefore
-            #use loop over range(n)
-        for i in range(self.n):
+        ln_l_array = [ln_l]
+        #do gradient descent multiple times, keep track of log likelihood
+        for i in range(self.n_gradient_descent):
+            #set the member variables containing the gradients to be zero,
+                #they are calculated in the next step
             for parameter in self.cp_parameter_array:
-                parameter.calculate_d_reg_self_i(i)
-        for parameter in self.cp_parameter_array:
-            #do gradient descent
-            parameter.gradient_descent()
+                parameter.reset_d_reg_self_array()
+            #for each time step, work out d itself / d parameter where itself
+                #can be poisson_rate or gamma_mean for example and parameter can
+                #be the AR or MA parameters
+            #gradient at time step i depends on gradient at time step i-1,
+                #therefore work out each gradient in sequence
+            for i in range(self.n):
+                for parameter in self.cp_parameter_array:
+                    parameter.calculate_d_reg_self_i(i)
+            for parameter in self.cp_parameter_array:
+                #do gradient descent
+                parameter.gradient_descent()
+            #work out log likelihood and test for convergence
+            self.update_all_cp_parameters()
+            ln_l_array.append(self.joint_log_likelihood())
+            if self.has_converge(ln_l_array):
+                break
     
     class Sum:
         
@@ -954,7 +964,7 @@ def main():
     gamma_dispersion["reg"] = [0.07, 0.007]
     gamma_dispersion["const"] = 0.12
     
-    time_series = TimeSeriesSgd(x, poisson_rate, gamma_mean, gamma_dispersion)
+    time_series = TimeSeries(x, poisson_rate, gamma_mean, gamma_dispersion)
     time_series.simulate(rng)
     print_figures(time_series, "simulation")
     
