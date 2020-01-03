@@ -30,6 +30,7 @@ class TimeSeries:
             gamma_dispersion
         z_array: latent poisson variables at each time step
         y_array: compound poisson variables at each time step
+        ln_l_array: the joint log likelihood after calling the method fit()
         step_size: the step size for gradient descent, used in the M step
         n_em: number of EM steps
         n_gradient_descent: number of steps in a M step
@@ -56,6 +57,7 @@ class TimeSeries:
         self.z_array = np.zeros(self.n)
         self.z_var_array = np.zeros(self.n)
         self.y_array = np.zeros(self.n)
+        self.ln_l_array = None
         
         self.step_size = 0.1
         self.n_em = 100
@@ -126,24 +128,21 @@ class TimeSeries:
         Fit the Compound Poisson time series to the data (model fields) and y.
             The z_array is estimated using the E step. The reg parameters are
             estimated using the M step. The compound Poisson parameters updates
-            between each E and M step.
-        
-        Returns:
-            joint log likelihood at each EM step
+            between each E and M step. The joint log likelihood at each EM step
+            can be obtained from the member variable ln_l_array
         """
         self.e_step()
-        ln_l_array = [self.joint_log_likelihood()]
+        self.ln_l_array = [self.joint_log_likelihood()]
         for i in range(self.n_em):
             print("step", i)
             #do EM
-            self.m_step(ln_l_array[len(ln_l_array)-1])
+            self.m_step(self.ln_l_array[len(self.ln_l_array)-1])
             self.e_step()
             #save the log likelihood
-            ln_l_array.append(self.joint_log_likelihood())
+            self.ln_l_array.append(self.joint_log_likelihood())
             #check if the log likelihood has decreased small enough
-            if self.has_converge(ln_l_array):
+            if self.has_converge(self.ln_l_array):
                 break
-        return ln_l_array
     
     def has_converge(self, ln_l_array):
         """Set convergence criterion from the likelihood
@@ -519,12 +518,13 @@ class TimeSeries:
         def copy(self):
             """Return deep copy of itself
             """
-            copy = Parameters(self.n_dim)
+            copy = self.__class__(self.n_dim)
             for key, value in self.reg_parameters.items():
                 if type(value) is np.ndarray:
                     copy[key] = value.copy()
                 else:
                     copy[key] = value
+            copy.assign_parent(self._parent)
             copy.value_array = self.value_array.copy()
             return copy
         
@@ -613,7 +613,7 @@ class TimeSeries:
             """
             d_self_ln_l = self.d_self_ln_l(index)
             for key in self._d_reg_self_array.keys():
-                self[key] += (self._parent.step_size
+                self[key] += (self._parent.stochastic_step_size
                     * (self._d_reg_self_array[key][index]* d_self_ln_l))
         
         def d_reg_ln_l(self):
@@ -648,12 +648,12 @@ class TimeSeries:
                 #sum over all time steps (chain rule for partial diff)
                 value = d_reg_ln_l[key]
                 if value.ndim == 1:
-                    self._d_reg_self_array[key] = np.sum(value)
+                    d_reg_ln_l[key] = np.sum(value)
                 else:
-                    self._d_reg_self_array[key] = np.sum(value, 0)
+                    d_reg_ln_l[key] = np.sum(value, 0)
             #put the gradient in a Parameter object and return it
             gradient = TimeSeries.Parameter(self.n_dim)
-            gradient.reg_parameters = self._d_reg_self_array
+            gradient.reg_parameters = d_reg_ln_l
             return gradient
         
         def d_self_ln_l_all(self):
@@ -865,10 +865,23 @@ class TimeSeries:
                 return np.sum(terms) / math.pow(phi,2)
 
 class TimeSeriesSgd(TimeSeries):
-    """Compound Poisson Time Series which uses stochastic gradient descent for
-        optimisation
+    """Compound Poisson Time Series which uses stochastic gradient descent
+    
+    The fitting is done using different initial values. Regular gradient descent
+        is used on the first value in the EM algorithm. Different initial values
+        are obtained by using stochastic gradient descent in the M step.
     
     Attributes:
+        n_initial: number of different inital points to try out
+        stochastic_step_size: step size of stochastic gradient descent
+        n_stochastic_step: number of stochastic gradient descent steps
+        ln_l_max: points to the selected maximum log likelihood from the member
+            variable ln_l_array
+        ln_l_stochastic_index: array which points to the member variable
+            ln_l_array which indicates which are from gradient descent and
+            stochastic gradient descent. [1, ..., len(ln_l_array)]. The values
+            in the middle correspond to resulting first log likelihood from
+            gradient descent or stochastic gradient descent
         _rng: random number generator to generate a random permutation to select
             time points at random
         _permutation_iter: iterator for the permutation of index
@@ -876,20 +889,70 @@ class TimeSeriesSgd(TimeSeries):
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
         super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
-        self.step_size = 0.001
-        self.n_em = 2500
+        self.n_initial = 10
+        self.stochastic_step_size = 0.01
+        self.n_stochastic_step = 10
+        self.ln_l_max_index = 0
+        self.ln_l_stochastic_index = [1]
         self._rng = random.RandomState(np.uint32(672819639))
         self._permutation_iter = self._rng.permutation(self.n).__iter__()
     
-    def has_converge(self, ln_l_array):
-        #likelihood is stochastic, no covergence criterion
-        return False
-    
-    def m_step(self):
-        """Does the M step of the EM algorithm
+    def fit(self):
+        """Fit model - override
         
-        Estimates the reg parameters given the observed rainfall y and the
-            latent variable z using stochastic gradient descent.
+        Regular gradient descent is used on the first value in the EM algorithm.
+            Different initial values are obtained by using stochastic gradient
+            descent in the M step. Select the parameters which has the maximum
+            log likelihood.
+        """
+        ln_l_all_array = [] #array of all log likelihoods
+        ln_l_max = float("-inf") #keep track of the maximum likelihood
+        cp_parameter_array = None #parameters with the maximum likelihood
+        #for multiple initial values
+        for i in range(self.n_initial):
+            print("gradient descent")
+            super().fit() #regular gradient descent
+            #copy the log likelihood
+            for ln_l in self.ln_l_array:
+                ln_l_all_array.append(ln_l)
+            #check for convergence in the log likelihood
+            ln_l = ln_l_all_array[len(ln_l_all_array)-1]
+            if ln_l > ln_l_max:
+                #the log likelihood is bigger, copy the parmeters
+                ln_l_max = ln_l
+                self.ln_l_max_index = len(ln_l_all_array)-1
+                cp_parameter_array = [
+                    self.poisson_rate.copy(),
+                    self.gamma_mean.copy(),
+                    self.gamma_dispersion.copy(),
+                ]
+            print("stochastic gradient descent")
+            #do stochastic gradient descent to get a different initial value
+            if i < self.n_initial-1:
+                #track when stochastic gradient descent was done for this entry
+                    #of ln_l_array
+                self.ln_l_stochastic_index.append(len(ln_l_all_array))
+                for j in range(self.n_stochastic_step):
+                    print("step", j)
+                    self.m_stochastic_step()
+                    self.update_all_cp_parameters()
+                    ln_l_all_array.append(self.joint_log_likelihood())
+                #track when gradient descent was done
+                #the E step right after this in super().fit() is considered part
+                    #of stochastic gradient descent
+                self.ln_l_stochastic_index.append(len(ln_l_all_array)+1)
+            else:
+                self.ln_l_stochastic_index.append(len(ln_l_all_array))
+        #copy results to the member variable
+        self.ln_l_array = ln_l_all_array
+        self.cp_parameter_array = cp_parameter_array
+        self.poisson_rate = cp_parameter_array[0]
+        self.gamma_mean = cp_parameter_array[1]
+        self.gamma_dispersion = cp_parameter_array[2]
+        self.e_step()
+    
+    def m_stochastic_step(self):
+        """Does stochastic gradient descent
         """
         #set their member variables containing the gradients to be zero, they
             #are calculated in the next step
@@ -964,14 +1027,13 @@ def main():
     gamma_dispersion["reg"] = [0.07, 0.007]
     gamma_dispersion["const"] = 0.12
     
-    time_series = TimeSeries(x, poisson_rate, gamma_mean, gamma_dispersion)
+    time_series = TimeSeriesSgd(x, poisson_rate, gamma_mean, gamma_dispersion)
     time_series.simulate(rng)
     print_figures(time_series, "simulation")
     
     poisson_rate_guess = math.log(n/(n- np.count_nonzero(time_series.z_array)))
     gamma_mean_guess = np.mean(time_series.y_array) / poisson_rate_guess
-    gamma_dispersion_guess = (
-        np.var(time_series.y_array, ddof=1)
+    gamma_dispersion_guess = (np.var(time_series.y_array, ddof=1)
         /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
     
     poisson_rate = TimeSeries.PoissonRate(n_dim)
@@ -985,9 +1047,22 @@ def main():
     print(time_series.poisson_rate)
     print(time_series.gamma_mean)
     print(time_series.gamma_dispersion)
-    ln_l_array = time_series.fit()
+    time_series.fit()
+    
     plt.figure()
-    plt.plot(ln_l_array)
+    ax = plt.gca()
+    ln_l_array = time_series.ln_l_array
+    ln_l_stochastic_index = time_series.ln_l_stochastic_index
+    for i in range(len(ln_l_stochastic_index)-1):
+        start = ln_l_stochastic_index[i]-1
+        end = ln_l_stochastic_index[i+1]
+        if i%2 == 0:
+            linestyle = "-"
+        else:
+            linestyle = ":"
+        ax.set_prop_cycle(None)
+        plt.plot(range(start, end), ln_l_array[start:end], linestyle=linestyle)
+    plt.axvline(x=time_series.ln_l_max_index, linestyle='--')
     plt.xlabel("Number of EM steps")
     plt.ylabel("log-likelihood")
     plt.savefig("../figures/fit_ln_l.png")
