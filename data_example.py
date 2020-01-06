@@ -85,7 +85,7 @@ ax.coastlines(resolution="50m")
 plt.colorbar(im)
 ax.set_aspect("auto", adjustable=None)
 plt.title("Mean "+rain_data["rr"].long_name+" ("+rain_data["rr"].units+")")
-plt.savefig("figures/rainfall_mean.png")
+plt.savefig("figures/rainfall_mean.pdf")
 plt.close()
 
 #plot the rainfall as a time series for each city
@@ -105,7 +105,7 @@ for city, coordinates in city_location.items():
     plt.title(city+": Rain")
     plt.xlabel("Time (calendar year)")
     plt.ylabel(rain_data["rr"].long_name+" ("+rain_data["rr"].units+")")
-    plt.savefig("figures/rainfall_"+city+".png")
+    plt.savefig("figures/rainfall_"+city+".pdf")
     plt.close()
     
     #plot the acf
@@ -114,7 +114,7 @@ for city, coordinates in city_location.items():
     plt.title(city+": Autocorrelation of rain")
     plt.xlabel("Lag (day)")
     plt.ylabel("Autocorrelation")
-    plt.savefig("figures/rainfall_acf_"+city+".png")
+    plt.savefig("figures/rainfall_acf_"+city+".pdf")
     plt.close()
     
     #plot the pacf
@@ -123,7 +123,7 @@ for city, coordinates in city_location.items():
     plt.title(city+": Partial autocorrelation of rain")
     plt.xlabel("Lag (day)")
     plt.ylabel("Partial autocorrelation")
-    plt.savefig("figures/rainfall_pacf_"+city+".png")
+    plt.savefig("figures/rainfall_pacf_"+city+".pdf")
     plt.close()
 
 ##########          MODEL FIELDS          ##########
@@ -180,7 +180,7 @@ for model_field in model_fields_data.values():
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
         plt.title("mean " + model_field_name)
-        plt.savefig("figures/"+model_field_name.replace(" ", "_")+"_mean.png")
+        plt.savefig("figures/"+model_field_name.replace(" ", "_")+"_mean.pdf")
         plt.close()
         
         #for each city time series
@@ -206,7 +206,7 @@ for model_field in model_fields_data.values():
             plt.xlabel("Time (calendar year)")
             plt.ylabel(model_field_name)
             plt.savefig("figures/"+model_field_name.replace(" ", "_")
-                +"_"+city+".png")
+                +"_"+city+".pdf")
             plt.close()
             
             #plot the autocorrelation of the time series
@@ -216,7 +216,7 @@ for model_field in model_fields_data.values():
             plt.xlabel("Lag (day)")
             plt.ylabel("Autocorrelation")
             plt.savefig("figures/"+model_field_name.replace(" ", "_")+"_acf_"
-                +city+".png")
+                +city+".pdf")
             plt.close()
             
             #plot the partial autocorrelation of the time series
@@ -227,7 +227,7 @@ for model_field in model_fields_data.values():
             plt.xlabel("Lag (day)")
             plt.ylabel("Partial autocorrelation")
             plt.savefig("figures/"+model_field_name.replace(" ", "_")+"_pacf_"
-                +city+".png")
+                +city+".pdf")
             plt.close()
 
 ##########          MATRIX PLOT          ##########
@@ -288,7 +288,7 @@ for city, coordinates in city_location.items():
             plt.ylabel("Cross correlation")
             plt.xlabel("Lag (day)")
             plt.savefig("figures/cross_correlation_"+model_field_name
-                +"_"+city+".png")
+                +"_"+city+".pdf")
             plt.close()
             
     

@@ -361,8 +361,7 @@ class TimeSeries:
                         self.log_expectation_term(z_l), 
                         -ln_w_max])
                     #if this log ratio is bigger than the threshold
-                    if (log_ratio
-                        > TimeSeries.Sum.cp_sum_threshold):
+                    if log_ratio > TimeSeries.Sum.cp_sum_threshold:
                         #append the ratio to the array of terms
                         terms.append(math.exp(log_ratio))
                     else:
@@ -407,7 +406,7 @@ class TimeSeries:
                 #an integer
             terms = np.zeros(3)
             terms[0] = math.log(self.y)
-            terms[1] = math.pow(self.poisson_rate, self.gamma_dispersion)
+            terms[1] = self.gamma_dispersion * math.log(self.poisson_rate)
             terms[2] = -math.log(self.gamma_mean)
             z_max = math.exp(np.sum(terms)/(self.gamma_dispersion+1))
             z_max = round(z_max)
@@ -889,7 +888,7 @@ class TimeSeriesSgd(TimeSeries):
     
     def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
         super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
-        self.n_initial = 10
+        self.n_initial = 100
         self.stochastic_step_size = 0.01
         self.n_stochastic_step = 10
         self.ln_l_max_index = 0
@@ -910,6 +909,7 @@ class TimeSeriesSgd(TimeSeries):
         cp_parameter_array = None #parameters with the maximum likelihood
         #for multiple initial values
         for i in range(self.n_initial):
+            print("initial value", i)
             print("gradient descent")
             super().fit() #regular gradient descent
             #copy the log likelihood
@@ -926,6 +926,8 @@ class TimeSeriesSgd(TimeSeries):
                     self.gamma_mean.copy(),
                     self.gamma_dispersion.copy(),
                 ]
+            for parameter in cp_parameter_array:
+                print(parameter)
             print("stochastic gradient descent")
             #do stochastic gradient descent to get a different initial value
             if i < self.n_initial-1:
@@ -1065,7 +1067,7 @@ def main():
     plt.axvline(x=time_series.ln_l_max_index, linestyle='--')
     plt.xlabel("Number of EM steps")
     plt.ylabel("log-likelihood")
-    plt.savefig("../figures/fit_ln_l.png")
+    plt.savefig("../figures/fit_ln_l.pdf")
     plt.close()
     print(time_series.poisson_rate)
     print(time_series.gamma_mean)
@@ -1092,7 +1094,7 @@ def print_figures(time_series, prefix):
     plt.plot(y)
     plt.xlabel("Time (day)")
     plt.ylabel("Rainfall (mm)")
-    plt.savefig("../figures/"+prefix+"_rain.png")
+    plt.savefig("../figures/"+prefix+"_rain.pdf")
     plt.close()
     
     for i_dim in range(n_dim):
@@ -1100,49 +1102,49 @@ def print_figures(time_series, prefix):
         plt.plot(x[:,i_dim])
         plt.xlabel("Time (day)")
         plt.ylabel("Model field "+str(i_dim))
-        plt.savefig("../figures/"+prefix+"_model_field_"+str(i_dim)+".png")
+        plt.savefig("../figures/"+prefix+"_model_field_"+str(i_dim)+".pdf")
         plt.close()
     
     plt.figure()
     plt.bar(np.asarray(range(acf.size)), acf)
     plt.xlabel("Time (day)")
     plt.ylabel("Autocorrelation")
-    plt.savefig("../figures/"+prefix+"_acf.png")
+    plt.savefig("../figures/"+prefix+"_acf.pdf")
     plt.close()
     
     plt.figure()
     plt.bar(np.asarray(range(pacf.size)), pacf)
     plt.xlabel("Time (day)")
     plt.ylabel("Partial autocorrelation")
-    plt.savefig("../figures/"+prefix+"_pacf.png")
+    plt.savefig("../figures/"+prefix+"_pacf.pdf")
     plt.close()
     
     plt.figure()
     plt.plot(poisson_rate_array)
     plt.xlabel("Time (day)")
     plt.ylabel("Poisson rate")
-    plt.savefig("../figures/"+prefix+"_lambda.png")
+    plt.savefig("../figures/"+prefix+"_lambda.pdf")
     plt.close()
     
     plt.figure()
     plt.plot(gamma_mean_array)
     plt.xlabel("Time (day)")
-    plt.ylabel("Mean of gamma")
-    plt.savefig("../figures/"+prefix+"_mu.png")
+    plt.ylabel("Gamma mean (mm)")
+    plt.savefig("../figures/"+prefix+"_mu.pdf")
     plt.close()
     
     plt.figure()
     plt.plot(gamma_dispersion_array)
     plt.xlabel("Time (day)")
-    plt.ylabel("Dispersion")
-    plt.savefig("../figures/"+prefix+"_dispersion.png")
+    plt.ylabel("Gamma dispersion")
+    plt.savefig("../figures/"+prefix+"_dispersion.pdf")
     plt.close()
     
     plt.figure()
     plt.plot(range(n), z)
     plt.xlabel("Time (day)")
     plt.ylabel("Z")
-    plt.savefig("../figures/"+prefix+"_z.png")
+    plt.savefig("../figures/"+prefix+"_z.pdf")
     plt.close()
     
 main()
