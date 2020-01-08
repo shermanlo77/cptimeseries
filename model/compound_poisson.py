@@ -5,6 +5,7 @@ import numpy.random as random
 import statsmodels.tsa.stattools as stats
 
 from scipy.special import loggamma, digamma, polygamma
+from scipy.stats import multivariate_normal 
 
 class TimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
@@ -52,6 +53,7 @@ class TimeSeries:
         self.poisson_rate = None
         self.gamma_mean = None
         self.gamma_dispersion = None
+        self.n_parameter = None
         #array containing poisson_rate, gamma_mean and gamma_dispersion
         self.cp_parameter_array = None
         self.z_array = np.zeros(self.n)
@@ -92,6 +94,47 @@ class TimeSeries:
             parameter.assign_parent(self)
             #prepare the parameters by converting all to numpy array
             parameter.convert_all_to_np()
+        
+        #get number of parameters in this model
+        self.n_parameter = 0
+        for parameter in self.cp_parameter_array:
+            for reg in parameter.values():
+                self.n_parameter += reg.shape[0]
+    
+    def copy_parameter(self):
+        """Deep copy compound Poisson parameters
+        """
+        cp_parameter_array = []
+        for parameter in self.cp_parameter_array:
+            cp_parameter_array.append(parameter.copy())
+        return cp_parameter_array
+    
+    def get_parameter_vector(self, cp_parameter_array=None):
+        """Return the regression parameters as one vector
+        """
+        if cp_parameter_array is None:
+            cp_parameter_array = self.cp_parameter_array
+        #for each parameter, concatenate vectors together
+        parameter_vector = np.zeros(0)
+        for parameter in cp_parameter_array:
+            parameter_vector = np.concatenate(
+                (parameter_vector, parameter.get_reg_vector()))
+        return parameter_vector
+    
+    def set_parameter_vector(self, parameter_vector):
+        """Set the regression parameters using a single vector
+        """
+        parameter_counter = 0 #count the number of parameters
+        #for each parameter, take the correction section of parameter_vector and
+            #put it in the parameter
+        for parameter in self.cp_parameter_array:
+            n_parameter = 0
+            for reg in parameter.values():
+                n_parameter += reg.shape[0]
+            parameter.set_reg_vector(
+                parameter_vector[
+                parameter_counter:parameter_counter+n_parameter])
+            parameter_counter += n_parameter
     
     def set_observables(self, y_array):
         """Set the observed rainfall
@@ -132,14 +175,14 @@ class TimeSeries:
             can be obtained from the member variable ln_l_array
         """
         self.e_step()
-        self.ln_l_array = [self.joint_log_likelihood()]
+        self.ln_l_array = [self.get_em_objective()]
         for i in range(self.n_em):
             print("step", i)
             #do EM
             self.m_step(self.ln_l_array[len(self.ln_l_array)-1])
             self.e_step()
             #save the log likelihood
-            self.ln_l_array.append(self.joint_log_likelihood())
+            self.ln_l_array.append(self.get_em_objective())
             #check if the log likelihood has decreased small enough
             if self.has_converge(self.ln_l_array):
                 break
@@ -183,7 +226,7 @@ class TimeSeries:
         for parameter in self.cp_parameter_array:
             parameter.update_value_array(index)
     
-    def joint_log_likelihood(self):
+    def get_joint_log_likelihood(self):
         """Joint log likelihood
         
         Returns the joint log likelihood of the compound Poisson time series
@@ -199,26 +242,40 @@ class TimeSeries:
         """
         ln_l_array = np.zeros(self.n)
         for i in range(self.n):
-            ln_l_array[i] = -self.poisson_rate[i]
-            z = self.z_array[i]
-            if z > 0:
-                y = self.y_array[i]
-                z_var = self.z_var_array[i]
-                poisson_rate = self.poisson_rate[i]
-                gamma_mean = self.gamma_mean[i]
-                gamma_dispersion = self.gamma_dispersion[i]
-                terms = np.zeros(7)
-                terms[0] = (-z/gamma_dispersion *
-                    (math.log(gamma_mean) + math.log(gamma_dispersion)))
-                terms[1] = -loggamma(z/gamma_dispersion)
-                terms[2] = (z/gamma_dispersion-1)*math.log(y)
-                terms[3] = -y/gamma_mean/gamma_dispersion
-                terms[4] = z*math.log(poisson_rate)
-                terms[5] = -loggamma(z+1)
-                terms[6] = -(0.5*z_var*polygamma(1, z/gamma_dispersion)
-                    /math.pow(gamma_dispersion, 2))
-                ln_l_array[i] += np.sum(terms)
+            ln_l_array[i] = self.get_joint_log_likelihood_i(i)
         return np.sum(ln_l_array)
+    
+    def get_em_objective(self):
+        ln_l_array = np.zeros(self.n)
+        for i in range(self.n):
+            ln_l_array[i] = self.get_em_objective_i(i)
+        return np.sum(ln_l_array)
+    
+    def get_em_objective_i(self, i):
+        objective = self.get_joint_log_likelihood_i(i)
+        objective -= (0.5*z_var*polygamma(1, z/gamma_dispersion)
+            /math.pow(gamma_dispersion, 2))
+        return objective
+    
+    def get_joint_log_likelihood_i(self, i):
+        ln_l = -self.poisson_rate[i]
+        z = self.z_array[i]
+        if z > 0:
+            y = self.y_array[i]
+            z_var = self.z_var_array[i]
+            poisson_rate = self.poisson_rate[i]
+            gamma_mean = self.gamma_mean[i]
+            gamma_dispersion = self.gamma_dispersion[i]
+            terms = np.zeros(6)
+            terms[0] = (-z/gamma_dispersion *
+                (math.log(gamma_mean) + math.log(gamma_dispersion)))
+            terms[1] = -loggamma(z/gamma_dispersion)
+            terms[2] = (z/gamma_dispersion-1)*math.log(y)
+            terms[3] = -y/gamma_mean/gamma_dispersion
+            terms[4] = z*math.log(poisson_rate)
+            terms[5] = -loggamma(z+1)
+            ln_l += np.sum(terms)
+        return ln_l
     
     def e_step(self):
         """Does the E step of the EM algorithm
@@ -276,10 +333,10 @@ class TimeSeries:
                 parameter.gradient_descent()
             #work out log likelihood and test for convergence
             self.update_all_cp_parameters()
-            ln_l_array.append(self.joint_log_likelihood())
+            ln_l_array.append(self.get_em_objective())
             if self.has_converge(ln_l_array):
                 break
-    
+        
     class Sum:
         
         """Works out the compound Poisson sum, only important terms are summed.
@@ -550,9 +607,9 @@ class TimeSeries:
             exponent = 0.0
             exponent += self["const"]
             exponent += np.dot(self["reg"], self._parent.x[index,:])
-            if "AR" in self.reg_parameters.keys():
+            if "AR" in self.keys():
                 exponent += self["AR"] * self.ar_term(index)
-            if "MA" in self.reg_parameters.keys():
+            if "MA" in self.keys():
                 exponent += self["MA"] * self.ma_term(index)
             #exp link function, make it positive
             self[index] = math.exp(exponent)
@@ -595,8 +652,8 @@ class TimeSeries:
                 called for all index. See the method m_step in TimeSeries
             """
             gradient = self.d_reg_ln_l()
-            for key in self.reg_parameters.keys():
-                self[key] += (self._parent.step_size/self.n)*gradient[key]
+            gradient *= self._parent.step_size/self.n
+            self += gradient
         
         def stochastic_gradient_descent(self, index):
             """Update itself using stochastic gradient descent
@@ -611,7 +668,7 @@ class TimeSeries:
                     gradient descent
             """
             d_self_ln_l = self.d_self_ln_l(index)
-            for key in self._d_reg_self_array.keys():
+            for key in self.keys():
                 self[key] += (self._parent.stochastic_step_size
                     * (self._d_reg_self_array[key][index]* d_self_ln_l))
         
@@ -638,8 +695,8 @@ class TimeSeries:
                     "AR" and "MA"
             """
             d_self_ln_l = self.d_self_ln_l_all()
-            d_reg_ln_l = self._d_reg_self_array
-            for key in self._d_reg_self_array.keys():
+            d_reg_ln_l = self._d_regn_parameter = parameter.n_parameter_self_array
+            for key in self.keys():
                 for i in range(self.n):
                     #chain rule
                     d_reg_ln_l[key][i] = (
@@ -703,16 +760,15 @@ class TimeSeries:
                 index: time step to modify the array _d_reg_self_array
             """
             parameter_i = self[index]
-            keys = self._d_reg_self_array.keys()
-            for key in self.reg_parameters.keys():
+            for key in self.keys():
                 d_reg_self = self._d_reg_self_array[key]
                 if index > 0:
                     #AR and MA terms
                     parameter_i_1 = self[index-1]
-                    if "AR" in keys:
+                    if "AR" in self.keys():
                         d_reg_self[index] += (self["AR"]
                             * d_reg_self[index-1] / parameter_i_1)
-                    if "MA" in keys:
+                    if "MA" in self.keys():
                         d_reg_self[index] += (self["MA"]
                             * self.d_parameter_ma(index, key))
                 if key == "reg":
@@ -723,7 +779,7 @@ class TimeSeries:
                     d_reg_self[index] += self.ma_term(index)
                 elif key == "const":
                     d_reg_self[index] += 1
-                    if "AR" in keys and index > 0:
+                    if "AR" in self.keys() and index > 0:
                         d_reg_self[index] -= self["AR"]
                 d_reg_self[index] *= parameter_i
         
@@ -742,6 +798,45 @@ class TimeSeries:
             """
             pass
         
+        def get_reg_vector(self):
+            """Return all regression parameters as a single vector
+            
+            Returns:
+                regression parameter as a single vector
+            """
+            parameter = np.empty(0)
+            for value in self.values():
+                parameter = np.concatenate((parameter, value))
+            return parameter
+        
+        def set_reg_vector(self, parameter):
+            """Set all regression parameters using a single vectors
+            
+            Args:
+                parameter: regression parameter as a single vector
+            """
+            dim_counter = 0
+            for key in self.keys():
+                n_dim_key = self[key].shape[0]
+                self[key] = parameter[dim_counter:dim_counter+n_dim_key]
+                dim_counter += n_dim_key
+        
+        def delete_array(self):
+            """Delete arrays value_array and _d_reg_self_array
+            """
+            self.value_array = None
+            self._d_reg_self_array = None
+        
+        def keys(self):
+            """Return the keys of the regression parameters
+            """
+            return self.reg_parameters.keys()
+        
+        def values(self):
+            """Return the regression parameters
+            """
+            return self.reg_parameters.values()
+        
         def __str__(self):
             #print reg_parameters
             return self.reg_parameters.__str__()
@@ -750,7 +845,7 @@ class TimeSeries:
             #can return a value in value_array when key is an integer
             #can return a reg parameter when provided with "reg", "AR", "MA",
                 #"const"
-            if key in self.reg_parameters.keys():
+            if key in self.keys():
                 return self.reg_parameters[key]
             else:
                 return self.value_array[key]
@@ -759,10 +854,22 @@ class TimeSeries:
             #can set a value in value_array when key is an integer
             #can set a reg parameter when provided with "reg", "AR", "MA",
                 #"const"
-            if key in self.reg_parameters.keys():
+            if key in self.keys():
                 self.reg_parameters[key] = value
             else:
                 self.value_array[key] = value
+        
+        def __add__(self, other):
+            #add reg parameters
+            for key in self.keys():
+                self[key] += other[key]
+            return self
+        
+        def __mul__(self, other):
+            #multiply reg parameters by a scalar
+            for key in self.keys():
+                self[key] *= other
+            return self
     
     class PoissonRate(Parameter):
         def __init__(self, n_dim):
@@ -821,7 +928,7 @@ class TimeSeries:
                 gamma_mean = self[index-1]
                 gamma_dispersion = self._parent.gamma_dispersion
                 d_reg_gamma_mean = self._d_reg_self_array[key][index-1]
-                if key in gamma_dispersion.reg_parameters.keys():
+                if key in gamma_dispersion.keys():
                     d_reg_gamma_dispersion = (gamma_dispersion
                         ._d_reg_self_array[key][index-1])
                 else:
@@ -938,7 +1045,7 @@ class TimeSeriesSgd(TimeSeries):
                     print("step", j)
                     self.m_stochastic_step()
                     self.update_all_cp_parameters()
-                    ln_l_all_array.append(self.joint_log_likelihood())
+                    ln_l_all_array.append(self.get_em_objective())
                 #track when gradient descent was done
                 #the E step right after this in super().fit() is considered part
                     #of stochastic gradient descent
@@ -983,6 +1090,135 @@ class TimeSeriesSgd(TimeSeries):
         except StopIteration:
             self._permutation_iter = self._rng.permutation(self.n).__iter__()
             return self._permutation_iter.__next__()
+
+class TimeSeriesMcmc(TimeSeries):
+    
+    def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
+        super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
+        self.prior_mean = np.zeros(self.n_parameter)
+        self.prior_covariance = 0.25*np.identity(self.n_parameter)
+        self.prob_small_proposal = 0.05
+        self.chain_mean = np.zeros(self.n_parameter)
+        self.chain_covariance = np.zeros(
+            (self.n_parameter, self.n_parameter))
+        self.proposal_covariance_small = 0.01 / self.n_parameter
+        self.n_sample = 100
+        self.parameter_sample = []
+        self.z_sample = []
+        self.rng = random.RandomState(np.uint32(2057577976))
+        self.proposal_scale = math.pow(2.38,2)/self.n_parameter
+    
+    def e_step(self):
+        super().e_step()
+        self.z_array = self.z_array.round()
+        self.z_array[np.logical_and(self.z_array==0, self.y_array>0)] = 1
+    
+    def fit(self):
+        self.prior_mean = self.get_parameter_vector()
+        self.e_step()
+        n_adapt = 2*self.n_parameter
+        for i in range(self.n_sample):
+            print("Sample", i)
+            self.metropolis_hastings_on_z()
+            if i < n_adapt:
+                self.metropolis_hastings_on_reg(True)
+            else:
+                if self.rng.rand() < self.prob_small_proposal:
+                    self.metropolis_hastings_on_reg(True)
+                else:
+                    self.metropolis_hastings_on_reg(False)
+            self.z_sample.append(self.z_array.copy())
+            self.parameter_sample.append(self.get_parameter_vector())
+            self.update_chain_statistics()
+        self.update_all_cp_parameters()
+        self.set_parameter_vector(self.chain_mean)
+    
+    def metropolis_hastings_on_z(self):
+        z_before = self.z_array.copy()
+        for i in range(self.n):
+            z = self.z_array[i]
+            if z != 0:
+                log_posterior_before = self.get_joint_log_likelihood_i(i)
+                n_transition_to_one = 0
+                if z == 1:
+                    self.z_array[i] += self.rng.randint(0,2)
+                    if self.z_array[i] == 2:
+                        n_transition_to_one = -1
+                else:    
+                    self.z_array[i] += self.rng.randint(-1,2)
+                    if self.z_array[i] == 1:
+                        n_transition_to_one = 1
+                if self.z_array[i] != z:
+                    try:
+                        self.update_cp_parameters(i)
+                        log_posterior_after = self.get_joint_log_likelihood_i(i)
+                        log_posterior_after += (n_transition_to_one
+                            * math.log(3/2))
+                        if not self.is_accept_step(log_posterior_before,
+                            log_posterior_after):
+                            self.z_array[i] = z
+                    except(ValueError, OverflowError):
+                        self.z_array[i] = z
+        try:
+            self.update_cp_parameters(i)
+        except(ValueError, OverflowError):
+            self.z_array = z_before
+    
+    def metropolis_hastings_on_reg(self, is_small_proposal):
+        if is_small_proposal:
+            proposal_covariance = (self.proposal_covariance_small
+                * np.identity(self.n_parameter))
+        else:
+            proposal_covariance = self.proposal_scale * self.chain_covariance
+        #copy the reg_parameters
+        cp_parameter_before_proposal = self.copy_parameter()
+        log_posterior_before = (self.get_joint_log_likelihood()
+            + self.get_log_prior())
+        #make a step
+        if self.propose(proposal_covariance):
+            log_posterior_after = (self.get_joint_log_likelihood()
+                + self.get_log_prior())
+            if not self.is_accept_step(
+                log_posterior_before, log_posterior_after):
+                self.cp_parameter_array = cp_parameter_before_proposal
+        else:
+            self.cp_parameter_array = cp_parameter_before_proposal
+    
+    def is_accept_step(self, log_posterior_before, log_posterior_after):
+        accept_prob = math.exp(log_posterior_after - log_posterior_before)
+        if self.rng.rand() < accept_prob:
+            return True
+        else:
+            return False
+    
+    def get_log_prior(self):
+        return multivariate_normal.logpdf(
+            self.get_parameter_vector(), self.prior_mean, self.prior_covariance)
+    
+    def propose(self, covariance):
+        parameter_vector = self.get_parameter_vector()
+        parameter_vector = self.rng.multivariate_normal(
+            parameter_vector, covariance)
+        self.set_parameter_vector(parameter_vector)
+        try:
+            self.update_all_cp_parameters()
+            return True
+        except (ValueError, OverflowError):
+            return False
+    
+    def update_chain_statistics(self):
+        n = len(self.parameter_sample)
+        parameter = self.parameter_sample[n-1]
+        self.chain_mean *= (n-1)/n
+        self.chain_mean += parameter / n
+        diff = parameter-self.chain_mean
+        if n == 2:
+            diff0 = parameter[0]-self.chain_mean
+            self.chain_covariance = np.outer(diff0, diff0)
+            self.chain_covariance += np.outer(diff, diff)
+        elif n>2:
+            self.chain_covariance *= (n-2)/(n-1)
+            self.chain_covariance += (n/math.pow(n-1,2)) * np.outer(diff, diff)
 
 def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
     """Simulate a single compound poisson random variable
@@ -1146,5 +1382,3 @@ def print_figures(time_series, prefix):
     plt.ylabel("Z")
     plt.savefig("../figures/"+prefix+"_z.pdf")
     plt.close()
-    
-main()
