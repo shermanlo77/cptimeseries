@@ -5,7 +5,7 @@ import numpy.random as random
 import statsmodels.tsa.stattools as stats
 
 from scipy.special import loggamma, digamma, polygamma
-from scipy.stats import multivariate_normal 
+from scipy.stats import multivariate_normal
 
 class TimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
@@ -267,8 +267,12 @@ class TimeSeries:
             or update_cp_parameters(index) for index in range(self.n).
         """
         objective = self.get_joint_log_likelihood_i(i)
-        objective -= (0.5*z_var*polygamma(1, z/gamma_dispersion)
-            /math.pow(gamma_dispersion, 2))
+        z = self.z_array[i]
+        if z > 0:
+            z_var = self.z_var_array[i]
+            gamma_dispersion = self.gamma_dispersion[i]
+            objective -= (0.5*z_var*polygamma(1, z/gamma_dispersion)
+                /math.pow(gamma_dispersion, 2))
         return objective
     
     def get_joint_log_likelihood_i(self, i):
@@ -281,18 +285,13 @@ class TimeSeries:
         z = self.z_array[i]
         if z > 0:
             y = self.y_array[i]
-            z_var = self.z_var_array[i]
-            poisson_rate = self.poisson_rate[i]
             gamma_mean = self.gamma_mean[i]
             gamma_dispersion = self.gamma_dispersion[i]
-            terms = np.zeros(6)
-            terms[0] = (-z/gamma_dispersion *
-                (math.log(gamma_mean) + math.log(gamma_dispersion)))
-            terms[1] = -loggamma(z/gamma_dispersion)
-            terms[2] = (z/gamma_dispersion-1)*math.log(y)
-            terms[3] = -y/gamma_mean/gamma_dispersion
-            terms[4] = z*math.log(poisson_rate)
-            terms[5] = -loggamma(z+1)
+            cp_term = TimeSeries.Terms(self, i)
+            terms = np.zeros(3)
+            terms[0] = -y/gamma_mean/gamma_dispersion
+            terms[1] = -math.log(y)
+            terms[2] = cp_term.ln_wz(z)
             ln_l += np.sum(terms)
         return ln_l
     
@@ -314,13 +313,13 @@ class TimeSeries:
                 self.z_var_array[i] = 0
             else:
                 #work out the normalisation constant for the expectation
-                sum = TimeSeries.Sum(self, i)
+                sum = TimeSeries.Terms(self, i)
                 normalisation_constant = sum.ln_sum_w()
                 #work out the expectation
-                sum = TimeSeries.SumZ(self, i)
+                sum = TimeSeries.TermsZ(self, i)
                 self.z_array[i] = math.exp(
                     sum.ln_sum_w() - normalisation_constant)
-                sum = TimeSeries.SumZ2(self, i)
+                sum = TimeSeries.TermsZ2(self, i)
                 self.z_var_array[i] = (math.exp(
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
@@ -349,16 +348,17 @@ class TimeSeries:
                     parameter.calculate_d_reg_self_i(i)
             for parameter in self.cp_parameter_array:
                 #do gradient descent
-                parameter.gradient_descent()
+                parameter.gradient_descent(self.step_size)
             #work out log likelihood and test for convergence
             self.update_all_cp_parameters()
             ln_l_array.append(self.get_em_objective())
             if self.has_converge(ln_l_array):
                 break
         
-    class Sum:
+    class Terms:
+        """Contains the terms for the compound Poisson series.
         
-        """Works out the compound Poisson sum, only important terms are summed.
+        Can sum the compound Poisson series by summing only important terms.
             See Dynn, Smyth (2005)
         
         Attributes:
@@ -437,7 +437,7 @@ class TimeSeries:
                         self.log_expectation_term(z_l), 
                         -ln_w_max])
                     #if this log ratio is bigger than the threshold
-                    if log_ratio > TimeSeries.Sum.cp_sum_threshold:
+                    if log_ratio > TimeSeries.Terms.cp_sum_threshold:
                         #append the ratio to the array of terms
                         terms.append(math.exp(log_ratio))
                     else:
@@ -458,7 +458,7 @@ class TimeSeries:
                     self.log_expectation_term(z_u),
                     -ln_w_max])
                 #if this log ratio is bigger than the threshold
-                if log_ratio > TimeSeries.Sum.cp_sum_threshold:
+                if log_ratio > TimeSeries.Terms.cp_sum_threshold:
                     #append the ratio to the array of terms
                     terms.append(math.exp(log_ratio))
                 else:
@@ -516,23 +516,17 @@ class TimeSeries:
             ln_wz = np.sum(terms)
             return ln_wz
     
-    class SumZ(Sum):
+    class TermsZ(Terms):
         def __init__(self, parent, index):
             super().__init__(parent, index)
         def log_expectation_term(self, z):
             return math.log(z)
     
-    class SumZ2(Sum):
+    class TermsZ2(Terms):
         def __init__(self, parent, index):
             super().__init__(parent, index)
         def log_expectation_term(self, z):
             return 2*math.log(z)
-    
-    class SumZDigamma(Sum):
-        def __init__(self, parent, index):
-            super().__init__(parent, index)
-        def log_expectation_term(self, z):
-            return math.log(z) + math.log(digamma(z/self.gamma_dispersion))
     
     class Parameter:
         """Dynamic parameters of the compound Poisson
@@ -663,18 +657,21 @@ class TimeSeries:
             """
             pass
         
-        def gradient_descent(self):
+        def gradient_descent(self, step_size):
             """Update itself using gradient descent
             
             Modifies self.reg_parameters using gradient_descent given the model
                 fields and z_array. Requires calculate_d_reg_self_i() to be
                 called for all index. See the method m_step in TimeSeries
+            
+            Args:
+                step_size: change parameters by step_size/self.n * gradient
             """
             gradient = self.d_reg_ln_l()
-            gradient *= self._parent.step_size/self.n
+            gradient *= step_size/self.n
             self += gradient
         
-        def stochastic_gradient_descent(self, index):
+        def stochastic_gradient_descent(self, index, step_size):
             """Update itself using stochastic gradient descent
             
             Modifies self.reg_parameters using gradient_descent given the model
@@ -685,11 +682,12 @@ class TimeSeries:
             Args:
                 index: the point in the time series to be used for stochastic
                     gradient descent
+                step_size: change parameters by step_size * gradient
             """
             d_self_ln_l = self.d_self_ln_l(index)
             for key in self.keys():
-                self[key] += (self._parent.stochastic_step_size
-                    * (self._d_reg_self_array[key][index]* d_self_ln_l))
+                self[key] += (step_size * (self._d_reg_self_array[key][index]
+                    * d_self_ln_l))
         
         def d_reg_ln_l(self):
             """Returns the derivate of the log likelihood wrt reg parameters
@@ -714,7 +712,7 @@ class TimeSeries:
                     "AR" and "MA"
             """
             d_self_ln_l = self.d_self_ln_l_all()
-            d_reg_ln_l = self._d_regn_parameter = parameter.n_parameter_self_array
+            d_reg_ln_l = self._d_reg_self_array
             for key in self.keys():
                 for i in range(self.n):
                     #chain rule
@@ -1047,11 +1045,7 @@ class TimeSeriesSgd(TimeSeries):
                 #the log likelihood is bigger, copy the parmeters
                 ln_l_max = ln_l
                 self.ln_l_max_index = len(ln_l_all_array)-1
-                cp_parameter_array = [
-                    self.poisson_rate.copy(),
-                    self.gamma_mean.copy(),
-                    self.gamma_dispersion.copy(),
-                ]
+                cp_parameter_array = self.copy_parameter()
             for parameter in cp_parameter_array:
                 print(parameter)
             print("stochastic gradient descent")
@@ -1073,7 +1067,7 @@ class TimeSeriesSgd(TimeSeries):
                 self.ln_l_stochastic_index.append(len(ln_l_all_array))
         #copy results to the member variable
         self.ln_l_array = ln_l_all_array
-        self.cp_parameter_array = cp_parameter_array
+        self.set_parameter(cp_parameter_array)
         self.poisson_rate = cp_parameter_array[0]
         self.gamma_mean = cp_parameter_array[1]
         self.gamma_dispersion = cp_parameter_array[2]
@@ -1093,7 +1087,8 @@ class TimeSeriesSgd(TimeSeries):
                 parameter.calculate_d_reg_self_i(i)
         for parameter in self.cp_parameter_array:
             #do stochastic gradient descent
-            parameter.stochastic_gradient_descent(index)
+            parameter.stochastic_gradient_descent(
+                index, self.stochastic_step_size)
     
     def get_next_permutation(self):
         """Returns a index from a random permutation
@@ -1124,8 +1119,12 @@ class TimeSeriesMcmc(TimeSeries):
         proposal_z_parameter: for proposal,probability of movingq z
         prior_mean: prior mean for the regression parameters
         prior_covariance: prior covariance for the regression parameters
+        n_till_adapt: the chain always use the small proposal initially, number
+            of steps till use the adaptive proposal covariance
         prob_small_proposal: probability of using proposal_covariance_small as
             the proposal covariance for the reggression parameters
+        proposal_covariance_small: the size of the small proposal covariance,
+            scalar, it is to be multipled by an identity matrix
         proposal_scale: proposal covariance for the regression parameters is
             proposal_scale times chain_covariance
         chain_mean: mean of the regression parameter chain (excludes z step)
@@ -1143,14 +1142,14 @@ class TimeSeriesMcmc(TimeSeries):
     
     def __init__(self, x, cp_parameter_array):
         super().__init__(x, cp_parameter_array)
-        self.n_sample = 100
+        self.n_sample = 1000
         self.z_sample = []
         self.parameter_sample = []
         self.proposal_z_parameter = 1/self.n
         self.prior_mean = np.zeros(self.n_parameter)
         self.prior_covariance = 0.25*np.identity(self.n_parameter)
+        self.n_till_adapt = 2*self.n_parameter
         self.prob_small_proposal = 0.05
-        self.n_adapt = 2*self.n_parameter
         self.proposal_covariance_small = 1e-8 / self.n_parameter
         self.proposal_scale = math.pow(2.38,2)/self.n_parameter
         self.chain_mean = np.zeros(self.n_parameter)
@@ -1246,7 +1245,7 @@ class TimeSeriesMcmc(TimeSeries):
         #decide to use small proposal or adaptive proposal
         #for the first n_adapt runs, they are small to ensure chain_covariance
             #is full rank
-        if self.n_propose_reg < self.n_adapt:
+        if self.n_propose_reg < self.n_till_adapt:
             is_small_proposal = True
         #after adapting, mixture of small proposal and adaptive proposal
         else:
