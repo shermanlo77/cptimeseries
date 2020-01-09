@@ -28,7 +28,9 @@ gamma_dispersion = cp.TimeSeries.GammaDispersion(n_dim)
 gamma_dispersion["reg"] = [0.07, 0.007]
 gamma_dispersion["const"] = 0.12
 
+
 time_series = cp.TimeSeriesMcmc(x, [poisson_rate, gamma_mean, gamma_dispersion])
+true_parameter = time_series.get_parameter_vector()
 time_series.simulate(rng)
 
 poisson_rate_guess = math.log(n/(n- np.count_nonzero(time_series.z_array)))
@@ -46,24 +48,9 @@ gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
 time_series.set_new_parameter([poisson_rate, gamma_mean, gamma_dispersion])
 time_series.fit()
 chain = np.asarray(time_series.parameter_sample)
-plot.figure()
-for i in range(time_series.n_parameter):
-    plot.plot(chain[:,i])
-plot.show()
 
-chain = np.sum(np.asarray(time_series.z_sample),1)
-plot.figure()
-plot.plot(chain)
-plot.show()
+np.savez('Posterior_Sample', chain=chain, zchain=time_series.z_sample, true_parameter=true_parameter,
+         zacc=time_series.accept_z_array, regarr=time_series.accept_reg_array)
 
-accept = np.asarray(time_series.accept_reg_array)
-plot.figure()
-plot.plot(accept)
-plot.show()
-
-accept = np.asarray(time_series.accept_z_array)
-plot.figure()
-plot.plot(accept)
-plot.show()
 
 pdb.set_trace()
