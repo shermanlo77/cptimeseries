@@ -39,13 +39,12 @@ class TimeSeries:
             likelihood increases not very much
     """
     
-    def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
+    def __init__(self, x, cp_parameter_array):
         """
         Args:
             x: design matrix of the model fields, shape (n, n_dim)
-            poisson_rate: PoissonRate object
-            gamma_mean: GammaMean object
-            gamma_dispersion: GammaDispersion object
+            cp_parameter_array: array containing in order PoissonRate object,
+                GammaMean object, GammaDispersion object
         """
         self.x = x
         self.n = x.shape[0]
@@ -66,27 +65,17 @@ class TimeSeries:
         self.n_gradient_descent = 100
         self.min_ln_l_ratio = 0.0001
         
-        self.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
+        self.set_new_parameter(cp_parameter_array)
     
-    def set_parameters(self, poisson_rate, gamma_mean, gamma_dispersion):
-        """Set the member variables of the cp paramters
+    def set_new_parameter(self, cp_parameter_array):
+        """Set the member variables of newly instantised cp paramters
         
         Set the member variables of poisson_rate, gamma_mean,
             gamma_dispersion and cp_parameter_array. Itself is assigned as the
             parent to these objects. The reg parameters in these objects are
             converted to numpy array
-        
-        Args:
-            poisson_rate: PoissonRate object
-            gamma_mean: GammaMean object
-            gamma_dispersion: GammaDispersion object
         """
-        self.poisson_rate = poisson_rate
-        self.gamma_mean = gamma_mean
-        self.gamma_dispersion = gamma_dispersion
-        #make dictionary of these variables
-        self.cp_parameter_array = [poisson_rate, gamma_mean, gamma_dispersion]
-        
+        self.set_parameter(cp_parameter_array)
         for parameter in self.cp_parameter_array:
             #assign the parameters parents as self, this is so that the
                 #parameter objects has access to all member variables and
@@ -94,12 +83,26 @@ class TimeSeries:
             parameter.assign_parent(self)
             #prepare the parameters by converting all to numpy array
             parameter.convert_all_to_np()
-        
         #get number of parameters in this model
         self.n_parameter = 0
         for parameter in self.cp_parameter_array:
             for reg in parameter.values():
                 self.n_parameter += reg.shape[0]
+    
+    def set_parameter(self, cp_parameter_array):
+        """Set the member variables of the cp paramters
+        
+        Set the member variables of poisson_rate, gamma_mean,
+            gamma_dispersion and cp_parameter_array. 
+        
+        Args:
+            array containing in order: PoissonRate object, GammaMean object,
+                GammaDispersion object
+        """
+        self.poisson_rate = cp_parameter_array[0]
+        self.gamma_mean = cp_parameter_array[1]
+        self.gamma_dispersion = cp_parameter_array[2]
+        self.cp_parameter_array = cp_parameter_array
     
     def copy_parameter(self):
         """Deep copy compound Poisson parameters
@@ -233,9 +236,10 @@ class TimeSeries:
             assuming the latent variable z are observed (via simulation or
             estimating using the E step). Requires the method
             update_all_cp_parameters() to be called beforehand or
-            update_cp_parameters(index) for index in range(self.n). Note that
-            this is done after calling e_step(), thus this method can be called
-            without any prerequisites afer calling e_step(). 
+            update_cp_parameters(index) for index in range(self.n) if only a few
+            parameters has changed. Note that this is done after calling
+            e_step(), thus this method can be called without any prerequisites
+            afer calling e_step(). 
         
         Returns:
             log likelihood
@@ -246,18 +250,33 @@ class TimeSeries:
         return np.sum(ln_l_array)
     
     def get_em_objective(self):
+        """Return M step objective for a single data point
+        
+        Requires the method update_all_cp_parameters() to be called beforehand
+            or update_cp_parameters(index) for index in range(self.n).
+        """
         ln_l_array = np.zeros(self.n)
         for i in range(self.n):
             ln_l_array[i] = self.get_em_objective_i(i)
         return np.sum(ln_l_array)
     
     def get_em_objective_i(self, i):
+        """Return M step objective for a single data point
+        
+        Requires the method update_all_cp_parameters() to be called beforehand
+            or update_cp_parameters(index) for index in range(self.n).
+        """
         objective = self.get_joint_log_likelihood_i(i)
         objective -= (0.5*z_var*polygamma(1, z/gamma_dispersion)
             /math.pow(gamma_dispersion, 2))
         return objective
     
     def get_joint_log_likelihood_i(self, i):
+        """Return joint log likelihood for a single data point
+        
+        Requires the method update_all_cp_parameters() to be called beforehand
+            or update_cp_parameters(index) for index in range(self.n).
+        """
         ln_l = -self.poisson_rate[i]
         z = self.z_array[i]
         if z > 0:
@@ -993,8 +1012,8 @@ class TimeSeriesSgd(TimeSeries):
         _permutation_iter: iterator for the permutation of index
     """
     
-    def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
-        super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
+    def __init__(self, x, cp_parameter_array):
+        super().__init__(x, cp_parameter_array)
         self.n_initial = 100
         self.stochastic_step_size = 0.01
         self.n_stochastic_step = 10
@@ -1122,9 +1141,9 @@ class TimeSeriesMcmc(TimeSeries):
         rng: random number generator
     """
     
-    def __init__(self, x, poisson_rate, gamma_mean, gamma_dispersion):
-        super().__init__(x, poisson_rate, gamma_mean, gamma_dispersion)
-        self.n_sample = 1000
+    def __init__(self, x, cp_parameter_array):
+        super().__init__(x, cp_parameter_array)
+        self.n_sample = 100
         self.z_sample = []
         self.parameter_sample = []
         self.proposal_z_parameter = 1/self.n
@@ -1132,11 +1151,10 @@ class TimeSeriesMcmc(TimeSeries):
         self.prior_covariance = 0.25*np.identity(self.n_parameter)
         self.prob_small_proposal = 0.05
         self.n_adapt = 2*self.n_parameter
-        self.proposal_covariance_small = 0.0001 / self.n_parameter
+        self.proposal_covariance_small = 1e-8 / self.n_parameter
         self.proposal_scale = math.pow(2.38,2)/self.n_parameter
         self.chain_mean = np.zeros(self.n_parameter)
-        self.chain_covariance = np.zeros(
-            (self.n_parameter, self.n_parameter))
+        self.chain_covariance = np.zeros((self.n_parameter, self.n_parameter))
         self.n_propose_z = 0
         self.n_propose_reg = 0
         self.n_accept_z = 0
@@ -1182,6 +1200,7 @@ class TimeSeriesMcmc(TimeSeries):
         """
         #make a deep copy of the z, use it in case of rejection step
         z_before = self.z_array.copy()
+        cp_parameter_before = self.copy_parameter()
         log_posterior_before = self.get_joint_log_likelihood()
         #count number of times z moves to 1, also subtract if z moves from 1
         #use because the transition is non-symetric at 1
@@ -1206,7 +1225,7 @@ class TimeSeriesMcmc(TimeSeries):
                 log_posterior_after):
                 #rejection step, replace the z before this MCMC step
                 self.z_array = z_before
-                self.update_all_cp_parameters()
+                self.set_parameter(cp_parameter_before)
             else:
                 #accept step only if at least one z has moved
                 if not np.array_equal(z_before, self.z_array):
@@ -1214,7 +1233,7 @@ class TimeSeriesMcmc(TimeSeries):
         #treat numerical errors as a rejection
         except(ValueError, OverflowError):
             self.z_array = z_before
-            self.update_all_cp_parameters()
+            self.set_parameter(cp_parameter_before)
         #keep track of acceptance rate
         self.n_propose_z += 1
         self.accept_z_array.append(self.n_accept_z/self.n_propose_z)
@@ -1243,7 +1262,7 @@ class TimeSeriesMcmc(TimeSeries):
             proposal_covariance = self.proposal_scale * self.chain_covariance
         
         #copy the reg_parameters, in case of rejection step
-        cp_parameter_before_proposal = self.copy_parameter()
+        cp_parameter_before = self.copy_parameter()
         #get posterior
         log_posterior_before = (self.get_joint_log_likelihood()
             + self.get_log_prior())
@@ -1258,15 +1277,13 @@ class TimeSeriesMcmc(TimeSeries):
             if not self.is_accept_step(
                 log_posterior_before, log_posterior_after):
                 #regression step, set the parameters before the MCMC step
-                self.cp_parameter_array = cp_parameter_before_proposal
-                self.update_all_cp_parameters()
+                self.set_parameter(cp_parameter_before)
             else:
                 #acceptance step, keep track of acceptance rate
                 self.n_accept_reg += 1
         else:
             #treat numerical problems as a rejection step
-            self.cp_parameter_array = cp_parameter_before_proposal
-            self.update_all_cp_parameters()
+            self.set_parameter(cp_parameter_before)
         #keep track of acceptance rate
         self.n_propose_reg += 1
         self.accept_reg_array.append(self.n_accept_reg/self.n_propose_reg)
@@ -1409,7 +1426,7 @@ def main():
     gamma_dispersion["reg"] = [0.07, 0.007]
     gamma_dispersion["const"] = 0.12
     
-    time_series = TimeSeriesSgd(x, poisson_rate, gamma_mean, gamma_dispersion)
+    time_series = TimeSeriesSgd(x, [poisson_rate, gamma_mean, gamma_dispersion])
     time_series.simulate(rng)
     print_figures(time_series, "simulation")
     
@@ -1425,7 +1442,7 @@ def main():
     gamma_mean["const"] = math.log(gamma_mean_guess)
     gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
     
-    time_series.set_parameters(poisson_rate, gamma_mean, gamma_dispersion)
+    time_series.set_new_parameter([poisson_rate, gamma_mean, gamma_dispersion])
     print(time_series.poisson_rate)
     print(time_series.gamma_mean)
     print(time_series.gamma_dispersion)
