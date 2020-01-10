@@ -42,7 +42,7 @@ class TimeSeriesMcmc(TimeSeries):
     
     def __init__(self, x, cp_parameter_array):
         super().__init__(x, cp_parameter_array)
-        self.n_sample = 10000
+        self.n_sample = 92000
         self.z_sample = []
         self.parameter_sample = []
         self.proposal_z_parameter = 1/self.n

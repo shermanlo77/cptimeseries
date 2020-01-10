@@ -4,7 +4,7 @@ import numpy.random as random
 import pdb
 import math
 import matplotlib.pyplot as plot
-import pickle
+import joblib
 
 rng = random.RandomState(np.uint32(372625178))
 n = 10000
@@ -47,6 +47,6 @@ gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
 
 time_series.set_new_parameter([poisson_rate, gamma_mean, gamma_dispersion])
 time_series.fit()
-pickle.dump(time_series, "mcmc_result.pickle")
+joblib.dump(time_series, "mcmc_result.zlib")
 
 pdb.set_trace()
