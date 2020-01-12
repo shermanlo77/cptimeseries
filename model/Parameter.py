@@ -1,6 +1,7 @@
 import math
 import numpy as np
 
+from Arma import Arma
 from scipy.special import digamma, polygamma
 
 class Parameter:
@@ -28,6 +29,7 @@ class Parameter:
         reg_parameters: dictionary containing regressive (reg) parameters
             with keys "reg", "AR", "MA", "const" which corresponds to the
             names of the reg parameters
+        arma: object to evalute arma terms
         value_array: array of values of the parameter for each time step
         _parent: TimeSeries object containing this
         _d_reg_self_array: dictionary containing arrays of derivates
@@ -45,6 +47,7 @@ class Parameter:
             "reg": np.zeros(n_dim),
             "const": 0.0,
         }
+        self.arma = None
         self.value_array = None
         self._parent = None
         self._d_reg_self_array = None
@@ -58,6 +61,7 @@ class Parameter:
         self._parent = parent
         self.n = parent.n
         self.value_array = np.zeros(self.n)
+        self.arma = Arma(self)
     
     def copy(self):
         """Return deep copy of itself
@@ -105,30 +109,30 @@ class Parameter:
     def ar_term(self, index):
         """AR term at a time step
         
-        Returns the autoregressive term, log(self[index-1]) - constant term
-        
-        Args:
-            index: time step
-        
-        Returns:
-            the AR term at a time step
+        Returns the AR term at a given time step. Uses the arma object.
         """
-        if index > 0:
-            return math.log(self[index-1]) - self["const"]
-        else:
-            return 0.0
+        return self.arma.ar(index)
     
     def ma_term(self, index):
         """MA term at a time step
         
-        Returns the moving average term, (self[index-1] -
-            expected(self[index-1])) / std(self[index-1])
+        Returns the MA term at a given time step. Uses the arma object.
+        """
+        return self.arma.ma(index)
+    
+    def ar(self, parameter):
+        """AR term given parameters
         
-        Args:
-            index: time step
+        Returns the autoregressive term given parameters, to be used by the arma
+            object.
+        """
+        return math.log(parameter) - self["const"]
+    
+    def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
+        """MA term given parameters
         
-        Returns:
-            the MA term at a time step
+        Returns the moving average term given parameters, to be implemented. to
+            be used by the arma object.
         """
         pass
     
@@ -368,14 +372,8 @@ class PoissonRate(Parameter):
         super().__init__(n_dim)
         self.reg_parameters["AR"] = 0.0
         self.reg_parameters["MA"] = 0.0
-    def ma_term(self, index):
-        if index > 0:
-            poisson_rate_before = self[index-1]
-            return (
-                (self._parent.z_array[index-1] - poisson_rate_before)
-                / math.sqrt(poisson_rate_before))
-        else:
-            return 0.0
+    def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
+        return (z - poisson_rate) / math.sqrt(poisson_rate)
     def d_self_ln_l(self, index):
         z = self._parent.z_array[index]
         poisson_rate = self.value_array[index]
@@ -391,20 +389,10 @@ class GammaMean(Parameter):
         super().__init__(n_dim)
         self.reg_parameters["AR"] = 0.0
         self.reg_parameters["MA"] = 0.0
-    def ma_term(self, index):
-        if index > 0:
-            z_before = self._parent.z_array[index-1]
-            if z_before > 0:
-                y_before = self._parent.y_array[index-1]
-                self_before = self[index-1]
-                return (
-                    (y_before - z_before*self_before)
-                    / self_before
-                    / math.sqrt(
-                        self._parent.gamma_dispersion[index-1]
-                        * z_before))
-            else:
-                return 0.0
+    def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
+        if z > 0:
+            return ((y - z* gamma_mean) / gamma_mean
+                / math.sqrt(gamma_dispersion * z))
         else:
             return 0.0
     def d_self_ln_l(self, index):
