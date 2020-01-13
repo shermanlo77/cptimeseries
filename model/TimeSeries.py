@@ -155,14 +155,43 @@ class TimeSeries:
                 self.poisson_rate[i], self.gamma_mean[i],
                 self.gamma_dispersion[i], rng)
     
+    def simulate_given_z(self, rng):
+        """Return a simulated of a whole time series with given z
+        
+        Simulate a time series given the model fields self.x, cp parameters and
+            latent variables in self.z_array. Modify the member variables
+            poisson_rate, gamma_mean and gamma_dispersion by updating its values
+            at each time step. Also modifies self.y_array with the simulated
+            values.
+        
+        Args:
+            rng: numpy.random.RandomState object
+        """
+        for i in range(self.n):
+            #get the parameters of the compound Poisson at this time step
+            self.update_cp_parameters(i)
+            #simulate this compound Poisson
+            self.y_array[i] = simulate_cp_given_z(
+                self.z_array[i], self.gamma_mean[i], self.gamma_dispersion[i],
+                rng)
+    
     def set_y_to_expectation(self):
-        """Expectation of the whole time series
+        """Set y_array to expectation of the whole time series
         
         Set y_array to be the expected value, that is poisson_rate * gamma_mean
         """
-        self.update_all_cp_parameters()
         for i in range(self.n):
+            self.update_cp_parameters(i)
             self.y_array[i] = self.poisson_rate[i] * self.gamma_mean[i]
+    
+    def set_y_to_expectation_given_z(self):
+        """Set y_array to expectation of the whole time series given z
+        
+        Set y_array to be the conditional expected value, that is z * gamma_mean
+        """
+        for i in range(self.n):
+            self.update_cp_parameters(i)
+            self.y_array[i] = self.z_array[i] * self.gamma_mean[i]
     
     def fit(self):
         pass
@@ -308,6 +337,26 @@ class TimeSeries:
         forecast.simulate(rng)
         return forecast
     
+    def self_forecast(self):
+        """Forecast itself
+        
+        Return a time series with y_array the expectation given the parameters
+            and z_array
+        """
+        forecast = self.copy()
+        forecast.set_y_to_expectation_given_z()
+        return forecast
+    
+    def self_forecast_simulate(self, rng):
+        """Simulate a forecast itself
+        
+        Return a time series with y_array which was simulated given the
+            parameters and z_array
+        """
+        forecast = self.copy()
+        forecast.simulate_given_z(rng)
+        return forecast
+    
     def instantiate_forecast(self, x):
         """Instantiate a TimeSeries object for forecast
         
@@ -335,6 +384,18 @@ class TimeSeries:
         """
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
+    
+    def copy(self):
+        """Return a copy of this TimeSeries
+        
+        Return a copy of this TimeSeries. Deep copy the parameters, z_array and
+            y_array. Soft copy x. Soft copy fitted_time_series.
+        """
+        copy = TimeSeries(self.x, self.copy_parameter())
+        copy.z_array = self.z_array.copy()
+        copy.y_array = self.y_array.copy()
+        copy.fitted_time_series = self.fitted_time_series
+        return copy
     
     class Terms:
         """Contains the terms for the compound Poisson series.
@@ -522,9 +583,24 @@ def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
         tuple contain vectors of y (compound Poisson random variable) and z
             (latent Poisson random variable)
     """
+    #poisson random variable variable
+    z = rng.poisson(poisson_rate)
+    #gamma random variable
+    y = simulate_cp_given_z(z, gamma_mean, gamma_dispersion, rng)
+    return (y, z)
+
+def simulate_cp_given_z(z, gamma_mean, gamma_dispersion, rng):
+    """Simulate a single compound poisson random varible given z
     
-    z = rng.poisson(poisson_rate) #poisson random variable
+    Args:
+        z: latent poisson variable
+        gamma_mean: mean of the gamma random variable
+        gamma_dispersion: dispersion of the gamma random variable
+    
+    Returns:
+        simulated compound Poisson random variable
+    """
     shape = z / gamma_dispersion #gamma shape parameter
     scale = gamma_mean * gamma_dispersion #gamma scale parameter
     y = rng.gamma(shape, scale=scale) #gamma random variable
-    return (y, z)
+    return y
