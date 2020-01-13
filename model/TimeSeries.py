@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from Arma import Arma, ArmaForecast, ArmaForecastNoMa
 from scipy.special import loggamma, polygamma
 
 class TimeSeries:
@@ -27,6 +28,7 @@ class TimeSeries:
         z_array: latent poisson variables at each time step
         z_var_array: variance of the z at each time step
         y_array: compound poisson variables at each time step
+        fitted_time_series: time series before this one, used for forecasting
     """
     
     def __init__(self, x, cp_parameter_array):
@@ -48,6 +50,7 @@ class TimeSeries:
         self.z_array = np.zeros(self.n)
         self.z_var_array = np.zeros(self.n)
         self.y_array = np.zeros(self.n)
+        self.fitted_time_series = None
         
         self.set_new_parameter(cp_parameter_array)
     
@@ -151,6 +154,15 @@ class TimeSeries:
             self.y_array[i], self.z_array[i] = simulate_cp(
                 self.poisson_rate[i], self.gamma_mean[i],
                 self.gamma_dispersion[i], rng)
+    
+    def set_y_to_expectation(self):
+        """Expectation of the whole time series
+        
+        Set y_array to be the expected value, that is poisson_rate * gamma_mean
+        """
+        self.update_all_cp_parameters()
+        for i in range(self.n):
+            self.y_array[i] = self.poisson_rate[i] * self.gamma_mean[i]
     
     def fit(self):
         pass
@@ -270,7 +282,60 @@ class TimeSeries:
                 self.z_var_array[i] = (math.exp(
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
+    
+    def forecast(self, x):
+        """Forecast given the model fields
         
+        Return a forecasted time series which follows on from this one given the
+            model fields beyond the one provided here. The forecast is the
+            expected value of Y. Any non-early MA terms are set to zero because
+            no variables are simulated and the expectation is used. 
+        """
+        forecast = self.instantiate_forecast(x)
+        forecast.cast_arma(ArmaForecastNoMa)
+        forecast.set_y_to_expectation()
+        return forecast
+        
+    def forecast_simulate(self, x, rng):
+        """Simulated a time series beyond now
+        
+        Return a forecasted time series which follows on from this one given the
+            model fields beyond the one provided here. The forecast is a
+            simulation of Z and Y.
+        """
+        forecast = self.instantiate_forecast(x)
+        forecast.cast_arma(ArmaForecast)
+        forecast.simulate(rng)
+        return forecast
+    
+    def instantiate_forecast(self, x):
+        """Instantiate a TimeSeries object for forecast
+        
+        Return a new TimeSeries object with the reg parameter copied over
+        
+        Args:
+            x: model fields
+        """
+        cp_parameter_array = [self.poisson_rate.copy_reg(),
+                              self.gamma_mean.copy_reg(),
+                              self.gamma_dispersion.copy_reg(),
+                              ]
+        forecast = TimeSeries(x, cp_parameter_array)
+        forecast.fitted_time_series = self
+        return forecast
+    
+    def cast_arma(self, arma_class):
+        """Cast the arma object
+        
+        Update the member variable arma to be of another type using a provided
+            class
+        
+        Args:
+            arma_class: class object, self will be passed into the constructor
+        """
+        for parameter in self.cp_parameter_array:
+            parameter.cast_arma(arma_class)
+    
     class Terms:
         """Contains the terms for the compound Poisson series.
         

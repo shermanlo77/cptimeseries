@@ -92,6 +92,17 @@ class TimeSeriesMcmc(TimeSeries):
         self.update_all_cp_parameters()
         self.set_parameter_vector(self.chain_mean)
     
+    def set_parameter_from_sample(self, index):
+        """Set parameter from MCMC sample
+        
+        Set the regression parameters and latent variables z from the MCMC
+            samples in parameter_sample and z_sample. NOTE: does a shallow copy
+            from the array of samples.
+        """
+        self.set_parameter_vector(self.parameter_sample[index])
+        self.z_array = self.z_sample[index]
+        self.update_all_cp_parameters()
+    
     def metropolis_hastings_on_z(self):
         """Use Metropolis Hastings to sample z
         

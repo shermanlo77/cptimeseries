@@ -66,14 +66,20 @@ class Parameter:
     def copy(self):
         """Return deep copy of itself
         """
+        copy = self.copy_reg()
+        copy.assign_parent(self._parent)
+        copy.value_array = self.value_array.copy()
+        return copy
+    
+    def copy_reg(self):
+        """Return deep copy of the regression parameters
+        """
         copy = self.__class__(self.n_dim)
         for key, value in self.reg_parameters.items():
             if type(value) is np.ndarray:
                 copy[key] = value.copy()
             else:
                 copy[key] = value
-        copy.assign_parent(self._parent)
-        copy.value_array = self.value_array.copy()
         return copy
     
     def convert_all_to_np(self):
@@ -105,6 +111,17 @@ class Parameter:
             exponent += self["MA"] * self.ma_term(index)
         #exp link function, make it positive
         self[index] = math.exp(exponent)
+    
+    def cast_arma(self, arma_class):
+        """Cast the arma object
+        
+        Update the member variable arma to be of another type using a provided
+            class
+        
+        Args:
+            arma_class: class object, self will be passed into the constructor
+        """
+        self.arma = arma_class(self)
     
     def ar_term(self, index):
         """AR term at a time step
@@ -338,13 +355,27 @@ class Parameter:
         return self.reg_parameters.__str__()
     
     def __getitem__(self, key):
-        #can return a value in value_array when key is an integer
+        #can return a value in value_array when key is a non-negative integer
+        #can return a value from the corresponding parameter in
+            #_parent.fitted_time_series (if it exists) if key is a negative
+            #integer
         #can return a reg parameter when provided with "reg", "AR", "MA",
             #"const"
         if key in self.keys():
             return self.reg_parameters[key]
         else:
-            return self.value_array[key]
+            #non-negative index, return value in value_array
+            if key >= 0:
+                return self.value_array[key]
+            #negative index, return value from the past time series
+            else:
+                time_series_before = self._parent.fitted_time_series
+                #get the corresponding parameter from the past time series
+                for parameter in time_series_before.cp_parameter_array:
+                    if isinstance(parameter, self.__class__):
+                        parameter_before = parameter
+                        break
+                return parameter_before[parameter_before.n + key]
     
     def __setitem__(self, key, value):
         #can set a value in value_array when key is an integer
