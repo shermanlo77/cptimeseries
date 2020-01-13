@@ -28,7 +28,7 @@ class TimeSeriesSgd(TimeSeriesGd):
     
     def __init__(self, x, cp_parameter_array):
         super().__init__(x, cp_parameter_array)
-        self.n_initial = 100
+        self.n_initial = 1000
         self.stochastic_step_size = 0.01
         self.n_stochastic_step = 10
         self.ln_l_max_index = 0
