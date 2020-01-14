@@ -397,6 +397,53 @@ class TimeSeries:
         copy.fitted_time_series = self.fitted_time_series
         return copy
     
+    def get_error_rmse(self, true_y):
+        """Return root mean square error
+        
+        Compare this y_array (usually a prediction) with a given true_y using
+            the root mean squared error
+        
+        Args:
+            true_y: array of y
+        
+        Return:
+            root mean square error
+        """
+        return np.sqrt(np.sum(np.square(self.y_array - true_y)) / self.n)
+    
+    def get_error_square_sqrt(self, true_y):
+        """Return square mean sqrt error
+        
+        Compare this y_array (usually a prediction) with a given true_y using
+            the square mean sqrt error. This is the Tweedie deviance with
+            p = 1.5
+        
+        Args:
+            true_y: array of y
+        
+        Return:
+            square mean sqrt error, can be infinite
+        """
+        error = np.zeros(self.n)
+        is_infinite = False
+        for i in range(self.n):
+            y = true_y[i]
+            y_hat = self.y_array[i]
+            if y == 0:
+                error[i] = math.sqrt(y_hat)
+            else:
+                if y_hat == 0:
+                    is_infinite = True
+                    break
+                else:
+                    sqrt_y_hat = math.sqrt(y_hat)
+                    error[i] = (math.pow(math.sqrt(y) - sqrt_y_hat, 2)
+                        / sqrt_y_hat)
+        if is_infinite:
+            return math.inf
+        else:
+            return math.pow(np.sum(error) / self.n, 2)
+    
     class Terms:
         """Contains the terms for the compound Poisson series.
         
