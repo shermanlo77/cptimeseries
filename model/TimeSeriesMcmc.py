@@ -82,9 +82,9 @@ class TimeSeriesMcmc(TimeSeries):
             print("Sample",i)
             #select random component
             if self.rng.rand() < 0.5:
-                self.metropolis_hastings_on_z()
+                self.sample_z()
             else:
-                self.metropolis_hastings_on_reg()
+                self.sample_reg()
             #add parameter to the array of samples
             self.z_sample.append(self.z_array.copy())
             self.parameter_sample.append(self.get_parameter_vector())
@@ -103,7 +103,7 @@ class TimeSeriesMcmc(TimeSeries):
         self.z_array = self.z_sample[index]
         self.update_all_cp_parameters()
     
-    def metropolis_hastings_on_z(self):
+    def sample_z(self):
         """Use Metropolis Hastings to sample z
         
         Uniform prior, proposal is step back, stay or step forward
@@ -148,7 +148,7 @@ class TimeSeriesMcmc(TimeSeries):
         self.n_propose_z += 1
         self.accept_z_array.append(self.n_accept_z/self.n_propose_z)
     
-    def metropolis_hastings_on_reg(self):
+    def sample_reg(self):
         """Use Metropolis Hastings to sample regression parameters
         
         Normal prior, normal proposal

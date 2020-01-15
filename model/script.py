@@ -33,7 +33,7 @@ time_series = cp.TimeSeriesMcmc(x, [poisson_rate, gamma_mean, gamma_dispersion])
 true_parameter = time_series.get_parameter_vector()
 time_series.simulate(rng)
 
-poisson_rate_guess = math.log(n/(n- np.count_nonzero(time_series.z_array)))
+poisson_rate_guess = math.log(n/(n- np.count_nonzero(time_series.y_array)))
 gamma_mean_guess = np.mean(time_series.y_array) / poisson_rate_guess
 gamma_dispersion_guess = (np.var(time_series.y_array, ddof=1)
     /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)

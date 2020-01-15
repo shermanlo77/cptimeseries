@@ -44,4 +44,4 @@ def simulate_test():
         for i_dim in range(n_dim):
             x[i, i_dim] = (0.8*math.sin(2*math.pi/365 * (i+n))
                 + (i_dim+1)*rng.normal())
-    return time_series.forecast_simulate(x,rng)
+    return time_series.simulate_future(x,rng)

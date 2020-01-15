@@ -312,6 +312,16 @@ class TimeSeries:
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
     
+    def forecast_self(self):
+        """Forecast itself
+        
+        Return a time series with y_array the expectation given the parameters
+            and z_array
+        """
+        forecast = self.copy()
+        forecast.set_y_to_expectation_given_z()
+        return forecast
+    
     def forecast(self, x):
         """Forecast given the model fields
         
@@ -324,8 +334,8 @@ class TimeSeries:
         forecast.cast_arma(ArmaForecastNoMa)
         forecast.set_y_to_expectation()
         return forecast
-        
-    def forecast_simulate(self, x, rng):
+    
+    def simulate_future(self, x, rng):
         """Simulated a time series beyond now
         
         Return a forecasted time series which follows on from this one given the
@@ -335,26 +345,6 @@ class TimeSeries:
         forecast = self.instantiate_forecast(x)
         forecast.cast_arma(ArmaForecast)
         forecast.simulate(rng)
-        return forecast
-    
-    def self_forecast(self):
-        """Forecast itself
-        
-        Return a time series with y_array the expectation given the parameters
-            and z_array
-        """
-        forecast = self.copy()
-        forecast.set_y_to_expectation_given_z()
-        return forecast
-    
-    def self_forecast_simulate(self, rng):
-        """Simulate a forecast itself
-        
-        Return a time series with y_array which was simulated given the
-            parameters and z_array
-        """
-        forecast = self.copy()
-        forecast.simulate_given_z(rng)
         return forecast
     
     def instantiate_forecast(self, x):
@@ -437,7 +427,7 @@ class TimeSeries:
                     break
                 else:
                     sqrt_y_hat = math.sqrt(y_hat)
-                    error[i] = (math.pow(math.sqrt(y) - sqrt_y_hat, 2)
+                    error[i] = (4 * math.pow(math.sqrt(y) - sqrt_y_hat, 2)
                         / sqrt_y_hat)
         if is_infinite:
             return math.inf

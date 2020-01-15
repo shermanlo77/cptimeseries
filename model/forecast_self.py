@@ -19,20 +19,22 @@ for parameter in time_series.cp_parameter_array:
     parameter.arma = Arma(parameter)
 
 rng = random.RandomState(np.uint32(292203111))
-y_prediction = []
+y_simulation = []
 rmse_array = np.zeros(n_sample)
 deviance_array = np.zeros(n_sample)
 for i in range(n_sample):
     print("Predictive sample", i)
     time_series.set_parameter_from_sample(
         rng.randint(n_burnin, time_series.n_sample))
-    forecast = time_series.self_forecast_simulate(rng)
-    y_prediction.append(forecast.y_array)
+    simulation = time_series.copy()
+    simulation.simulate_given_z(rng)
+    y_simulation.append(simulation.y_array)
+    forecast = simulation.forecast_self()
     rmse_array[i] = forecast.get_error_rmse(time_series.y_array)
     deviance_array[i] = forecast.get_error_square_sqrt(time_series.y_array)
 
-y_prediction_mean = np.mean(np.asarray(y_prediction), 0)
-forecast.y_array = y_prediction_mean
+y_prediction = np.mean(np.asarray(y_simulation), 0)
+forecast.y_array = y_prediction
 print("root mean square =",
       forecast.get_error_rmse(time_series.y_array),
       "mm")
@@ -51,7 +53,7 @@ plot.close()
 
 plot.figure()
 plot.plot()
-plot.plot(y_prediction[0])
+plot.plot(y_simulation[0])
 plot.ylabel("rainfall (mm)")
 plot.xlabel("time (day)")
 plot.savefig("../figures/forecast_simulation/self_y_sample.eps")
@@ -60,7 +62,7 @@ plot.close()
 
 plot.figure()
 plot.plot(time_series.y_array)
-plot.plot(y_prediction_mean)
+plot.plot(y_prediction)
 plot.ylabel("rainfall (mm)")
 plot.xlabel("time (day)")
 plot.savefig("../figures/forecast_simulation/self_y_mean.eps")
@@ -68,7 +70,7 @@ plot.show()
 plot.close()
 
 plot.figure()
-plot.plot(y_prediction_mean - time_series.y_array)
+plot.plot(y_prediction - time_series.y_array)
 plot.ylabel("residual (mm)")
 plot.xlabel("time (day)")
 plot.savefig("../figures/forecast_simulation/self_residual.eps")
