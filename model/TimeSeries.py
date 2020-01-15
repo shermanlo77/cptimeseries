@@ -14,7 +14,10 @@ class TimeSeries:
     There is a simuate method
     
     Attributes:
-        x: design matrix of the model fields, shape (n, n_dim)
+        x: np.array as a design matrix of the model fields, shape
+            (n, n_dim)
+        x_shift: mean of x along time
+        x_scale: standard deviation of x along time
         n: length of time series
         n_dim: number of dimensions of the model fields
         poisson_rate: PoissonRate object containing the parameter at each time
@@ -38,9 +41,12 @@ class TimeSeries:
             cp_parameter_array: array containing in order PoissonRate object,
                 GammaMean object, GammaDispersion object
         """
-        self.x = x
-        self.n = x.shape[0]
-        self.n_dim = x.shape[1]
+        self.x = x.copy()
+        self.x_shift = np.mean(self.x, 0)
+        self.x_scale = np.std(self.x, 0, ddof=1)
+        
+        self.n = self.x.shape[0]
+        self.n_dim = self.x.shape[1]
         self.poisson_rate = None
         self.gamma_mean = None
         self.gamma_dispersion = None
@@ -53,6 +59,12 @@ class TimeSeries:
         self.fitted_time_series = None
         
         self.set_new_parameter(cp_parameter_array)
+    
+    def get_normalise_x(self, index):
+        """Return a model field vector at a specific time step which is
+            normalised to have mean zero, std one along the time axis
+        """
+        return (self.x[index] - self.x_shift) / self.x_scale
     
     def set_new_parameter(self, cp_parameter_array):
         """Set the member variables of newly instantised cp paramters
@@ -355,11 +367,11 @@ class TimeSeries:
         Args:
             x: model fields
         """
-        cp_parameter_array = [self.poisson_rate.copy_reg(),
-                              self.gamma_mean.copy_reg(),
-                              self.gamma_dispersion.copy_reg(),
-                              ]
-        forecast = TimeSeries(x, cp_parameter_array)
+        forecast = TimeSeries(x, self.copy_parameter())
+        forecast.x_shift = self.x_shift.copy()
+        forecast.x_scale = self.x_scale.copy()
+        forecast.z_array = self.z_array.copy()
+        forecast.y_array = self.y_array.copy()
         forecast.fitted_time_series = self
         return forecast
     
@@ -378,8 +390,9 @@ class TimeSeries:
     def copy(self):
         """Return a copy of this TimeSeries
         
-        Return a copy of this TimeSeries. Deep copy the parameters, z_array and
-            y_array. Soft copy x. Soft copy fitted_time_series.
+        Return a copy of this TimeSeries. Deep copy the parameters, x_shift,
+            x_scale, z_array and y_array. Soft copy x. Soft copy
+            fitted_time_series.
         """
         copy = TimeSeries(self.x, self.copy_parameter())
         copy.z_array = self.z_array.copy()

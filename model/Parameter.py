@@ -104,7 +104,7 @@ class Parameter:
         #regressive on the model fields and constant
         exponent = 0.0
         exponent += self["const"]
-        exponent += np.dot(self["reg"], self._parent.x[index,:])
+        exponent += np.dot(self["reg"], self._parent.get_normalise_x(index))
         if "AR" in self.keys():
             exponent += self["AR"] * self.ar_term(index)
         if "MA" in self.keys():
@@ -285,7 +285,7 @@ class Parameter:
                     d_reg_self[index] += (self["MA"]
                         * self.d_parameter_ma(index, key))
             if key == "reg":
-                d_reg_self[index] += self._parent.x[index,:]
+                d_reg_self[index] += self._parent.get_normalise_x(index)
             elif key == "AR":
                 d_reg_self[index] += self.ar_term(index)
             elif key == "MA":
