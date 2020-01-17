@@ -44,6 +44,7 @@ class TimeSeries:
         self.x = x.copy()
         self.x_shift = np.mean(self.x, 0)
         self.x_scale = np.std(self.x, 0, ddof=1)
+        self.model_field_name = None
         
         self.n = self.x.shape[0]
         self.n_dim = self.x.shape[1]
@@ -105,10 +106,33 @@ class TimeSeries:
     
     def copy_parameter(self):
         """Deep copy compound Poisson parameters
+        
+        Copy the compound Poisson parameters poisson_mean, gamma_mean and
+            gamma_dispersion. Deep copies the regression parameters and also
+            the value of itself at each time step
+        
+        Returns:
+            array containing in order: poisson_mean, gamma_mean,
+                gamma_dispersion
         """
         cp_parameter_array = []
         for parameter in self.cp_parameter_array:
             cp_parameter_array.append(parameter.copy())
+        return cp_parameter_array
+    
+    def copy_parameter_only_reg(self):
+        """Deep copy the regression parameters of compound Poisson parameters
+        
+        Copy the compound Poisson parameters poisson_mean, gamma_mean and
+            gamma_dispersion. Deep copies the regression parameters only
+        
+        Returns:
+            array containing in order: poisson_mean, gamma_mean,
+                gamma_dispersion
+        """
+        cp_parameter_array = []
+        for parameter in self.cp_parameter_array:
+            cp_parameter_array.append(parameter.copy_reg())
         return cp_parameter_array
     
     def get_parameter_vector(self, cp_parameter_array=None):
@@ -122,6 +146,16 @@ class TimeSeries:
             parameter_vector = np.concatenate(
                 (parameter_vector, parameter.get_reg_vector()))
         return parameter_vector
+    
+    def get_parameter_vector_name(self):
+        """Return the name of each element of the regression parameter vector
+        """
+        vector_name = []
+        for parameter in self.cp_parameter_array:
+            parameter_name = parameter.get_reg_vector_name()
+            for name in parameter_name:
+                vector_name.append(name)
+        return vector_name
     
     def set_parameter_vector(self, parameter_vector):
         """Set the regression parameters using a single vector
@@ -367,11 +401,9 @@ class TimeSeries:
         Args:
             x: model fields
         """
-        forecast = TimeSeries(x, self.copy_parameter())
+        forecast = TimeSeries(x, self.copy_parameter_only_reg())
         forecast.x_shift = self.x_shift.copy()
         forecast.x_scale = self.x_scale.copy()
-        forecast.z_array = self.z_array.copy()
-        forecast.y_array = self.y_array.copy()
         forecast.fitted_time_series = self
         return forecast
     

@@ -322,6 +322,23 @@ class Parameter:
             parameter = np.concatenate((parameter, value))
         return parameter
     
+    def get_reg_vector_name(self):
+        """Return the name of each element of the regression parameter vector
+        
+        Return an array of strings with the format class_regression_parameter or
+            if the regression parameter is "reg", the class_model_field
+        """
+        vector_name = []
+        self_name = self.__class__.__name__ 
+        for key, value in self.items():
+            if key == "reg":
+                for i in range(self.n_dim):
+                    vector_name.append(
+                        self_name+"_"+self._parent.model_field_name[i])
+            else:
+                vector_name.append(self_name+"_"+key)
+        return vector_name
+    
     def set_reg_vector(self, parameter):
         """Set all regression parameters using a single vectors
         
@@ -349,6 +366,11 @@ class Parameter:
         """Return the regression parameters
         """
         return self.reg_parameters.values()
+    
+    def items(self):
+        """Return the keys and regression parameters
+        """
+        return self.reg_parameters.items()
     
     def __str__(self):
         #print reg_parameters
