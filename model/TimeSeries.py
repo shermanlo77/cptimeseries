@@ -19,12 +19,12 @@ class TimeSeries:
     
     Attributes:
         x: np.array as a design matrix of the model fields, shape
-            (n, n_dim)
+            (n, n_model_fields)
         x_shift: mean of x along time
         x_scale: standard deviation of x along time
         n: length of time series
         time_array: time stamp for each time step
-        n_dim: number of dimensions of the model fields
+        n_model_fields: number of dimensions of the model fields
         poisson_rate: PoissonRate object containing the parameter at each time
             step and parameters for the regressive and ARMA parameters elements
         gamma_mean:  GammaMean containing the parameter at each time step and
@@ -42,7 +42,7 @@ class TimeSeries:
     def __init__(self, x, cp_parameter_array=None, rainfall=None):
         """
         Args:
-            x: design matrix of the model fields, shape (n, n_dim)
+            x: design matrix of the model fields, shape (n, n_model_fields)
             cp_parameter_array: array containing in order PoissonRate object,
                 GammaMean object, GammaDispersion object
             rainfall: array of rainfall data
@@ -54,7 +54,7 @@ class TimeSeries:
         self.model_field_name = []
         
         self.time_array = range(n)
-        self.n_dim = self.x.shape[1]
+        self.n_model_fields = self.x.shape[1]
         self.poisson_rate = None
         self.gamma_mean = None
         self.gamma_dispersion = None
@@ -67,7 +67,7 @@ class TimeSeries:
         self.fitted_time_series = None
         self.rng = random.RandomState(np.uint32(2057577976))
         
-        for i in range(self.n_dim):
+        for i in range(self.n_model_fields):
             self.model_field_name.append("model_field_" + str(i))
         if rainfall is None:
             self.y_array = np.zeros(n)
@@ -84,7 +84,7 @@ class TimeSeries:
         """
         y_array = self.y_array
         n = len(self)
-        n_dim = self.n_dim
+        n_model_fields = self.n_model_fields
         #estimate the parameters assuming the data is iid, use method of moments
             #estimators
         poisson_rate_guess = math.log(n/(n- np.count_nonzero(y_array)))
@@ -92,9 +92,9 @@ class TimeSeries:
         gamma_dispersion_guess = (np.var(y_array, ddof=1)
             /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
         #instantise parameters and set it
-        poisson_rate = PoissonRate(n_dim)
-        gamma_mean = GammaMean(n_dim)
-        gamma_dispersion = GammaDispersion(n_dim)
+        poisson_rate = PoissonRate(n_model_fields)
+        gamma_mean = GammaMean(n_model_fields)
+        gamma_dispersion = GammaDispersion(n_model_fields)
         poisson_rate["const"] = math.log(poisson_rate_guess)
         gamma_mean["const"] = math.log(gamma_mean_guess)
         gamma_dispersion["const"] = math.log(gamma_dispersion_guess)

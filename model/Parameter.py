@@ -25,7 +25,7 @@ class Parameter:
     
     Attributes:
         n: number of time steps
-        n_dim: number of dimensions the model fields has
+        n_model_fields: number of dimensions the model fields has
         reg_parameters: dictionary containing regressive (reg) parameters
             with keys "reg", "AR", "MA", "const" which corresponds to the
             names of the reg parameters
@@ -36,14 +36,14 @@ class Parameter:
             of itself wrt reg parameters
     """
     
-    def __init__(self, n_dim):
+    def __init__(self, n_model_fields):
         """
         Args:
-            n_dim: number of dimensions
+            n_model_fields: number of model fields
         """
-        self.n_dim = n_dim
+        self.n_model_fields = n_model_fields
         self.reg_parameters = {
-            "reg": np.zeros(n_dim),
+            "reg": np.zeros(n_model_fields),
             "const": 0.0,
         }
         self.arma = None
@@ -72,7 +72,7 @@ class Parameter:
     def copy_reg(self):
         """Return deep copy of the regression parameters
         """
-        copy = self.__class__(self.n_dim)
+        copy = self.__class__(self.n_model_fields)
         for key, value in self.reg_parameters.items():
             if type(value) is np.ndarray:
                 copy[key] = value.copy()
@@ -86,7 +86,7 @@ class Parameter:
         for key, value in self.reg_parameters.items():
             self[key] = np.asarray(value)
             if key == "reg":
-                self[key] = np.reshape(self[key], self.n_dim)
+                self[key] = np.reshape(self[key], self.n_model_fields)
             else:
                 self[key] = np.reshape(self[key], 1)
     
@@ -219,7 +219,7 @@ class Parameter:
             else:
                 d_reg_ln_l[key] = np.sum(value, 0)
         #put the gradient in a Parameter object and return it
-        gradient = Parameter(self.n_dim)
+        gradient = Parameter(self.n_model_fields)
         gradient.reg_parameters = d_reg_ln_l
         return gradient
     
@@ -329,7 +329,7 @@ class Parameter:
         self_name = self.__class__.__name__ 
         for key, value in self.items():
             if key == "reg":
-                for i in range(self.n_dim):
+                for i in range(self.n_model_fields):
                     vector_name.append(
                         self_name+"_"+self.time_series.model_field_name[i])
             else:
@@ -421,8 +421,8 @@ class Parameter:
         return self
 
 class PoissonRate(Parameter):
-    def __init__(self, n_dim):
-        super().__init__(n_dim)
+    def __init__(self, n_model_fields):
+        super().__init__(n_model_fields)
         self.reg_parameters["AR"] = 0.0
         self.reg_parameters["MA"] = 0.0
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
@@ -438,8 +438,8 @@ class PoissonRate(Parameter):
             *self._d_reg_self_array[key][index-1])
 
 class GammaMean(Parameter):
-    def __init__(self, n_dim):
-        super().__init__(n_dim)
+    def __init__(self, n_model_fields):
+        super().__init__(n_model_fields)
         self.reg_parameters["AR"] = 0.0
         self.reg_parameters["MA"] = 0.0
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
@@ -482,8 +482,8 @@ class GammaMean(Parameter):
             return 0.0
 
 class GammaDispersion(Parameter):
-    def __init__(self, n_dim):
-        super().__init__(n_dim)
+    def __init__(self, n_model_fields):
+        super().__init__(n_model_fields)
     def d_self_ln_l(self, index):
         z = self.time_series.z_array[index]
         if z == 0:

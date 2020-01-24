@@ -16,7 +16,7 @@ def print_time_series(time_series, prefix):
     y = time_series.y_array
     z = time_series.z_array
     n = len(time_series)
-    n_dim = time_series.n_dim
+    n_model_fields = time_series.n_model_fields
     t = time_series.time_array
     poisson_rate_array = time_series.poisson_rate.value_array
     gamma_mean_array = time_series.gamma_mean.value_array
@@ -34,7 +34,7 @@ def print_time_series(time_series, prefix):
     plot.savefig(prefix + "rainfall.pdf")
     plot.close()
     
-    for i_dim in range(n_dim):
+    for i_dim in range(n_model_fields):
         plot.figure()
         ax = plot.gca()
         ax.set_prop_cycle(cycle)
