@@ -96,7 +96,7 @@ for city, coordinates in city_location.items():
     #get the time series for this city
     rainfall_series = rain_data["rr"][:,latitude_index,longitude_index]
     #get the autocorrelation and partial autocorrelation of the time series
-    acf = stats.acf(rainfall_series, nlags=100, fft=True)
+    acf = stats.acf(rainfall_series, nlags=10, fft=True)
     pacf = stats.pacf(rainfall_series, nlags=10)
     
     #plot the time series
@@ -196,7 +196,7 @@ for model_field in model_fields_data.values():
             #get the acf and pacf
             #in the model fields, 4 readings per day, want to have 1.5 years of
                 #lag to look for seasonality
-            acf = stats.acf(model_field_time_series, nlags=2192, fft=True)
+            acf = stats.acf(model_field_time_series, nlags=10, fft=True)
             pacf = stats.pacf(model_field_time_series, nlags=10)
         
             #plot the model field as a time series

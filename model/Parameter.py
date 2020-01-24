@@ -373,7 +373,7 @@ class Parameter:
         return self.reg_parameters.items()
     
     def __str__(self):
-        #print reg_parameters
+        #return reg_parameters
         return self.reg_parameters.__str__()
     
     def __getitem__(self, key):

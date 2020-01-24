@@ -21,20 +21,17 @@ class TimeSeriesSgd(TimeSeriesGd):
             stochastic gradient descent. [1, ..., len(ln_l_array)]. The values
             in the middle correspond to resulting first log likelihood from
             gradient descent or stochastic gradient descent
-        _rng: random number generator to generate a random permutation to select
-            time points at random
         _permutation_iter: iterator for the permutation of index
     """
     
-    def __init__(self, x, cp_parameter_array):
-        super().__init__(x, cp_parameter_array)
-        self.n_initial = 1000
+    def __init__(self, x, cp_parameter_array=None, rainfall=None):
+        super().__init__(x, cp_parameter_array, rainfall)
+        self.n_initial = 100
         self.stochastic_step_size = 0.01
         self.n_stochastic_step = 10
         self.ln_l_max_index = 0
         self.ln_l_stochastic_index = [1]
-        self._rng = random.RandomState(np.uint32(672819639))
-        self._permutation_iter = self._rng.permutation(self.n).__iter__()
+        self._permutation_iter = self.rng.permutation(self.n).__iter__()
     
     def fit(self):
         """Fit model - override
@@ -62,11 +59,9 @@ class TimeSeriesSgd(TimeSeriesGd):
                 ln_l_max = ln_l
                 self.ln_l_max_index = len(ln_l_all_array)-1
                 cp_parameter_array = self.copy_parameter()
-            for parameter in cp_parameter_array:
-                print(parameter)
-            print("stochastic gradient descent")
             #do stochastic gradient descent to get a different initial value
             if i < self.n_initial-1:
+                print("stochastic gradient descent")
                 #track when stochastic gradient descent was done for this entry
                     #of ln_l_array
                 self.ln_l_stochastic_index.append(len(ln_l_all_array))
@@ -84,9 +79,6 @@ class TimeSeriesSgd(TimeSeriesGd):
         #copy results to the member variable
         self.ln_l_array = ln_l_all_array
         self.set_parameter(cp_parameter_array)
-        self.poisson_rate = cp_parameter_array[0]
-        self.gamma_mean = cp_parameter_array[1]
-        self.gamma_dispersion = cp_parameter_array[2]
         self.e_step()
     
     def m_stochastic_step(self):
@@ -118,5 +110,5 @@ class TimeSeriesSgd(TimeSeriesGd):
         try:
             return self._permutation_iter.__next__()
         except StopIteration:
-            self._permutation_iter = self._rng.permutation(self.n).__iter__()
+            self._permutation_iter = self.rng.permutation(self.n).__iter__()
             return self._permutation_iter.__next__()

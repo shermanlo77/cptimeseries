@@ -12,14 +12,13 @@ class TimeSeriesGd(TimeSeries):
             likelihood increases not very much
     """
     
-    def __init__(self, x, cp_parameter_array):
-        super().__init__(x, cp_parameter_array)
+    def __init__(self, x, cp_parameter_array=None, rainfall=None):
+        super().__init__(x, cp_parameter_array, rainfall)
         self.ln_l_array = None
         self.step_size = 0.1
         self.n_em = 100
         self.n_gradient_descent = 100
         self.min_ln_l_ratio = 0.0001
-        self.set_new_parameter(cp_parameter_array)
     
     def fit(self):
         """Fit model

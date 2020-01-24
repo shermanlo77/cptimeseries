@@ -40,9 +40,10 @@ class TimeSeriesMcmc(TimeSeries):
         rng: random number generator
     """
     
-    def __init__(self, x, cp_parameter_array):
-        super().__init__(x, cp_parameter_array)
-        self.n_sample = 92000
+    def __init__(self, x, cp_parameter_array=None, rainfall=None):
+        super().__init__(x, cp_parameter_array, rainfall)
+        self.n_sample = 100000
+        self.burn_in = 0
         self.z_sample = []
         self.parameter_sample = []
         self.proposal_z_parameter = 1/self.n
@@ -60,7 +61,6 @@ class TimeSeriesMcmc(TimeSeries):
         self.n_accept_reg = 0
         self.accept_reg_array = []
         self.accept_z_array = []
-        self.rng = random.RandomState(np.uint32(2057577976))
     
     def fit(self):
         """Do MCMC
@@ -290,3 +290,15 @@ class TimeSeriesMcmc(TimeSeries):
         elif n>2:
             self.chain_covariance *= (n-2)/(n-1)
             self.chain_covariance += (n/math.pow(n-1,2)) * np.outer(diff, diff)
+    
+    def instantiate_forecast_self(self):
+        self.set_parameter_from_sample(
+            self.rng.randint(self.burn_in, self.n_sample))
+        forecast = super().instantiate_forecast_self()
+        return forecast
+    
+    def instantiate_forecast(self, x):
+        self.set_parameter_from_sample(
+            self.rng.randint(self.burn_in, self.n_sample))
+        forecast = super().instantiate_forecast(x)
+        return forecast

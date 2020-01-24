@@ -1,7 +1,11 @@
 import math
 import numpy as np
+import numpy.random as random
+from scipy.special import polygamma
 from Arma import Arma, ArmaForecast, ArmaForecastNoMa
-from scipy.special import loggamma, polygamma
+from Forecast import Forecast
+from Parameter import PoissonRate, GammaMean, GammaDispersion
+from Terms import Terms, TermsZ, TermsZ2
 
 class TimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
@@ -19,6 +23,7 @@ class TimeSeries:
         x_shift: mean of x along time
         x_scale: standard deviation of x along time
         n: length of time series
+        time_array: time stamp for each time step
         n_dim: number of dimensions of the model fields
         poisson_rate: PoissonRate object containing the parameter at each time
             step and parameters for the regressive and ARMA parameters elements
@@ -34,19 +39,21 @@ class TimeSeries:
         fitted_time_series: time series before this one, used for forecasting
     """
     
-    def __init__(self, x, cp_parameter_array):
+    def __init__(self, x, cp_parameter_array=None, rainfall=None):
         """
         Args:
             x: design matrix of the model fields, shape (n, n_dim)
             cp_parameter_array: array containing in order PoissonRate object,
                 GammaMean object, GammaDispersion object
+            rainfall: array of rainfall data
         """
-        self.x = x.copy()
+        self.x = x
         self.x_shift = np.mean(self.x, 0)
         self.x_scale = np.std(self.x, 0, ddof=1)
-        self.model_field_name = None
+        self.model_field_name = []
         
         self.n = self.x.shape[0]
+        self.time_array = range(self.n)
         self.n_dim = self.x.shape[1]
         self.poisson_rate = None
         self.gamma_mean = None
@@ -56,10 +63,42 @@ class TimeSeries:
         self.cp_parameter_array = None
         self.z_array = np.zeros(self.n)
         self.z_var_array = np.zeros(self.n)
-        self.y_array = np.zeros(self.n)
+        self.y_array = None
         self.fitted_time_series = None
+        self.rng = random.RandomState(np.uint32(2057577976))
         
-        self.set_new_parameter(cp_parameter_array)
+        for i in range(self.n_dim):
+            self.model_field_name.append("model_field_" + str(i))
+        if rainfall is None:
+            self.y_array = np.zeros(self.n)
+        else:
+            self.y_array = rainfall
+            self.initalise_parameters()
+        if not (cp_parameter_array is None):
+            self.set_new_parameter(cp_parameter_array)
+    
+    def initalise_parameters(self):
+        """Set the initial parameters
+        
+        Set the initial parameters to be naive guesses using method of moments
+        """
+        y_array = self.y_array
+        n = self.n
+        n_dim = self.n_dim
+        #estimate the parameters assuming the data is iid, use method of moments
+            #estimators
+        poisson_rate_guess = math.log(n/(n- np.count_nonzero(y_array)))
+        gamma_mean_guess = np.mean(y_array) / poisson_rate_guess
+        gamma_dispersion_guess = (np.var(y_array, ddof=1)
+            /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
+        #instantise parameters and set it
+        poisson_rate = PoissonRate(n_dim)
+        gamma_mean = GammaMean(n_dim)
+        gamma_dispersion = GammaDispersion(n_dim)
+        poisson_rate["const"] = math.log(poisson_rate_guess)
+        gamma_mean["const"] = math.log(gamma_mean_guess)
+        gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
+        self.set_new_parameter([poisson_rate, gamma_mean, gamma_dispersion])
     
     def get_normalise_x(self, index):
         """Return a model field vector at a specific time step which is
@@ -135,14 +174,12 @@ class TimeSeries:
             cp_parameter_array.append(parameter.copy_reg())
         return cp_parameter_array
     
-    def get_parameter_vector(self, cp_parameter_array=None):
+    def get_parameter_vector(self):
         """Return the regression parameters as one vector
         """
-        if cp_parameter_array is None:
-            cp_parameter_array = self.cp_parameter_array
         #for each parameter, concatenate vectors together
         parameter_vector = np.zeros(0)
-        for parameter in cp_parameter_array:
+        for parameter in self.cp_parameter_array:
             parameter_vector = np.concatenate(
                 (parameter_vector, parameter.get_reg_vector()))
         return parameter_vector
@@ -172,74 +209,97 @@ class TimeSeries:
                 parameter_counter:parameter_counter+n_parameter])
             parameter_counter += n_parameter
     
-    def set_observables(self, y_array):
-        """Set the observed rainfall
-        
-        Args:
-            y_array: rainfall for each day (vector)
-        """
-        self.y_array = y_array
-    
-    def simulate(self, rng):
+    def simulate(self):
         """Simulate a whole time series
         
+        MODIFIES ITSELF
         Simulate a time series given the model fields self.x and cp parameters.
             Modify the member variables poisson_rate, gamma_mean and
             gamma_dispersion by updating its values at each time step.
             Also modifies self.z_array and self.y_array with the
             simulated values.
         
-        Args:
-            rng: numpy.random.RandomState object
         """
         #simulate n times
         for i in range(self.n):
             #get the parameters of the compound Poisson at this time step
             self.update_cp_parameters(i)
             #simulate this compound Poisson
-            self.y_array[i], self.z_array[i] = simulate_cp(
+            self.y_array[i], self.z_array[i] = self.simulate_cp(
                 self.poisson_rate[i], self.gamma_mean[i],
-                self.gamma_dispersion[i], rng)
+                self.gamma_dispersion[i])
     
-    def simulate_given_z(self, rng):
+    def simulate_given_z(self):
         """Return a simulated of a whole time series with given z
         
+        MODIFIES ITSELF
         Simulate a time series given the model fields self.x, cp parameters and
             latent variables in self.z_array. Modify the member variables
             poisson_rate, gamma_mean and gamma_dispersion by updating its values
             at each time step. Also modifies self.y_array with the simulated
             values.
-        
-        Args:
-            rng: numpy.random.RandomState object
         """
         for i in range(self.n):
             #get the parameters of the compound Poisson at this time step
             self.update_cp_parameters(i)
             #simulate this compound Poisson
-            self.y_array[i] = simulate_cp_given_z(
-                self.z_array[i], self.gamma_mean[i], self.gamma_dispersion[i],
-                rng)
+            self.y_array[i] = self.simulate_cp_given_z(
+                self.z_array[i], self.gamma_mean[i], self.gamma_dispersion[i])
     
-    def set_y_to_expectation(self):
-        """Set y_array to expectation of the whole time series
+    def simulate_future(self, x):
+        """Return a simulation of the future
         
-        Set y_array to be the expected value, that is poisson_rate * gamma_mean
+        Return a simulated time series given itself and future model fields
+        
+        Args:
+            x: future model fields
+        
+        Returns:
+            TimeSeries object containing a simulated future
         """
-        for i in range(self.n):
-            self.update_cp_parameters(i)
-            self.y_array[i] = self.poisson_rate[i] * self.gamma_mean[i]
+        forecast = self.instantiate_forecast(x)
+        forecast.simulate()
+        return forecast
     
-    def set_y_to_expectation_given_z(self):
-        """Set y_array to expectation of the whole time series given z
+    def simulate_cp(self, poisson_rate, gamma_mean, gamma_dispersion):
+        """Simulate a single compound poisson random variable
         
-        Set y_array to be the conditional expected value, that is z * gamma_mean
+        Args:
+            poisson_rate: scalar
+            gamma_mean: scalar
+            gamma_dispersion: scalar
+        
+        Returns:
+            tuple contain vectors of y (compound Poisson random variable) and z
+                (latent Poisson random variable)
         """
-        for i in range(self.n):
-            self.update_cp_parameters(i)
-            self.y_array[i] = self.z_array[i] * self.gamma_mean[i]
+        #poisson random variable variable
+        z = self.rng.poisson(poisson_rate)
+        #gamma random variable
+        y = self.simulate_cp_given_z(z, gamma_mean, gamma_dispersion)
+        return (y, z)
+
+    def simulate_cp_given_z(self, z, gamma_mean, gamma_dispersion):
+        """Simulate a single compound poisson random varible given z
+        
+        Args:
+            z: latent poisson variable
+            gamma_mean: mean of the gamma random variable
+            gamma_dispersion: dispersion of the gamma random variable
+        
+        Returns:
+            simulated compound Poisson random variable
+        """
+        shape = z / gamma_dispersion #gamma shape parameter
+        scale = gamma_mean * gamma_dispersion #gamma scale parameter
+        y = self.rng.gamma(shape, scale=scale) #gamma random variable
+        return y
     
     def fit(self):
+        """Fit the model onto the data
+        
+        To be implemented by subclasses
+        """
         pass
     
     def update_all_cp_parameters(self):
@@ -321,7 +381,7 @@ class TimeSeries:
             y = self.y_array[i]
             gamma_mean = self.gamma_mean[i]
             gamma_dispersion = self.gamma_dispersion[i]
-            cp_term = TimeSeries.Terms(self, i)
+            cp_term = Terms(self, i)
             terms = np.zeros(3)
             terms[0] = -y/gamma_mean/gamma_dispersion
             terms[1] = -math.log(y)
@@ -347,64 +407,101 @@ class TimeSeries:
                 self.z_var_array[i] = 0
             else:
                 #work out the normalisation constant for the expectation
-                sum = TimeSeries.Terms(self, i)
+                sum = Terms(self, i)
                 normalisation_constant = sum.ln_sum_w()
                 #work out the expectation
-                sum = TimeSeries.TermsZ(self, i)
+                sum = TermsZ(self, i)
                 self.z_array[i] = math.exp(
                     sum.ln_sum_w() - normalisation_constant)
-                sum = TimeSeries.TermsZ2(self, i)
+                sum = TermsZ2(self, i)
                 self.z_var_array[i] = (math.exp(
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
     
-    def forecast_self(self):
+    def forecast_self(self, n_simulation):
         """Forecast itself
         
-        Return a time series with y_array the expectation given the parameters
-            and z_array
-        """
-        forecast = self.copy()
-        forecast.set_y_to_expectation_given_z()
-        return forecast
-    
-    def forecast(self, x):
-        """Forecast given the model fields
-        
-        Return a forecasted time series which follows on from this one given the
-            model fields beyond the one provided here. The forecast is the
-            expected value of Y. Any non-early MA terms are set to zero because
-            no variables are simulated and the expectation is used. 
-        """
-        forecast = self.instantiate_forecast(x)
-        forecast.cast_arma(ArmaForecastNoMa)
-        forecast.set_y_to_expectation()
-        return forecast
-    
-    def simulate_future(self, x, rng):
-        """Simulated a time series beyond now
-        
-        Return a forecasted time series which follows on from this one given the
-            model fields beyond the one provided here. The forecast is a
-            simulation of Z and Y.
-        """
-        forecast = self.instantiate_forecast(x)
-        forecast.cast_arma(ArmaForecast)
-        forecast.simulate(rng)
-        return forecast
-    
-    def instantiate_forecast(self, x):
-        """Instantiate a TimeSeries object for forecast
-        
-        Return a new TimeSeries object with the reg parameter copied over
+        Forecast itself given its parameters and estimates of z. Use expectation
+            of the predictive distribution using Monte Carlo.
         
         Args:
-            x: model fields
+            n_simulation: number of Monte Carlo simulations
+        
+        Returns:
+            forecast: Forecast object
+        """
+        forecast_array = Forecast()
+        for i in range(n_simulation):
+            print("Predictive sample", i)
+            forecast = self.instantiate_forecast_self()
+            forecast.simulate_given_z()
+            forecast_array.append(forecast)
+        forecast_array.get_forecast()
+        return forecast_array
+    
+    def instantiate_forecast_self(self):
+        """Instantiate TimeSeries for forecasting itself
+        
+        Instantiate TimeSeries object which is a copy of itself. Deep copy the
+            parameters and z_array. Soft copy x.
+        
+        Returns:
+            forecast: Forecast object
+        """
+        forecast = TimeSeries(self.x, self.copy_parameter_only_reg())
+        forecast.z_array = self.z_array.copy()
+        forecast.x_shift = self.x_shift
+        forecast.x_scale = self.x_scale
+        forecast.model_field_name = self.model_field_name
+        forecast.time_array = self.time_array
+        forecast.rng = self.rng
+        return forecast
+    
+    def forecast(self, x, n_simulation):
+        """Forecast
+        
+        Forecast itself given its parameters, estimates of z and future model
+            fields. Use expectation of the predictive distribution using Monte
+            Carlo.
+        
+        Args:
+            x: model fields, np.array, each element for each time step
+            n_simulation: number of Monte Carlo simulations
+        
+        Returns:
+            forecast: Forecast object
+        """
+        forecast_array = Forecast()
+        for i in range(n_simulation):
+            print("Predictive sample", i)
+            forecast = self.simulate_future(x)
+            forecast_array.append(forecast)
+        forecast_array.get_forecast()
+        return forecast_array
+    
+    def instantiate_forecast(self, x):
+        """Instantiate TimeSeries for forecasting
+        
+        Instantiate TimeSeries object containing future model fields. Deep copy
+            the parameters.
+        
+        Returns:
+            forecast: Forecast object
         """
         forecast = TimeSeries(x, self.copy_parameter_only_reg())
-        forecast.x_shift = self.x_shift.copy()
-        forecast.x_scale = self.x_scale.copy()
+        forecast.cast_arma(ArmaForecast)
+        forecast.x_shift = self.x_shift
+        forecast.x_scale = self.x_scale
         forecast.fitted_time_series = self
+        forecast.model_field_name = self.model_field_name
+        forecast.time_array = []
+        forecast.rng = self.rng
+        #the forecast time_array is the future
+        last_time = self.time_array[self.n-1]
+        time_diff = last_time - self.time_array[self.n-2]
+        for i in range(len(x)):
+            forecast.time_array.append(last_time + (i+1)*time_diff)
+        
         return forecast
     
     def cast_arma(self, arma_class):
@@ -419,270 +516,15 @@ class TimeSeries:
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
     
-    def copy(self):
-        """Return a copy of this TimeSeries
-        
-        Return a copy of this TimeSeries. Deep copy the parameters, x_shift,
-            x_scale, z_array and y_array. Soft copy x. Soft copy
-            fitted_time_series.
-        """
-        copy = TimeSeries(self.x, self.copy_parameter())
-        copy.z_array = self.z_array.copy()
-        copy.y_array = self.y_array.copy()
-        copy.fitted_time_series = self.fitted_time_series
-        return copy
+    def __str__(self):
+        #return the reg parameters for each cp parameter
+        string = ""
+        for i in range(len(self.cp_parameter_array)):
+            parameter = self.cp_parameter_array[i]
+            string += parameter.__class__.__name__
+            string += ":"
+            string += parameter.__str__()
+            if i != len(self.cp_parameter_array) - 1:
+                string += "\n"
+        return string
     
-    def get_error_rmse(self, true_y):
-        """Return root mean square error
-        
-        Compare this y_array (usually a prediction) with a given true_y using
-            the root mean squared error
-        
-        Args:
-            true_y: array of y
-        
-        Return:
-            root mean square error
-        """
-        return np.sqrt(np.sum(np.square(self.y_array - true_y)) / self.n)
-    
-    def get_error_square_sqrt(self, true_y):
-        """Return square mean sqrt error
-        
-        Compare this y_array (usually a prediction) with a given true_y using
-            the square mean sqrt error. This is the Tweedie deviance with
-            p = 1.5
-        
-        Args:
-            true_y: array of y
-        
-        Return:
-            square mean sqrt error, can be infinite
-        """
-        error = np.zeros(self.n)
-        is_infinite = False
-        for i in range(self.n):
-            y = true_y[i]
-            y_hat = self.y_array[i]
-            if y == 0:
-                error[i] = math.sqrt(y_hat)
-            else:
-                if y_hat == 0:
-                    is_infinite = True
-                    break
-                else:
-                    sqrt_y_hat = math.sqrt(y_hat)
-                    error[i] = (4 * math.pow(math.sqrt(y) - sqrt_y_hat, 2)
-                        / sqrt_y_hat)
-        if is_infinite:
-            return math.inf
-        else:
-            return math.pow(np.sum(error) / self.n, 2)
-    
-    class Terms:
-        """Contains the terms for the compound Poisson series.
-        
-        Can sum the compound Poisson series by summing only important terms.
-            See Dynn, Smyth (2005)
-        
-        Attributes:
-            y
-            poisson_rate
-            gamma_mean
-            gamma_dispersion
-        """
-        #negative number, determines the smallest term to add in the compound
-            #Poisson sum
-        cp_sum_threshold = -37
-        
-        def __init__(self, parent, index):
-            self.y = parent.y_array[index]
-            self.poisson_rate = parent.poisson_rate[index]
-            self.gamma_mean = parent.gamma_mean[index]
-            self.gamma_dispersion = parent.gamma_dispersion[index]
-        
-        def log_expectation_term(self, z):
-            """Multiple each term in the sum by exp(this return value)
-            
-            Can be override if want to take for example expectation
-            """
-            return 0
-        
-        def ln_sum_w(self):
-            """Works out the compound Poisson sum, only important terms are
-                summed. See Dynn, Smyth (2005).
-                
-            Returns:
-                log compound Poisson sum
-            """
-            
-            #get the y with the biggest term in the compound Poisson sum
-            z_max = self.z_max()
-            #get the biggest log compound Poisson term + any expectation terms
-            ln_w_max = self.ln_wz(z_max) + self.log_expectation_term(z_max)
-            
-            #declare array of compound poisson terms
-            #each term is a ratio of the compound poisson term with the maximum
-                #compound poisson term
-            #the first term is 1, that is exp[ln(w_z_max)-ln(w_z_max)] = 1;
-            terms = [1]
-            
-            #declare booleans is_got_z_l and is_got_z_u
-            #these are true if we got the lower and upper bound respectively for
-                #the compound Poisson sum
-            is_got_z_l = False
-            is_got_z_u = False
-            
-            #declare the summation bounds, z_l for the lower bound, z_u for the
-                #upper bound
-            z_l = z_max
-            z_u = z_max
-            
-            #calculate the compound poisson terms starting at z_l and working
-                #downwards if the lower bound is 1, can't go any lower and set
-                #is_got_z_l to be true
-            if z_l == 1:
-                is_got_z_l = True
-            
-            #while we haven't got a lower bound
-            while not is_got_z_l:
-                #lower the lower bound
-                z_l -= 1
-                #if the lower bound is 0, then set is_got_z_l to be true and
-                    #raise the lower bound back by one
-                if z_l == 0:
-                    is_got_z_l = True
-                    z_l += 1
-                else: #else the lower bound is not 0
-                    #calculate the log ratio of the compound poisson term with
-                        #the maximum compound poisson term
-                    log_ratio = np.sum(
-                        [self.ln_wz(z_l), 
-                        self.log_expectation_term(z_l), 
-                        -ln_w_max])
-                    #if this log ratio is bigger than the threshold
-                    if log_ratio > TimeSeries.Terms.cp_sum_threshold:
-                        #append the ratio to the array of terms
-                        terms.append(math.exp(log_ratio))
-                    else:
-                        #else the log ratio is smaller than the threshold
-                        #set is_got_z_l to be true and raise the lower bound by
-                            #1
-                        is_got_z_l = True
-                        z_l += 1
-            
-            #while we haven't got an upper bound
-            while not is_got_z_u:
-                #raise the upper bound by 1
-                z_u += 1;
-                #calculate the log ratio of the compound poisson term with the
-                    #maximum compound poisson term
-                log_ratio = np.sum(
-                    [self.ln_wz(z_u),
-                    self.log_expectation_term(z_u),
-                    -ln_w_max])
-                #if this log ratio is bigger than the threshold
-                if log_ratio > TimeSeries.Terms.cp_sum_threshold:
-                    #append the ratio to the array of terms
-                    terms.append(math.exp(log_ratio))
-                else:
-                    #else the log ratio is smaller than the threshold
-                    #set is_got_z_u to be true and lower the upper bound by 1
-                    is_got_z_u = True
-                    z_u -= 1
-            
-            #work out the compound Poisson sum
-            ln_sum_w = ln_w_max + math.log(np.sum(terms))
-            return ln_sum_w
-        
-        def z_max(self):
-            """Gets the index of the biggest term in the compound Poisson sum
-            
-            Returns:
-                positive integer, index of the biggest term in the compound
-                    Poisson sum
-            """
-            #get the optima with respect to the sum index, then round it to get
-                #an integer
-            terms = np.zeros(3)
-            terms[0] = math.log(self.y)
-            terms[1] = self.gamma_dispersion * math.log(self.poisson_rate)
-            terms[2] = -math.log(self.gamma_mean)
-            z_max = math.exp(np.sum(terms)/(self.gamma_dispersion+1))
-            z_max = round(z_max)
-            #if the integer is 0, then set the index to 1
-            if z_max == 0:
-                z_max = 1
-            return z_max
-        
-        def ln_wz(self, z):
-            """Return a log term from the compound Poisson sum
-            
-            Args:
-                index: time step, y[index] must be positive
-                z: Poisson variable or index of the sum element
-            
-            Returns:
-                log compopund Poisson term
-            """
-            
-            #declare array of terms to be summed to work out ln_wz
-            terms = np.zeros(6)
-            
-            #work out each individual term
-            terms[0] = -z*math.log(self.gamma_dispersion)/self.gamma_dispersion
-            terms[1] = -z*math.log(self.gamma_mean)/self.gamma_dispersion
-            terms[2] = -loggamma(z/self.gamma_dispersion)
-            terms[3] = z*math.log(self.y)/self.gamma_dispersion
-            terms[4] = z*math.log(self.poisson_rate)
-            terms[5] = -loggamma(1+z)
-            #sum the terms to get the log compound Poisson sum term
-            ln_wz = np.sum(terms)
-            return ln_wz
-    
-    class TermsZ(Terms):
-        def __init__(self, parent, index):
-            super().__init__(parent, index)
-        def log_expectation_term(self, z):
-            return math.log(z)
-    
-    class TermsZ2(Terms):
-        def __init__(self, parent, index):
-            super().__init__(parent, index)
-        def log_expectation_term(self, z):
-            return 2*math.log(z)
-
-def simulate_cp(poisson_rate, gamma_mean, gamma_dispersion, rng):
-    """Simulate a single compound poisson random variable
-    
-    Args:
-        poisson_rate: scalar
-        gamma_mean: scalar
-        gamma_dispersion: scalar
-        rng: numpy.random.RandomState object
-    
-    Returns:
-        tuple contain vectors of y (compound Poisson random variable) and z
-            (latent Poisson random variable)
-    """
-    #poisson random variable variable
-    z = rng.poisson(poisson_rate)
-    #gamma random variable
-    y = simulate_cp_given_z(z, gamma_mean, gamma_dispersion, rng)
-    return (y, z)
-
-def simulate_cp_given_z(z, gamma_mean, gamma_dispersion, rng):
-    """Simulate a single compound poisson random varible given z
-    
-    Args:
-        z: latent poisson variable
-        gamma_mean: mean of the gamma random variable
-        gamma_dispersion: dispersion of the gamma random variable
-    
-    Returns:
-        simulated compound Poisson random variable
-    """
-    shape = z / gamma_dispersion #gamma shape parameter
-    scale = gamma_mean * gamma_dispersion #gamma scale parameter
-    y = rng.gamma(shape, scale=scale) #gamma random variable
-    return y
