@@ -46,7 +46,7 @@ class TimeSeriesMcmc(TimeSeries):
         self.burn_in = 0
         self.z_sample = []
         self.parameter_sample = []
-        self.proposal_z_parameter = 1/self.n
+        self.proposal_z_parameter = 1/len(self)
         self.prior_mean = np.zeros(self.n_parameter)
         self.prior_covariance = 0.25*np.identity(self.n_parameter)
         self.n_till_adapt = 2*self.n_parameter
@@ -116,7 +116,7 @@ class TimeSeriesMcmc(TimeSeries):
         #use because the transition is non-symetric at 1
         n_transition_to_one = 0
         #for each z, proposal
-        for i in range(self.n):
+        for i in range(len(self)):
             z = self.z_array[i]
             if z != 0:
                 self.z_array[i] = self.propose_z(z)

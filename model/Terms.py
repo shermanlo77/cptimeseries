@@ -19,7 +19,7 @@ class Terms:
     cp_sum_threshold = -37
     
     def __init__(self, parent, index):
-        self.y = parent.y_array[index]
+        self.y = parent[index]
         self.poisson_rate = parent.poisson_rate[index]
         self.gamma_mean = parent.gamma_mean[index]
         self.gamma_dispersion = parent.gamma_dispersion[index]

@@ -50,10 +50,10 @@ class TimeSeries:
         self.x = x
         self.x_shift = np.mean(self.x, 0)
         self.x_scale = np.std(self.x, 0, ddof=1)
+        n = self.x.shape[0]
         self.model_field_name = []
         
-        self.n = self.x.shape[0]
-        self.time_array = range(self.n)
+        self.time_array = range(n)
         self.n_dim = self.x.shape[1]
         self.poisson_rate = None
         self.gamma_mean = None
@@ -61,8 +61,8 @@ class TimeSeries:
         self.n_parameter = None
         #array containing poisson_rate, gamma_mean and gamma_dispersion
         self.cp_parameter_array = None
-        self.z_array = np.zeros(self.n)
-        self.z_var_array = np.zeros(self.n)
+        self.z_array = np.zeros(n)
+        self.z_var_array = np.zeros(n)
         self.y_array = None
         self.fitted_time_series = None
         self.rng = random.RandomState(np.uint32(2057577976))
@@ -70,7 +70,7 @@ class TimeSeries:
         for i in range(self.n_dim):
             self.model_field_name.append("model_field_" + str(i))
         if rainfall is None:
-            self.y_array = np.zeros(self.n)
+            self.y_array = np.zeros(n)
         else:
             self.y_array = rainfall
             self.initalise_parameters()
@@ -83,7 +83,7 @@ class TimeSeries:
         Set the initial parameters to be naive guesses using method of moments
         """
         y_array = self.y_array
-        n = self.n
+        n = len(self)
         n_dim = self.n_dim
         #estimate the parameters assuming the data is iid, use method of moments
             #estimators
@@ -221,11 +221,11 @@ class TimeSeries:
         
         """
         #simulate n times
-        for i in range(self.n):
+        for i in range(len(self)):
             #get the parameters of the compound Poisson at this time step
             self.update_cp_parameters(i)
             #simulate this compound Poisson
-            self.y_array[i], self.z_array[i] = self.simulate_cp(
+            self[i], self.z_array[i] = self.simulate_cp(
                 self.poisson_rate[i], self.gamma_mean[i],
                 self.gamma_dispersion[i])
     
@@ -239,11 +239,11 @@ class TimeSeries:
             at each time step. Also modifies self.y_array with the simulated
             values.
         """
-        for i in range(self.n):
+        for i in range(len(self)):
             #get the parameters of the compound Poisson at this time step
             self.update_cp_parameters(i)
             #simulate this compound Poisson
-            self.y_array[i] = self.simulate_cp_given_z(
+            self[i] = self.simulate_cp_given_z(
                 self.z_array[i], self.gamma_mean[i], self.gamma_dispersion[i])
     
     def simulate_future(self, x):
@@ -308,7 +308,7 @@ class TimeSeries:
         
         See the method update_cp_parameters(self, index)
         """
-        for i in range(self.n):
+        for i in range(len(self)):
             self.update_cp_parameters(i)
     
     def update_cp_parameters(self, index):
@@ -330,16 +330,16 @@ class TimeSeries:
             assuming the latent variable z are observed (via simulation or
             estimating using the E step). Requires the method
             update_all_cp_parameters() to be called beforehand or
-            update_cp_parameters(index) for index in range(self.n) if only a few
-            parameters has changed. Note that this is done after calling
+            update_cp_parameters(index) for index in range(len(self)) if only a
+            few parameters has changed. Note that this is done after calling
             e_step(), thus this method can be called without any prerequisites
             afer calling e_step(). 
         
         Returns:
             log likelihood
         """
-        ln_l_array = np.zeros(self.n)
-        for i in range(self.n):
+        ln_l_array = np.zeros(len(self))
+        for i in range(len(self)):
             ln_l_array[i] = self.get_joint_log_likelihood_i(i)
         return np.sum(ln_l_array)
     
@@ -347,10 +347,10 @@ class TimeSeries:
         """Return M step objective for a single data point
         
         Requires the method update_all_cp_parameters() to be called beforehand
-            or update_cp_parameters(index) for index in range(self.n).
+            or update_cp_parameters(index) for index in range(len(self)).
         """
-        ln_l_array = np.zeros(self.n)
-        for i in range(self.n):
+        ln_l_array = np.zeros(len(self))
+        for i in range(len(self)):
             ln_l_array[i] = self.get_em_objective_i(i)
         return np.sum(ln_l_array)
     
@@ -358,7 +358,7 @@ class TimeSeries:
         """Return M step objective for a single data point
         
         Requires the method update_all_cp_parameters() to be called beforehand
-            or update_cp_parameters(index) for index in range(self.n).
+            or update_cp_parameters(index) for index in range(len(self)).
         """
         objective = self.get_joint_log_likelihood_i(i)
         z = self.z_array[i]
@@ -373,12 +373,12 @@ class TimeSeries:
         """Return joint log likelihood for a single data point
         
         Requires the method update_all_cp_parameters() to be called beforehand
-            or update_cp_parameters(index) for index in range(self.n).
+            or update_cp_parameters(index) for index in range(len(self)).
         """
         ln_l = -self.poisson_rate[i]
         z = self.z_array[i]
         if z > 0:
-            y = self.y_array[i]
+            y = self[i]
             gamma_mean = self.gamma_mean[i]
             gamma_dispersion = self.gamma_dispersion[i]
             cp_term = Terms(self, i)
@@ -397,12 +397,12 @@ class TimeSeries:
             variables z_array, poisson_rate, gamma_mean, and gamma_dispersion
         """
         #for each data point (forwards in time)
-        for i in range(self.n):
+        for i in range(len(self)):
             #update the parameter at this time step
             self.update_cp_parameters(i)
             
             #if the rainfall is zero, then z is zero (it has not rained)
-            if self.y_array[i] == 0:
+            if self[i] == 0:
                 self.z_array[i] = 0
                 self.z_var_array[i] = 0
             else:
@@ -497,8 +497,8 @@ class TimeSeries:
         forecast.time_array = []
         forecast.rng = self.rng
         #the forecast time_array is the future
-        last_time = self.time_array[self.n-1]
-        time_diff = last_time - self.time_array[self.n-2]
+        last_time = self.time_array[len(self)-1]
+        time_diff = last_time - self.time_array[len(self)-2]
         for i in range(len(x)):
             forecast.time_array.append(last_time + (i+1)*time_diff)
         
@@ -528,3 +528,14 @@ class TimeSeries:
                 string += "\n"
         return string
     
+    def __iter__(self):
+        return self.y_array.__iter__()
+    
+    def __len__(self):
+        return len(self.y_array)
+    
+    def __getitem__(self, index):
+        return self.y_array[index]
+    
+    def __setitem__(self, index, value):
+        self.y_array[index] = value

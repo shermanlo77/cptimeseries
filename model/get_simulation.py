@@ -41,7 +41,7 @@ def simulate_test():
     time_series = simulate_training(cp.TimeSeries)
     time_series.rng = random.RandomState(np.uint32(162715606))
     rng = time_series.rng
-    n = time_series.n
+    n = len(time_series)
     n_dim = time_series.n_dim
     n_forecast = 10000
     x = np.zeros((n_forecast,n_dim))

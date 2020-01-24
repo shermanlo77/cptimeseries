@@ -61,7 +61,7 @@ class TimeSeriesGd(TimeSeries):
                 #be the AR or MA parameters
             #gradient at time step i depends on gradient at time step i-1,
                 #therefore work out each gradient in sequence
-            for i in range(self.n):
+            for i in range(len(self)):
                 for parameter in self.cp_parameter_array:
                     parameter.calculate_d_reg_self_i(i)
             for parameter in self.cp_parameter_array:

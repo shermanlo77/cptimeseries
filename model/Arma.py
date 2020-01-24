@@ -12,7 +12,7 @@ class Arma:
     
     def __init__(self, parameter):
         self.parameter = parameter
-        self.time_series = parameter._parent
+        self.time_series = parameter.time_series
     
     def ar(self, index):
         """AR term at a time step
@@ -31,7 +31,7 @@ class Arma:
         """
         if index > 0:
             time_series = self.time_series
-            return self.parameter.ma(time_series.y_array[index-1],
+            return self.parameter.ma(time_series[index-1],
                                      time_series.z_array[index-1],
                                      time_series.poisson_rate[index-1],
                                      time_series.gamma_mean[index-1],
@@ -56,8 +56,8 @@ class ArmaForecastNoMa(Arma):
     def ma(self, index):
         if index == 0:
             time_series = self.time_series.fitted_time_series
-            n = time_series.n
-            return self.parameter.ma(time_series.y_array[n-1],
+            n = len(time_series)
+            return self.parameter.ma(time_series[n-1],
                                      time_series.z_array[n-1],
                                      time_series.poisson_rate[n-1],
                                      time_series.gamma_mean[n-1],
@@ -82,10 +82,10 @@ class ArmaForecast(Arma):
     def ma(self, index):
         if index == 0:
             time_series = self.time_series.fitted_time_series
-            index = time_series.n
+            index = len(time_series)
         else:
             time_series = self.time_series
-        return self.parameter.ma(time_series.y_array[index-1],
+        return self.parameter.ma(time_series[index-1],
                                  time_series.z_array[index-1],
                                  time_series.poisson_rate[index-1],
                                  time_series.gamma_mean[index-1],

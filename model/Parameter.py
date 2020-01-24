@@ -31,7 +31,7 @@ class Parameter:
             names of the reg parameters
         arma: object to evalute arma terms
         value_array: array of values of the parameter for each time step
-        _parent: TimeSeries object containing this
+        time_series: TimeSeries object containing this
         _d_reg_self_array: dictionary containing arrays of derivates
             of itself wrt reg parameters
     """
@@ -41,7 +41,6 @@ class Parameter:
         Args:
             n_dim: number of dimensions
         """
-        self.n = None
         self.n_dim = n_dim
         self.reg_parameters = {
             "reg": np.zeros(n_dim),
@@ -49,25 +48,24 @@ class Parameter:
         }
         self.arma = None
         self.value_array = None
-        self._parent = None
+        self.time_series = None
         self._d_reg_self_array = None
     
     def assign_parent(self, parent):
         """Assign parent
         
-        Assign the member variable _parent which points to the
+        Assign the member variable time_series which points to the
             TimeSeries object which owns self
         """
-        self._parent = parent
-        self.n = parent.n
-        self.value_array = np.zeros(self.n)
+        self.time_series = parent
+        self.value_array = np.zeros(len(parent))
         self.arma = Arma(self)
     
     def copy(self):
         """Return deep copy of itself
         """
         copy = self.copy_reg()
-        copy.assign_parent(self._parent)
+        copy.assign_parent(self.time_series)
         copy.value_array = self.value_array.copy()
         return copy
     
@@ -104,7 +102,7 @@ class Parameter:
         #regressive on the model fields and constant
         exponent = 0.0
         exponent += self["const"]
-        exponent += np.dot(self["reg"], self._parent.get_normalise_x(index))
+        exponent += np.dot(self["reg"], self.time_series.get_normalise_x(index))
         if "AR" in self.keys():
             exponent += self["AR"] * self.ar_term(index)
         if "MA" in self.keys():
@@ -161,10 +159,10 @@ class Parameter:
             called for all index. See the method m_step in TimeSeries
         
         Args:
-            step_size: change parameters by step_size/self.n * gradient
+            step_size: change parameters by step_size/len(self) * gradient
         """
         gradient = self.d_reg_ln_l()
-        gradient *= step_size/self.n
+        gradient *= step_size/len(self)
         self += gradient
     
     def stochastic_gradient_descent(self, index, step_size):
@@ -210,7 +208,7 @@ class Parameter:
         d_self_ln_l = self.d_self_ln_l_all()
         d_reg_ln_l = self._d_reg_self_array
         for key in self.keys():
-            for i in range(self.n):
+            for i in range(len(self)):
                 #chain rule
                 d_reg_ln_l[key][i] = (
                     self._d_reg_self_array[key][i] * d_self_ln_l[i])
@@ -233,8 +231,8 @@ class Parameter:
         Returns:
             vector of gradients
         """
-        d_self_ln_l = np.zeros(self.n)
-        for i in range(self.n):
+        d_self_ln_l = np.zeros(len(self))
+        for i in range(len(self)):
             d_self_ln_l[i] = self.d_self_ln_l(i)
         return d_self_ln_l
         
@@ -258,8 +256,7 @@ class Parameter:
         """
         self._d_reg_self_array = {}
         for key, value in self.reg_parameters.items():
-            self._d_reg_self_array[key] = np.zeros(
-                (self.n, value.size))
+            self._d_reg_self_array[key] = np.zeros((len(self), value.size))
     
     def calculate_d_reg_self_i(self, index):
         """Calculates the derivate of itself wrt parameter
@@ -285,7 +282,7 @@ class Parameter:
                     d_reg_self[index] += (self["MA"]
                         * self.d_parameter_ma(index, key))
             if key == "reg":
-                d_reg_self[index] += self._parent.get_normalise_x(index)
+                d_reg_self[index] += self.time_series.get_normalise_x(index)
             elif key == "AR":
                 d_reg_self[index] += self.ar_term(index)
             elif key == "MA":
@@ -334,7 +331,7 @@ class Parameter:
             if key == "reg":
                 for i in range(self.n_dim):
                     vector_name.append(
-                        self_name+"_"+self._parent.model_field_name[i])
+                        self_name+"_"+self.time_series.model_field_name[i])
             else:
                 vector_name.append(self_name+"_"+key)
         return vector_name
@@ -372,6 +369,9 @@ class Parameter:
         """
         return self.reg_parameters.items()
     
+    def __len__(self):
+        return len(self.value_array)
+    
     def __str__(self):
         #return reg_parameters
         return self.reg_parameters.__str__()
@@ -379,7 +379,7 @@ class Parameter:
     def __getitem__(self, key):
         #can return a value in value_array when key is a non-negative integer
         #can return a value from the corresponding parameter in
-            #_parent.fitted_time_series (if it exists) if key is a negative
+            #time_series.fitted_time_series (if it exists) if key is a negative
             #integer
         #can return a reg parameter when provided with "reg", "AR", "MA",
             #"const"
@@ -391,13 +391,13 @@ class Parameter:
                 return self.value_array[key]
             #negative index, return value from the past time series
             else:
-                time_series_before = self._parent.fitted_time_series
+                time_series_before = self.time_series.fitted_time_series
                 #get the corresponding parameter from the past time series
                 for parameter in time_series_before.cp_parameter_array:
                     if isinstance(parameter, self.__class__):
                         parameter_before = parameter
                         break
-                return parameter_before[parameter_before.n + key]
+                return parameter_before[len(time_series_before) + key]
     
     def __setitem__(self, key, value):
         #can set a value in value_array when key is an integer
@@ -428,12 +428,12 @@ class PoissonRate(Parameter):
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
         return (z - poisson_rate) / math.sqrt(poisson_rate)
     def d_self_ln_l(self, index):
-        z = self._parent.z_array[index]
+        z = self.time_series.z_array[index]
         poisson_rate = self.value_array[index]
         return z/poisson_rate - 1
     def d_parameter_ma(self, index, key):
         poisson_rate = self[index-1]
-        z = self._parent.z_array[index-1]
+        z = self.time_series.z_array[index-1]
         return (-0.5*(z+poisson_rate) / math.pow(poisson_rate, 3/2)
             *self._d_reg_self_array[key][index-1])
 
@@ -449,17 +449,17 @@ class GammaMean(Parameter):
         else:
             return 0.0
     def d_self_ln_l(self, index):
-        y = self._parent.y_array[index]
-        z = self._parent.z_array[index]
+        y = self.time_series[index]
+        z = self.time_series.z_array[index]
         mu = self[index]
-        phi = self._parent.gamma_dispersion[index]
+        phi = self.time_series.gamma_dispersion[index]
         return (y-z*mu) / (phi*math.pow(mu,2))
     def d_parameter_ma(self, index, key):
-        y = self._parent.y_array[index-1]
-        z = self._parent.z_array[index-1]
+        y = self.time_series[index-1]
+        z = self.time_series.z_array[index-1]
         if z > 0:
             gamma_mean = self[index-1]
-            gamma_dispersion = self._parent.gamma_dispersion
+            gamma_dispersion = self.time_series.gamma_dispersion
             d_reg_gamma_mean = self._d_reg_self_array[key][index-1]
             if key in gamma_dispersion.keys():
                 d_reg_gamma_dispersion = (gamma_dispersion
@@ -485,14 +485,14 @@ class GammaDispersion(Parameter):
     def __init__(self, n_dim):
         super().__init__(n_dim)
     def d_self_ln_l(self, index):
-        z = self._parent.z_array[index]
+        z = self.time_series.z_array[index]
         if z == 0:
             return 0
         else:
-            y = self._parent.y_array[index]
-            mu = self._parent.gamma_mean[index]
+            y = self.time_series[index]
+            mu = self.time_series.gamma_mean[index]
             phi = self[index]
-            z_var = self._parent.z_var_array[index]
+            z_var = self.time_series.z_var_array[index]
             terms = np.zeros(7)
             terms[0] = z*math.log(mu)
             terms[1] = z*math.log(phi)

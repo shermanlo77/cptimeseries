@@ -31,7 +31,7 @@ class TimeSeriesSgd(TimeSeriesGd):
         self.n_stochastic_step = 10
         self.ln_l_max_index = 0
         self.ln_l_stochastic_index = [1]
-        self._permutation_iter = self.rng.permutation(self.n).__iter__()
+        self._permutation_iter = self.rng.permutation(len(self)).__iter__()
     
     def fit(self):
         """Fit model - override
@@ -110,5 +110,5 @@ class TimeSeriesSgd(TimeSeriesGd):
         try:
             return self._permutation_iter.__next__()
         except StopIteration:
-            self._permutation_iter = self.rng.permutation(self.n).__iter__()
+            self._permutation_iter = self.rng.permutation(len(self)).__iter__()
             return self._permutation_iter.__next__()
