@@ -135,13 +135,13 @@ class Parameter:
         """
         return self.arma.ma(index)
     
-    def ar(self, parameter):
-        """AR term given parameters
+    def ar(self, index):
+        """AR term for a specific time step
         
-        Returns the autoregressive term given parameters, to be used by the arma
-            object.
+        Returns the autoregressive term for a specific time step, to be used by
+            the arma object.
         """
-        return math.log(parameter) - self["const"]
+        return math.log(self[index]) - self["const"]
     
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
         """MA term given parameters

@@ -20,7 +20,7 @@ class Arma:
         Returns the AR term at a given time step.
         """
         if index > 0:
-            return self.parameter.ar(self.parameter[index-1])
+            return self.parameter.ar(index-1)
         else:
             return 0
         
@@ -77,7 +77,7 @@ class ArmaForecast(Arma):
         super().__init__(parameter)
 
     def ar(self, index):
-        return self.parameter.ar(self.parameter[index-1])
+        return self.parameter.ar(index-1)
     
     def ma(self, index):
         if index == 0:
