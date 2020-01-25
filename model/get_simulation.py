@@ -16,15 +16,15 @@ def simulate_training(TimeSeriesClass=None):
         for i_dim in range(n_model_fields):
             x[i, i_dim] = (0.8*math.sin(2*math.pi/365 * i)
                 + (i_dim+1)*rng.normal())
-    poisson_rate = cp.PoissonRate(n_model_fields)
+    poisson_rate = cp.PoissonRate(n_model_fields, (2,2))
     poisson_rate["reg"] = [0.098, 0.001]
-    poisson_rate["AR"] = 0.13
-    poisson_rate["MA"] = 0.19
+    poisson_rate["AR"] = [0.13, 0.1]
+    poisson_rate["MA"] = [0.19, 0.13]
     poisson_rate["const"] = 0.42
-    gamma_mean = cp.GammaMean(n_model_fields)
+    gamma_mean = cp.GammaMean(n_model_fields, (2,2))
     gamma_mean["reg"] = [0.066, 0.002]
-    gamma_mean["AR"] = 0.1
-    gamma_mean["MA"] = 0.1
+    gamma_mean["AR"] = [0.1, 0.08]
+    gamma_mean["MA"] = [0.1, 0.07]
     gamma_mean["const"] = 0.89
     gamma_dispersion = cp.GammaDispersion(n_model_fields)
     gamma_dispersion["reg"] = [0.07, 0.007]

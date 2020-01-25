@@ -21,11 +21,12 @@ class Parameter:
         implemented:
         -ma_term(self, index)
         -d_self_ln_l(self)
-        -d_parameter_ma(self, index, key)
+        -d_reg_ma(self, index, key)
     
     Attributes:
-        n: number of time steps
         n_model_fields: number of dimensions the model fields has
+        n_ar: number of autoregressive terms (default 0)
+        n_ma: number of moving average terms (default 0)
         reg_parameters: dictionary containing regressive (reg) parameters
             with keys "reg", "AR", "MA", "const" which corresponds to the
             names of the reg parameters
@@ -36,12 +37,15 @@ class Parameter:
             of itself wrt reg parameters
     """
     
-    def __init__(self, n_model_fields):
+    def __init__(self, n_model_fields, n_arma):
         """
         Args:
             n_model_fields: number of model fields
+            n_arma: 2 element array, (n_ar, n_ma)
         """
         self.n_model_fields = n_model_fields
+        self.n_ar = n_arma[0]
+        self.n_ma = n_arma[1]
         self.reg_parameters = {
             "reg": np.zeros(n_model_fields),
             "const": 0.0,
@@ -50,6 +54,11 @@ class Parameter:
         self.value_array = None
         self.time_series = None
         self._d_reg_self_array = None
+        
+        if self.n_ar > 0:
+            self.reg_parameters["AR"] = np.zeros(self.n_ar)
+        if self.n_ma > 0:
+            self.reg_parameters["MA"] = np.zeros(self.n_ma)
     
     def assign_parent(self, parent):
         """Assign parent
@@ -72,7 +81,13 @@ class Parameter:
     def copy_reg(self):
         """Return deep copy of the regression parameters
         """
-        copy = self.__class__(self.n_model_fields)
+        #GammaDispersion does not hava ARMA terms
+        if isinstance(self, GammaDispersion):
+            copy = self.__class__(self.n_model_fields)
+        #any other parameters require ARMA terms
+        else:
+            copy = self.__class__(self.n_model_fields, (self.n_ar, self.n_ma))
+        #deep copy regression parameters
         for key, value in self.reg_parameters.items():
             if type(value) is np.ndarray:
                 copy[key] = value.copy()
@@ -87,7 +102,11 @@ class Parameter:
             self[key] = np.asarray(value)
             if key == "reg":
                 self[key] = np.reshape(self[key], self.n_model_fields)
-            else:
+            elif key == "AR":
+                self[key] = np.reshape(self[key], self.n_ar)
+            elif key == "MA":
+                self[key] = np.reshape(self[key], self.n_ma)
+            elif key == "const":
                 self[key] = np.reshape(self[key], 1)
     
     def update_value_array(self, index):
@@ -104,9 +123,9 @@ class Parameter:
         exponent += self["const"]
         exponent += np.dot(self["reg"], self.time_series.get_normalise_x(index))
         if "AR" in self.keys():
-            exponent += self["AR"] * self.ar_term(index)
+            exponent += np.dot(self["AR"], self.ar_term(index))
         if "MA" in self.keys():
-            exponent += self["MA"] * self.ma_term(index)
+            exponent += np.dot(self["MA"], self.ma_term(index))
         #exp link function, make it positive
         self[index] = math.exp(exponent)
     
@@ -280,7 +299,7 @@ class Parameter:
                         * d_reg_self[index-1] / parameter_i_1)
                 if "MA" in self.keys():
                     d_reg_self[index] += (self["MA"]
-                        * self.d_parameter_ma(index, key))
+                        * self.d_reg_ma(index, key))
             if key == "reg":
                 d_reg_self[index] += self.time_series.get_normalise_x(index)
             elif key == "AR":
@@ -293,7 +312,11 @@ class Parameter:
                     d_reg_self[index] -= self["AR"]
             d_reg_self[index] *= parameter_i
     
-    def d_parameter_ma(self, index, key):
+    def d_reg_ar(self, index, key):
+        pass
+        
+    
+    def d_reg_ma(self, index, key):
         """Derivate of the MA term at a time step
         
         Abstract method - subclasses to implement
@@ -328,10 +351,16 @@ class Parameter:
         vector_name = []
         self_name = self.__class__.__name__ 
         for key, value in self.items():
+            #put model field name
             if key == "reg":
-                for i in range(self.n_model_fields):
+                for i in range(len(value)):
                     vector_name.append(
                         self_name+"_"+self.time_series.model_field_name[i])
+            #for AR and MA, name it as eg AR_1, MA_2
+            elif key == "AR" or key == "MA":
+                for i in range(len(value)):
+                    vector_name.append(self_name+"_"+key+str(i+1))
+            #else it is a constant
             else:
                 vector_name.append(self_name+"_"+key)
         return vector_name
@@ -421,27 +450,23 @@ class Parameter:
         return self
 
 class PoissonRate(Parameter):
-    def __init__(self, n_model_fields):
-        super().__init__(n_model_fields)
-        self.reg_parameters["AR"] = 0.0
-        self.reg_parameters["MA"] = 0.0
+    def __init__(self, n_model_fields, n_arma):
+        super().__init__(n_model_fields, n_arma)
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
         return (z - poisson_rate) / math.sqrt(poisson_rate)
     def d_self_ln_l(self, index):
         z = self.time_series.z_array[index]
         poisson_rate = self.value_array[index]
         return z/poisson_rate - 1
-    def d_parameter_ma(self, index, key):
+    def d_reg_ma(self, index, key):
         poisson_rate = self[index-1]
         z = self.time_series.z_array[index-1]
         return (-0.5*(z+poisson_rate) / math.pow(poisson_rate, 3/2)
             *self._d_reg_self_array[key][index-1])
 
 class GammaMean(Parameter):
-    def __init__(self, n_model_fields):
-        super().__init__(n_model_fields)
-        self.reg_parameters["AR"] = 0.0
-        self.reg_parameters["MA"] = 0.0
+    def __init__(self, n_model_fields, n_arma):
+        super().__init__(n_model_fields, n_arma)
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
         if z > 0:
             return ((y - z* gamma_mean) / gamma_mean
@@ -454,7 +479,7 @@ class GammaMean(Parameter):
         mu = self[index]
         phi = self.time_series.gamma_dispersion[index]
         return (y-z*mu) / (phi*math.pow(mu,2))
-    def d_parameter_ma(self, index, key):
+    def d_reg_ma(self, index, key):
         y = self.time_series[index-1]
         z = self.time_series.z_array[index-1]
         if z > 0:
@@ -483,7 +508,7 @@ class GammaMean(Parameter):
 
 class GammaDispersion(Parameter):
     def __init__(self, n_model_fields):
-        super().__init__(n_model_fields)
+        super().__init__(n_model_fields, (0, 0))
     def d_self_ln_l(self, index):
         z = self.time_series.z_array[index]
         if z == 0:

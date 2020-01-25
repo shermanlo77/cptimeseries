@@ -2,7 +2,7 @@ import math
 import numpy as np
 import numpy.random as random
 from scipy.special import polygamma
-from Arma import Arma, ArmaForecast, ArmaForecastNoMa
+from Arma import Arma, ArmaForecast
 from Forecast import Forecast
 from Parameter import PoissonRate, GammaMean, GammaDispersion
 from Terms import Terms, TermsZ, TermsZ2
@@ -39,13 +39,23 @@ class TimeSeries:
         fitted_time_series: time series before this one, used for forecasting
     """
     
-    def __init__(self, x, cp_parameter_array=None, rainfall=None):
+    def __init__(self, 
+                 x,
+                 cp_parameter_array=None,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None):
         """
         Args:
             x: design matrix of the model fields, shape (n, n_model_fields)
             cp_parameter_array: array containing in order PoissonRate object,
                 GammaMean object, GammaDispersion object
-            rainfall: array of rainfall data
+            rainfall: array of rainfall data. Ignored if cp_parameter_array is
+                provided.
+            poisson_rate_n_arma: 2 element array, number of AR and MA terms for
+                the poisson rate. Ignored if cp_parameter_array is provided.
+            gamma_mean_n_arma: 2 element array, number of AR and MA terms for
+                the gamma mean. Ignored if cp_parameter_array is provided.
         """
         self.x = x
         self.x_shift = np.mean(self.x, 0)
@@ -69,15 +79,15 @@ class TimeSeries:
         
         for i in range(self.n_model_fields):
             self.model_field_name.append("model_field_" + str(i))
-        if rainfall is None:
+        
+        if not cp_parameter_array is None:
             self.y_array = np.zeros(n)
+            self.set_new_parameter(cp_parameter_array)
         else:
             self.y_array = rainfall
-            self.initalise_parameters()
-        if not (cp_parameter_array is None):
-            self.set_new_parameter(cp_parameter_array)
+            self.initalise_parameters(poisson_rate_n_arma, gamma_mean_n_arma)
     
-    def initalise_parameters(self):
+    def initalise_parameters(self, poisson_rate_n_arma, gamma_mean_n_arma):
         """Set the initial parameters
         
         Set the initial parameters to be naive guesses using method of moments
@@ -92,8 +102,8 @@ class TimeSeries:
         gamma_dispersion_guess = (np.var(y_array, ddof=1)
             /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
         #instantise parameters and set it
-        poisson_rate = PoissonRate(n_model_fields)
-        gamma_mean = GammaMean(n_model_fields)
+        poisson_rate = PoissonRate(n_model_fields, poisson_rate_n_arma)
+        gamma_mean = GammaMean(n_model_fields, gamma_mean_n_arma)
         gamma_dispersion = GammaDispersion(n_model_fields)
         poisson_rate["const"] = math.log(poisson_rate_guess)
         gamma_mean["const"] = math.log(gamma_mean_guess)
