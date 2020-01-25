@@ -11,19 +11,23 @@ class TimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
     
     A time series distribued as compound Poisson with dynamic varying
-        parameters. Objects from this class can simulate the model and fit the
-        model.
-    Initalise the model by passing initial parameters via the constructor. This
-        is used to simulate.
-    There is a simuate method
+        parameters. Objects from this class can simulate the model and/or fit
+        onto provided data or simulated data
+    Initalise the model by passing model fields, rainfall data and the number of
+        ARMA terms for the Poisson rate and the gamma mean.
+    Alternatively, initalise the model by passing model fields and an array of
+        Parameters (see the __init__)
+    __len__(), __iter__(), __getitem__() and __setitem__() overridden to
+        correspond to the array of rainfall
+    Subclasses should implement the method fit() to fit the model onto the data
     
     Attributes:
         x: np.array as a design matrix of the model fields, shape
             (n, n_model_fields)
         x_shift: mean of x along time
         x_scale: standard deviation of x along time
-        n: length of time series
-        time_array: time stamp for each time step
+        model_field_name: array containing a name (string) for each model field
+        time_array: time stamp for each time step (default range(n))
         n_model_fields: number of dimensions of the model fields
         poisson_rate: PoissonRate object containing the parameter at each time
             step and parameters for the regressive and ARMA parameters elements
@@ -31,31 +35,42 @@ class TimeSeries:
             parameters for the regressive and ARMA parameters elements
         gamma_dispersion:  GammaDispersion containing the parameter at each time 
             step and parameters for the regressive and ARMA parameters elements
+        n_parameter: number of total (from poisson_rate, gamma_mean,
+            gamma_dispersion) reg parameters
         cp_parameter_array: array pointing to poisson_rate, gamma_mean and
             gamma_dispersion
         z_array: latent poisson variables at each time step
         z_var_array: variance of the z at each time step
         y_array: compound poisson variables at each time step
         fitted_time_series: time series before this one, used for forecasting
+        rng: numpy.random.RandomState object
     """
     
     def __init__(self, 
                  x,
-                 cp_parameter_array=None,
                  rainfall=None,
                  poisson_rate_n_arma=None,
-                 gamma_mean_n_arma=None):
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
         """
+        Provide the following combination parameters (or signature) only:
+            -x, rainfall, poisson_rate_n_arma, gamma_mean_n_arma
+                -to be used for fitting the model onto a provided data
+            -x, rainfall, cp_parameter_array
+                -to be used for fitting the model onto a provided data with a
+                    provided initial value
+            -x, cp_parameter_array
+                -to be used for simulating rainfall
+        
         Args:
             x: design matrix of the model fields, shape (n, n_model_fields)
-            cp_parameter_array: array containing in order PoissonRate object,
-                GammaMean object, GammaDispersion object
-            rainfall: array of rainfall data. Ignored if cp_parameter_array is
-                provided.
+            rainfall: array of rainfall data. If none, all rain is zero
             poisson_rate_n_arma: 2 element array, number of AR and MA terms for
                 the poisson rate. Ignored if cp_parameter_array is provided.
             gamma_mean_n_arma: 2 element array, number of AR and MA terms for
                 the gamma mean. Ignored if cp_parameter_array is provided.
+            cp_parameter_array: array containing in order PoissonRate object,
+                GammaMean object, GammaDispersion object
         """
         self.x = x
         self.x_shift = np.mean(self.x, 0)
@@ -77,20 +92,34 @@ class TimeSeries:
         self.fitted_time_series = None
         self.rng = random.RandomState(np.uint32(2057577976))
         
+        #name the model fields
         for i in range(self.n_model_fields):
             self.model_field_name.append("model_field_" + str(i))
         
-        if not cp_parameter_array is None:
+        if rainfall is None:
             self.y_array = np.zeros(n)
-            self.set_new_parameter(cp_parameter_array)
         else:
             self.y_array = rainfall
+        
+        #initalise parameters if none is provided, all regression parameters to
+            #zero, constant is a naive estimate
+        if cp_parameter_array is None:
             self.initalise_parameters(poisson_rate_n_arma, gamma_mean_n_arma)
+        else:
+            self.set_new_parameter(cp_parameter_array)
     
     def initalise_parameters(self, poisson_rate_n_arma, gamma_mean_n_arma):
         """Set the initial parameters
         
-        Set the initial parameters to be naive guesses using method of moments
+        Modifies poisson_rate, gamma_mean, gamma_dispersion and
+            cp_parameter_array
+        Set the initial parameters to be naive estimates using method of moments
+            and y=0 count
+        
+        Args:
+            poisson_rate_n_arma: 2 element array (n_ar, n_ma) for the Poisson
+                rate
+            gamma_mean_n_arma: 2 element array (n_ar, n_na) for the Gamma mean
         """
         y_array = self.y_array
         n = len(self)
@@ -109,6 +138,18 @@ class TimeSeries:
         gamma_mean["const"] = math.log(gamma_mean_guess)
         gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
         self.set_new_parameter([poisson_rate, gamma_mean, gamma_dispersion])
+    
+    def initalise_parameters_given_arma(self):
+        """Set the initial parameters (using current number ARMA parameters)
+        
+        Modifies poisson_rate, gamma_mean, gamma_dispersion and
+            cp_parameter_array
+        Set the initial parameters to be naive estimates using method of moments
+            and y=0 count with the current number of ARMA parameters
+        """
+        poisson_rate_n_arma = (self.poisson_rate.n_ar, self.poisson_rate.n_ma)
+        gamma_mean_n_arma = (self.gamma_mean.n_ar, self.gamma_mean.n_ma)
+        self.initalise_parameters(poisson_rate_n_arma, gamma_mean_n_arma)
     
     def get_normalise_x(self, index):
         """Return a model field vector at a specific time step which is
@@ -141,8 +182,8 @@ class TimeSeries:
     def set_parameter(self, cp_parameter_array):
         """Set the member variables of the cp paramters
         
-        Set the member variables of poisson_rate, gamma_mean,
-            gamma_dispersion and cp_parameter_array. 
+        Set the member variables of poisson_rate, gamma_mean, gamma_dispersion
+            and cp_parameter_array. 
         
         Args:
             array containing in order: PoissonRate object, GammaMean object,
@@ -498,7 +539,8 @@ class TimeSeries:
         Returns:
             forecast: Forecast object
         """
-        forecast = TimeSeries(x, self.copy_parameter_only_reg())
+        forecast = TimeSeries(
+            x, cp_parameter_array=self.copy_parameter_only_reg())
         forecast.cast_arma(ArmaForecast)
         forecast.x_shift = self.x_shift
         forecast.x_scale = self.x_scale

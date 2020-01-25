@@ -3,6 +3,22 @@ import numpy as np
 import scipy.stats as stats
 
 class Forecast:
+    """Contain Monte Carlo forecasts
+    
+    Contain Monte Carlo forecasts in forecast_array as an array of TimeSeries
+        objects. Add forecasts using the method append(). Call the method
+        get_forecast() to calculate statistcs of all forecats. The statistics
+        are stored as member variables.
+    Used by the methods TimeSeries.forecast() and TimeSeries.forecast_self().
+    
+    Attributes:
+        forecast_array: array of TimeSeries objects
+        forecast: expectation of all forecasts
+        forecast_error: std of all forecasts
+        forecast_median: median of all forecasts
+        forecast_sigma: dictoary of z sigma errors of all forecasts
+        time_array: array, containing time stamps for each point in the forecast
+    """
     
     def __init__(self):
         self.forecast_array = []
@@ -13,9 +29,13 @@ class Forecast:
         self.time_array = None
     
     def append(self, forecast):
+        """Append forecast to collection
+        """
         self.forecast_array.append(forecast)
     
     def get_forecast(self):
+        """Calculate statistics over all the provided forecasts
+        """
         forecast_array = []
         for forecast in self.forecast_array:
             forecast_array.append(forecast.y_array)
@@ -34,8 +54,7 @@ class Forecast:
     def get_error_rmse(self, true_y):
         """Return root mean square error
         
-        Compare this y_array (usually a prediction) with a given true_y using
-            the root mean squared error
+        Compare forecast with a given true_y using the root mean squared error
         
         Args:
             true_y: array of y
@@ -49,9 +68,8 @@ class Forecast:
     def get_error_square_sqrt(self, true_y):
         """Return square mean sqrt error
         
-        Compare this y_array (usually a prediction) with a given true_y using
-            the square mean sqrt error. This is the Tweedie deviance with
-            p = 1.5
+        Compare forecast with a given true_y using the square mean sqrt error.
+            This is the Tweedie deviance with p = 1.5
         
         Args:
             true_y: array of y

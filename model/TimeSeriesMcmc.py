@@ -40,8 +40,17 @@ class TimeSeriesMcmc(TimeSeries):
         rng: random number generator
     """
     
-    def __init__(self, x, cp_parameter_array=None, rainfall=None):
-        super().__init__(x, cp_parameter_array, rainfall)
+    def __init__(self, 
+                 x,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
+        super().__init__(x,
+                         rainfall,
+                         poisson_rate_n_arma,
+                         gamma_mean_n_arma,
+                         cp_parameter_array)
         self.n_sample = 100000
         self.burn_in = 0
         self.z_sample = []

@@ -24,8 +24,17 @@ class TimeSeriesSgd(TimeSeriesGd):
         _permutation_iter: iterator for the permutation of index
     """
     
-    def __init__(self, x, cp_parameter_array=None, rainfall=None):
-        super().__init__(x, cp_parameter_array, rainfall)
+    def __init__(self, 
+                 x,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
+        super().__init__(x,
+                         rainfall,
+                         poisson_rate_n_arma,
+                         gamma_mean_n_arma,
+                         cp_parameter_array)
         self.n_initial = 100
         self.stochastic_step_size = 0.01
         self.n_stochastic_step = 10

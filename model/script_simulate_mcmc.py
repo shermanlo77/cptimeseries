@@ -4,7 +4,7 @@ from get_simulation import simulate_training
 
 def main():
     time_series = simulate_training(cp.TimeSeriesMcmc)
-    time_series.initalise_parameters()
+    time_series.initalise_parameters_given_arma()
     time_series.fit()
     joblib.dump(time_series, "results/simulate_mcmc.zlib")
     

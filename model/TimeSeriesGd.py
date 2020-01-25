@@ -12,8 +12,17 @@ class TimeSeriesGd(TimeSeries):
             likelihood increases not very much
     """
     
-    def __init__(self, x, cp_parameter_array=None, rainfall=None):
-        super().__init__(x, cp_parameter_array, rainfall)
+    def __init__(self, 
+                 x,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
+        super().__init__(x,
+                         rainfall,
+                         poisson_rate_n_arma,
+                         gamma_mean_n_arma,
+                         cp_parameter_array)
         self.ln_l_array = None
         self.step_size = 0.1
         self.n_em = 100

@@ -31,7 +31,7 @@ def simulate_training(TimeSeriesClass=None):
     gamma_dispersion["const"] = 0.12
     
     time_series = TimeSeriesClass(
-        x, [poisson_rate, gamma_mean, gamma_dispersion])
+        x, cp_parameter_array=[poisson_rate, gamma_mean, gamma_dispersion])
     time_series.rng = rng
     time_series.simulate()
     

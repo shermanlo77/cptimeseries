@@ -18,7 +18,7 @@ def main():
     rainfall = get_data.get_london_rain_training()
     model_field_name = x.columns
     x = np.asarray(x)
-    time_series = cp.TimeSeriesMcmc(x, rainfall=rainfall)
+    time_series = cp.TimeSeriesMcmc(x, rainfall, (1,1), (1,1))
     time_series.model_field_name = model_field_name
     time_series.time_array = get_data.get_time_training()
     time_series.fit()
