@@ -14,13 +14,14 @@ import joblib
 import numpy as np
 
 def main():
-    x = get_data.get_london_model_field_training()
-    rainfall = get_data.get_london_rain_training()
+    london = get_data.London()
+    x = london.get_model_field_training()
+    rainfall = london.get_rain_training()
     model_field_name = x.columns
     x = np.asarray(x)
     time_series = cp.TimeSeriesMcmc(x, rainfall, (1,1), (1,1))
     time_series.model_field_name = model_field_name
-    time_series.time_array = get_data.get_time_training()
+    time_series.time_array = london.get_time_training()
     time_series.fit()
     joblib.dump(time_series, "results/mcmc_london.zlib")
 

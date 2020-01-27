@@ -9,6 +9,7 @@
 #matrix plot of all the variables for each city
 
 import cartopy.crs as ccrs
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import statsmodels.tsa.stattools as stats
@@ -96,8 +97,12 @@ for city, coordinates in city_location.items():
     #get the time series for this city
     rainfall_series = rain_data["rr"][:,latitude_index,longitude_index]
     #get the autocorrelation and partial autocorrelation of the time series
-    acf = stats.acf(rainfall_series, nlags=10, fft=True)
-    pacf = stats.pacf(rainfall_series, nlags=10)
+    acf = stats.acf(rainfall_series, nlags=20, fft=True)
+    pacf = stats.pacf(rainfall_series, nlags=20)
+    
+    is_rain = 1 * (np.asarray(rainfall_series)>0)
+    z_acf = stats.acf(is_rain, nlags=20, fft=True)
+    z_pacf = stats.pacf(is_rain, nlags=20)
     
     #plot the time series
     plt.figure()
@@ -111,6 +116,7 @@ for city, coordinates in city_location.items():
     #plot the acf
     plt.figure()
     plt.bar(np.asarray(range(acf.size)), acf)
+    plt.axhline(1/math.sqrt(len(time)), linestyle="--")
     plt.title(city+": Autocorrelation of rain")
     plt.xlabel("Lag (day)")
     plt.ylabel("Autocorrelation")
@@ -120,10 +126,31 @@ for city, coordinates in city_location.items():
     #plot the pacf
     plt.figure()
     plt.bar(np.asarray(range(pacf.size)), pacf)
+    plt.axhline(1/math.sqrt(len(time)), linestyle="--")
     plt.title(city+": Partial autocorrelation of rain")
     plt.xlabel("Lag (day)")
     plt.ylabel("Partial autocorrelation")
     plt.savefig("figures/rainfall_pacf_"+city+".pdf")
+    plt.close()
+
+    #plot the acf
+    plt.figure()
+    plt.bar(np.asarray(range(acf.size)), z_acf)
+    plt.axhline(1/math.sqrt(len(time)), linestyle="--")
+    plt.title(city+": Autocorrelation of rain event")
+    plt.xlabel("Lag (day)")
+    plt.ylabel("Autocorrelation")
+    plt.savefig("figures/z_acf_"+city+".pdf")
+    plt.close()
+    
+    #plot the pacf
+    plt.figure()
+    plt.bar(np.asarray(range(pacf.size)), z_pacf)
+    plt.axhline(1/math.sqrt(len(time)), linestyle="--")
+    plt.title(city+": Partial autocorrelation of rain event")
+    plt.xlabel("Lag (day)")
+    plt.ylabel("Partial autocorrelation")
+    plt.savefig("figures/z_pacf_"+city+".pdf")
     plt.close()
 
 ##########          MODEL FIELDS          ##########

@@ -108,22 +108,17 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     time_array = forecast_self.time_array
     
     colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
-    cycle_with_error = cycler(color=[colours[1],
-                                     colours[1],
-                                     colours[1],
-                                     colours[0],
-                                     ],
-                              linestyle=['-', ':', ':','-'],
-                              linewidth=[1, 0.5, 0.5, 1],
-                              alpha=[1, 1, 1, 0.25]
-                             )
-    cycle_forecast = cycler(color=[colours[1],colours[0]],
+    cycle_forecast = cycler(color=[colours[1], colours[0]],
                             linewidth=[1, 1],
-                            alpha=[1, 0.25])
+                            alpha=[1, 0.5])
     
     plot.figure()
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
+    plot.fill_between(time_array,
+                      forecast_self.forecast_sigma[-1],
+                      forecast_self.forecast_sigma[1],
+                      alpha=0.25)
     plot.plot(time_array, forecast_self.forecast)
     plot.plot(time_array, true_y_self)
     plot.xlabel("Time")
@@ -133,10 +128,12 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     
     plot.figure()
     ax = plot.gca()
-    ax.set_prop_cycle(cycle_with_error)
+    ax.set_prop_cycle(cycle_forecast)
+    plot.fill_between(time_array,
+                      forecast_self.forecast_sigma[-1],
+                      forecast_self.forecast_sigma[1],
+                      alpha=0.25)
     plot.plot(time_array, forecast_self.forecast_median)
-    plot.plot(time_array, forecast_self.forecast_sigma[-1])
-    plot.plot(time_array, forecast_self.forecast_sigma[1])
     plot.plot(time_array, true_y_self)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
@@ -176,8 +173,12 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.figure()
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
-    plot.plot(time_array_future[0:365], forecast.forecast[0:365])
-    plot.plot(time_array_future[0:365], true_y_future[0:365])
+    plot.fill_between(time_array_future,
+                      forecast.forecast_sigma[-1],
+                      forecast.forecast_sigma[1],
+                      alpha=0.25)
+    plot.plot(time_array_future, forecast.forecast)
+    plot.plot(time_array_future, true_y_future)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "forecast.pdf")
@@ -186,10 +187,12 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.figure()
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
-    plot.plot(time_array_future[0:365], forecast.forecast_median[0:365])
-    #plot.plot(time_array_future[0:365], forecast.forecast_sigma[-1][0:365])
-    #plot.plot(time_array_future[0:365], forecast.forecast_sigma[1][0:365])
-    plot.plot(time_array_future[0:365], true_y_future[0:365])
+    plot.fill_between(time_array_future,
+                      forecast.forecast_sigma[-1],
+                      forecast.forecast_sigma[1],
+                      alpha=0.25)
+    plot.plot(time_array_future, forecast.forecast_median)
+    plot.plot(time_array_future, true_y_future)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "forecast_median.pdf")

@@ -499,7 +499,8 @@ class TimeSeries:
         Returns:
             forecast: Forecast object
         """
-        forecast = TimeSeries(self.x, self.copy_parameter_only_reg())
+        forecast = TimeSeries(
+            self.x, cp_parameter_array=self.copy_parameter_only_reg())
         forecast.z_array = self.z_array.copy()
         forecast.x_shift = self.x_shift
         forecast.x_scale = self.x_scale
