@@ -1,16 +1,16 @@
 import joblib
 import matplotlib.pyplot as plot
 import numpy as np
-from get_data import London
+from get_data import London2
 from print_figure import print_time_series, print_forecast
 
 def main():
     
-    time_series = joblib.load("results/mcmc_london.zlib")
+    time_series = joblib.load("results/mcmc_london2.zlib")
     time_series.burn_in = 90000
     
-    directory = "../figures/london/mcmc/"
-    london = London()
+    directory = "../figures/london/mcmc2/"
+    london = London2()
     
     parameter_name = time_series.get_parameter_vector_name()
     

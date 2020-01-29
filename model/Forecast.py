@@ -1,4 +1,5 @@
 import math
+import matplotlib.pyplot as plot
 import numpy as np
 import scipy.stats as stats
 
@@ -13,25 +14,33 @@ class Forecast:
     
     Attributes:
         forecast_array: array of TimeSeries objects
+        forecast_numpy: forecast_array in numpy format
         forecast: expectation of all forecasts
         forecast_error: std of all forecasts
         forecast_median: median of all forecasts
         forecast_sigma: dictoary of z sigma errors of all forecasts
         time_array: array, containing time stamps for each point in the forecast
+        n: length of time series
+        n_simulation: length of forecast_array
     """
     
     def __init__(self):
         self.forecast_array = []
+        self.forecast_numpy = None
         self.forecast = None
         self.forecast_error = None
         self.forecast_median = None
         self.forecast_sigma = {}
         self.time_array = None
+        self.n = None
+        self.n_simulation = 0
     
     def append(self, forecast):
         """Append forecast to collection
         """
         self.forecast_array.append(forecast)
+        self.n_simulation += 1
+        self.n = len(forecast)
     
     def get_forecast(self):
         """Calculate statistics over all the provided forecasts
@@ -39,7 +48,7 @@ class Forecast:
         forecast_array = []
         for forecast in self.forecast_array:
             forecast_array.append(forecast.y_array)
-        forecast_array = np.asarray(forecast_array)
+        self.forecast_numpy = np.asarray(forecast_array)
         self.forecast = np.mean(forecast_array, 0)
         self.forecast_error = np.std(forecast_array, 0, ddof=1)
         sigma_array = range(-3,4)
@@ -50,6 +59,76 @@ class Forecast:
             self.forecast_sigma[sigma_array[i]] = forecast_quantile[i]
         self.forecast_median = self.forecast_sigma[0]
         self.time_array = self.forecast_array[0].time_array
+    
+    def get_prob_rain(self, rainfall):
+        """Get the probability if it will rain at least of a certian amount
+        
+        Args:
+            rainfall: scalar, amount of rain to evaluate the probability
+        
+        Return:
+            vector, a probability for each day
+        """
+        p_rain = np.sum(self.forecast_numpy > rainfall, 0) / self.n_simulation
+        return p_rain
+    
+    def plot_roc_curve(self, rainfall, true_y):
+        """Plot ROC curve
+        """
+        #thresholds where a marker is shown
+        marker_threshold = [0.05, 0.10, 0.20]
+        #markers for each of these thresholds
+        marker_array = ['o', '^', 's']
+        #get probability it will rain more than rainfall
+        p_rain = self.get_prob_rain(rainfall)
+        #for each positive probability, sort them and they will be used for
+            #thresholds
+        threshold_array = np.sort(p_rain)
+        threshold_array = threshold_array[threshold_array > 0]
+        #marker thresholds goes at the end of threshold_array
+        threshold_array = np.concatenate((threshold_array, marker_threshold))
+        
+        #get the times it rained more than rainfall
+        is_rain = true_y > rainfall
+        n_is_rain = np.sum(is_rain) #number of times the event happened
+        #number of times event did not happaned
+        n_is_not_rain = len(is_rain) - n_is_rain
+        #array to store true and false positives, used for plotting
+        true_positive_array = []
+        false_positive_array = []
+        #for each threshold, get true and false positive
+        for threshold in threshold_array:
+            positive = p_rain >= threshold
+            true_positive = (
+                np.sum(np.logical_and(positive, is_rain)) / n_is_rain)
+            false_positive = (
+                np.sum(np.logical_and(positive, np.logical_not(is_rain)))
+                / n_is_not_rain)
+            true_positive_array.append(true_positive)
+            false_positive_array.append(false_positive)
+        
+        #variables for extracting ordered thresholds and marker thresholds
+        n_marker = len(marker_threshold)
+        n_threshold = len(threshold_array) - n_marker
+        #plot ROC curve, append [1] and [0] so that curves start at (1,1) and
+            #ends at (0,0)
+        #thresholds goes from smallest to largest, i.e highest false positive
+            #rate to lowest false positive rate 
+        ax = plot.plot(np.concatenate(
+                      ([1], false_positive_array[0:n_threshold], [0])),
+                  np.concatenate(
+                      ([1], true_positive_array[0:n_threshold], [0])),
+                  label=str(rainfall)+" mm",
+                  )
+        colour = ax[0].get_color() #make scatter plot same colour as ROC curve
+        #scatter plot the marker thresholds
+        for i in range(len(marker_threshold)):
+            plot.scatter(false_positive_array[n_threshold + i],
+                         true_positive_array[n_threshold + i],
+                         marker=marker_array[i],
+                         c=colour)
+        plot.xlabel("false positive rate")
+        plot.ylabel("true positive rate")
     
     def get_error_rmse(self, true_y):
         """Return root mean square error

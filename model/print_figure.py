@@ -97,6 +97,7 @@ def print_time_series(time_series, prefix):
 def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     
     register_matplotlib_converters()
+    rain_threshold_array = [5, 10, 15]
     
     #forecast self
     try:
@@ -143,7 +144,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.figure()
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
-    plot.plot(time_array, forecast_self.forecast_sigma[3])
+    plot.plot(time_array, forecast_self.forecast_sigma[2])
     plot.plot(time_array, true_y_self)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
@@ -156,6 +157,24 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.ylabel("residual (mm)")
     plot.savefig(prefix + "residual_self.pdf")
     plot.close()
+    
+    plot.figure()
+    for rain in rain_threshold_array:
+        forecast_self.plot_roc_curve(rain, true_y_self)
+    plot.legend()
+    plot.savefig(prefix + "roc_self.pdf")
+    plot.close()
+    
+    for rain in rain_threshold_array:
+        plot.figure()
+        plot.plot(time_array, forecast_self.get_prob_rain(rain))
+        for day in range(forecast_self.n):
+            if true_y_self[day] > rain:
+                plot.axvline(x=time_array[day], color="r", linestyle=":")
+        plot.xlabel("time")
+        plot.ylabel("forecasted probability of > "+str(rain)+" mm of rain")
+        plot.savefig(prefix + "prob_" + str(rain) + "_self.pdf")
+        plot.close()
     
     #forecast
     try:
@@ -181,6 +200,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.plot(time_array_future, true_y_future)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
+    plot.ylim([0, 30])
     plot.savefig(prefix + "forecast.pdf")
     plot.close()
     
@@ -201,10 +221,11 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.figure()
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
-    plot.plot(time_array_future, forecast.forecast_sigma[3])
+    plot.plot(time_array_future, forecast.forecast_sigma[2])
     plot.plot(time_array_future, true_y_future)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
+    plot.ylim([0, 160])
     plot.savefig(prefix + "forecast_extreme.pdf")
     plot.close()
     
@@ -214,6 +235,24 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "residual.pdf")
     plot.close()
+    
+    plot.figure()
+    for rain in rain_threshold_array:
+        forecast.plot_roc_curve(rain, true_y_future)
+    plot.legend()
+    plot.savefig(prefix + "roc.pdf")
+    plot.close()
+    
+    for rain in rain_threshold_array:
+        plot.figure()
+        plot.plot(time_array_future, forecast.get_prob_rain(rain))
+        for day in range(forecast.n):
+            if true_y_future[day] > rain:
+                plot.axvline(x=time_array_future[day], color="r", linestyle=":")
+        plot.xlabel("time")
+        plot.ylabel("forecasted probability of > "+str(rain)+" mm of rain")
+        plot.savefig(prefix + "prob_" + str(rain) + ".pdf")
+        plot.close()
     
     file = open(prefix + "errors.txt", "w")
     file.write("Self deviance: ")
