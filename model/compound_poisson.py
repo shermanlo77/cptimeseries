@@ -5,3 +5,4 @@ from TimeSeries import TimeSeries
 from TimeSeriesGd import TimeSeriesGd
 from TimeSeriesSgd import TimeSeriesSgd
 from TimeSeriesMcmc import TimeSeriesMcmc
+from TimeSeriesSlice import TimeSeriesSlice
