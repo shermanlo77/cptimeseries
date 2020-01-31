@@ -6,3 +6,4 @@ from TimeSeriesGd import TimeSeriesGd
 from TimeSeriesSgd import TimeSeriesSgd
 from TimeSeriesMcmc import TimeSeriesMcmc
 from TimeSeriesSlice import TimeSeriesSlice
+from TimeSeriesElliptical import TimeSeriesElliptical

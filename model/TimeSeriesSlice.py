@@ -21,6 +21,7 @@ class TimeSeriesSlice(TimeSeriesMcmc):
     def sample_z(self):
         """Override - Use slice sampling
         
+        See Neal (2003)
         Select a random z_t in the time series, then move it using slice
             sampling
         """
