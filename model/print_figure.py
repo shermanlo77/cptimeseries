@@ -1,4 +1,5 @@
 import joblib
+import math
 import matplotlib
 import matplotlib.pyplot as plot
 import numpy as np
@@ -10,7 +11,8 @@ def print_time_series(time_series, prefix):
     
     register_matplotlib_converters()
     
-    cycle = cycler(linewidth=[1])
+    colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
+    cycle = cycler(color=[colours[0]], linewidth=[1])
     
     x = time_series.x
     y = time_series.y_array
@@ -22,39 +24,51 @@ def print_time_series(time_series, prefix):
     gamma_mean_array = time_series.gamma_mean.value_array
     gamma_dispersion_array = time_series.gamma_dispersion.value_array
     
-    acf = stats.acf(y, nlags=10, fft=True)
-    pacf = stats.pacf(y, nlags=10)
+    acf = stats.acf(y, nlags=20, fft=True)
+    pacf = stats.pacf(y, nlags=20)
     
     plot.figure()
     ax = plot.gca()
     ax.set_prop_cycle(cycle)
     plot.plot(t, y)
-    plot.xlabel("Time")
-    plot.ylabel("Rainfall (mm)")
+    plot.xlabel("time")
+    plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "rainfall.pdf")
     plot.close()
     
-    for i_dim in range(n_model_fields):
-        plot.figure()
-        ax = plot.gca()
-        ax.set_prop_cycle(cycle)
-        plot.plot(t, x[:,i_dim])
-        plot.xlabel("Time")
-        plot.ylabel("Model field "+str(i_dim))
-        plot.savefig(prefix + "model_field"+str(i_dim)+".pdf")
-        plot.close()
+    plot.figure()
+    ax = plot.gca()
+    ax.set_prop_cycle(cycle)
+    rain_sorted = np.sort(y)
+    cdf = np.asarray(range(n))
+    plot.plot(rain_sorted, cdf)
+    if np.any(rain_sorted == 0):
+        non_zero_index = rain_sorted.nonzero()[0][0] - 1
+        plot.scatter(0, cdf[non_zero_index])
+    plot.xlabel("rainfall (mm)")
+    plot.ylabel("cumulative frequency")
+    plot.savefig(prefix + "cdf.pdf")
+    plot.close()
     
     plot.figure()
+    ax = plot.gca()
+    ax.set_prop_cycle(cycle)
     plot.bar(np.asarray(range(acf.size)), acf)
-    plot.xlabel("Time")
-    plot.ylabel("Autocorrelation")
+    plot.axhline(1/math.sqrt(n), linestyle='--', linewidth=1)
+    plot.axhline(-1/math.sqrt(n), linestyle='--', linewidth=1)
+    plot.xlabel("time (day)")
+    plot.ylabel("autocorrelation")
     plot.savefig(prefix + "acf.pdf")
     plot.close()
     
     plot.figure()
+    ax = plot.gca()
+    ax.set_prop_cycle(cycle)
     plot.bar(np.asarray(range(pacf.size)), pacf)
-    plot.xlabel("Time")
-    plot.ylabel("Partial autocorrelation")
+    plot.axhline(1/math.sqrt(n), linestyle='--', linewidth=1)
+    plot.axhline(-1/math.sqrt(n), linestyle='--', linewidth=1)
+    plot.xlabel("time (day)")
+    plot.ylabel("partial autocorrelation")
     plot.savefig(prefix + "pacf.pdf")
     plot.close()
     
@@ -62,8 +76,8 @@ def print_time_series(time_series, prefix):
     ax = plot.gca()
     ax.set_prop_cycle(cycle)
     plot.plot(t, poisson_rate_array)
-    plot.xlabel("Time")
-    plot.ylabel("Poisson rate")
+    plot.xlabel("time")
+    plot.ylabel("poisson rate")
     plot.savefig(prefix + "poisson_rate.pdf")
     plot.close()
     
@@ -71,8 +85,8 @@ def print_time_series(time_series, prefix):
     ax = plot.gca()
     ax.set_prop_cycle(cycle)
     plot.plot(t, gamma_mean_array)
-    plot.xlabel("Time")
-    plot.ylabel("Gamma mean (mm)")
+    plot.xlabel("time")
+    plot.ylabel("gamma mean (mm)")
     plot.savefig(prefix + "gamma_mean.pdf")
     plot.close()
     
@@ -80,8 +94,8 @@ def print_time_series(time_series, prefix):
     ax = plot.gca()
     ax.set_prop_cycle(cycle)
     plot.plot(t, gamma_dispersion_array)
-    plot.xlabel("Time")
-    plot.ylabel("Gamma dispersion")
+    plot.xlabel("time")
+    plot.ylabel("gamma dispersion")
     plot.savefig(prefix + "gamma_dispersion.pdf")
     plot.close()
     
@@ -89,22 +103,28 @@ def print_time_series(time_series, prefix):
     ax = plot.gca()
     ax.set_prop_cycle(cycle)
     plot.plot(t, z)
-    plot.xlabel("Time")
+    plot.xlabel("time")
     plot.ylabel("Z")
     plot.savefig(prefix + "z.pdf")
     plot.close()
+    
+    file = open(prefix + "parameter.txt", "w")
+    file.write(str(time_series))
+    file.close()
 
-def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
+def print_forecast(
+    time_series, time_series_training, time_series_test, prefix,
+    result_directory):
     
     register_matplotlib_converters()
     rain_threshold_array = [5, 10, 15]
     
     #forecast self
     try:
-        forecast_self = joblib.load(prefix + "self_forecast.zlib")
+        forecast_self = joblib.load(result_directory + "self_forecast.zlib")
     except FileNotFoundError:
         forecast_self = time_series.forecast_self(1000)
-        joblib.dump(forecast_self, prefix + "self_forecast.zlib")
+        joblib.dump(forecast_self, result_directory + "self_forecast.zlib")
         
     time_array = forecast_self.time_array
     
@@ -121,7 +141,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
                       forecast_self.forecast_sigma[1],
                       alpha=0.25)
     plot.plot(time_array, forecast_self.forecast)
-    plot.plot(time_array, true_y_self)
+    plot.plot(time_array, time_series_training.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "forecast_self.pdf")
@@ -135,7 +155,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
                       forecast_self.forecast_sigma[1],
                       alpha=0.25)
     plot.plot(time_array, forecast_self.forecast_median)
-    plot.plot(time_array, true_y_self)
+    plot.plot(time_array, time_series_training.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "forecast_self_median.pdf")
@@ -145,14 +165,14 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
     plot.plot(time_array, forecast_self.forecast_sigma[2])
-    plot.plot(time_array, true_y_self)
+    plot.plot(time_array, time_series_training.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "forecast_self_extreme.pdf")
     plot.close()
     
     plot.figure()
-    plot.plot(time_array, forecast_self.forecast - true_y_self)
+    plot.plot(time_array, forecast_self.forecast - time_series_training.y_array)
     plot.xlabel("Time")
     plot.ylabel("residual (mm)")
     plot.savefig(prefix + "residual_self.pdf")
@@ -160,7 +180,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     
     plot.figure()
     for rain in rain_threshold_array:
-        forecast_self.plot_roc_curve(rain, true_y_self)
+        forecast_self.plot_roc_curve(rain, time_series_training.y_array)
     plot.legend()
     plot.savefig(prefix + "roc_self.pdf")
     plot.close()
@@ -169,7 +189,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
         plot.figure()
         plot.plot(time_array, forecast_self.get_prob_rain(rain))
         for day in range(forecast_self.n):
-            if true_y_self[day] > rain:
+            if time_series_training[day] > rain:
                 plot.axvline(x=time_array[day], color="r", linestyle=":")
         plot.xlabel("time")
         plot.ylabel("forecasted probability of > "+str(rain)+" mm of rain")
@@ -178,10 +198,10 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     
     #forecast
     try:
-        forecast = joblib.load(prefix + "forecast.zlib")
+        forecast = joblib.load(result_directory + "forecast.zlib")
     except FileNotFoundError:
-        forecast = time_series.forecast(x_future, 1000)
-        joblib.dump(forecast, prefix + "forecast.zlib")
+        forecast = time_series.forecast(time_series_test.x, 1000)
+        joblib.dump(forecast, result_directory + "forecast.zlib")
     time_array_future = forecast.time_array
     time_array_full = []
     for i in range(len(time_array)):
@@ -197,7 +217,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
                       forecast.forecast_sigma[1],
                       alpha=0.25)
     plot.plot(time_array_future, forecast.forecast)
-    plot.plot(time_array_future, true_y_future)
+    plot.plot(time_array_future, time_series_test.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.ylim([0, 30])
@@ -212,7 +232,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
                       forecast.forecast_sigma[1],
                       alpha=0.25)
     plot.plot(time_array_future, forecast.forecast_median)
-    plot.plot(time_array_future, true_y_future)
+    plot.plot(time_array_future, time_series_test.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "forecast_median.pdf")
@@ -222,7 +242,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     ax = plot.gca()
     ax.set_prop_cycle(cycle_forecast)
     plot.plot(time_array_future, forecast.forecast_sigma[2])
-    plot.plot(time_array_future, true_y_future)
+    plot.plot(time_array_future, time_series_test.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.ylim([0, 160])
@@ -230,7 +250,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     plot.close()
     
     plot.figure()
-    plot.plot(time_array_future, forecast.forecast - true_y_future)
+    plot.plot(time_array_future, forecast.forecast - time_series_test.y_array)
     plot.xlabel("Time")
     plot.ylabel("rainfall (mm)")
     plot.savefig(prefix + "residual.pdf")
@@ -238,7 +258,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     
     plot.figure()
     for rain in rain_threshold_array:
-        forecast.plot_roc_curve(rain, true_y_future)
+        forecast.plot_roc_curve(rain, time_series_test.y_array)
     plot.legend()
     plot.savefig(prefix + "roc.pdf")
     plot.close()
@@ -247,7 +267,7 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
         plot.figure()
         plot.plot(time_array_future, forecast.get_prob_rain(rain))
         for day in range(forecast.n):
-            if true_y_future[day] > rain:
+            if time_series_test[day] > rain:
                 plot.axvline(x=time_array_future[day], color="r", linestyle=":")
         plot.xlabel("time")
         plot.ylabel("forecasted probability of > "+str(rain)+" mm of rain")
@@ -256,15 +276,19 @@ def print_forecast(time_series, true_y_self, x_future, true_y_future, prefix):
     
     file = open(prefix + "errors.txt", "w")
     file.write("Self deviance: ")
-    file.write(str(forecast_self.get_error_square_sqrt(true_y_self)))
+    file.write(
+        str(forecast_self.get_error_square_sqrt(time_series_training.y_array)))
     file.write("\n")
     file.write("Self rmse: ")
-    file.write(str(forecast_self.get_error_rmse(true_y_self)))
+    file.write(
+        str(forecast_self.get_error_rmse(time_series_training.y_array)))
     file.write("\n")
     file.write("Forecast deviance: ")
-    file.write(str(forecast.get_error_square_sqrt(true_y_future)))
+    file.write(
+        str(forecast.get_error_square_sqrt(time_series_test.y_array)))
     file.write("\n")
     file.write("Forecast rmse: ")
-    file.write(str(forecast.get_error_rmse(true_y_future)))
+    file.write(
+        str(forecast.get_error_rmse(time_series_test.y_array)))
     file.write("\n")
     file.close()

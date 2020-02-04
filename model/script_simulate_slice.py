@@ -6,10 +6,10 @@ def main():
     london = LondonSimulation()
     x = london.get_model_field_training()
     rainfall = london.get_rain_training()
-    time_series = cp.TimeSeriesSgd(x, rainfall, (2, 2), (2, 2))
+    time_series = cp.TimeSeriesSlice(x, rainfall, (2, 2), (2, 2))
     time_series.time_array = london.get_time_training()
     time_series.fit()
-    joblib.dump(time_series, "results/london/simulation/sgd.zlib")
+    joblib.dump(time_series, "results/london/simulation/slice.zlib")
 
 if __name__ == "__main__":
     main()

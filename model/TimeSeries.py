@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import numpy.random as random
+import pandas
 from scipy.special import polygamma
 from Arma import Arma, ArmaForecast
 from Forecast import Forecast
@@ -72,7 +73,11 @@ class TimeSeries:
             cp_parameter_array: array containing in order PoissonRate object,
                 GammaMean object, GammaDispersion object
         """
-        self.x = x
+        
+        if type(x) is pandas.core.frame.DataFrame:
+            self.x = np.asarray(x)
+        else:
+            self.x = x
         self.x_shift = np.mean(self.x, 0)
         self.x_scale = np.std(self.x, 0, ddof=1)
         n = self.x.shape[0]
@@ -92,9 +97,12 @@ class TimeSeries:
         self.fitted_time_series = None
         self.rng = random.RandomState(np.uint32(2057577976))
         
-        #name the model fields
-        for i in range(self.n_model_fields):
-            self.model_field_name.append("model_field_" + str(i))
+        #name the model fields, or extract from pandas data frame
+        if type(x) is pandas.core.frame.DataFrame:
+            self.model_field_name = x.columns
+        else:
+            for i in range(self.n_model_fields):
+                self.model_field_name.append("model_field_" + str(i))
         
         if rainfall is None:
             self.y_array = np.zeros(n)
@@ -308,7 +316,7 @@ class TimeSeries:
         Returns:
             TimeSeries object containing a simulated future
         """
-        forecast = self.instantiate_forecast(x)
+        forecast = self.instantise_future(x)
         forecast.simulate()
         return forecast
     
@@ -531,14 +539,16 @@ class TimeSeries:
         forecast_array.get_forecast()
         return forecast_array
     
-    def instantiate_forecast(self, x):
-        """Instantiate TimeSeries for forecasting
+    def instantise_future(self, x):
+        """Instantiate TimeSeries for simulating the future given the current
+            parameters
         
         Instantiate TimeSeries object containing future model fields. Deep copy
-            the parameters.
+            the parameters. This method is used by simulate_future() and
+            instantiate_forecast()
         
         Returns:
-            forecast: Forecast object
+            forecast: TimeSeries object
         """
         forecast = TimeSeries(
             x, cp_parameter_array=self.copy_parameter_only_reg())
@@ -556,6 +566,17 @@ class TimeSeries:
             forecast.time_array.append(last_time + (i+1)*time_diff)
         
         return forecast
+    
+    def instantiate_forecast(self, x):
+        """Instantiate TimeSeries for forecasting
+        
+        Instantiate TimeSeries object containing future model fields. Deep copy
+            the parameters.
+        
+        Returns:
+            forecast: TimeSeries object
+        """
+        return self.instantise_future(x)
     
     def cast_arma(self, arma_class):
         """Cast the arma object

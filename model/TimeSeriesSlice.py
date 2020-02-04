@@ -16,7 +16,11 @@ class TimeSeriesSlice(TimeSeriesMcmc):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
+        self.non_zero_index = None
+    
+    def fit(self):
         self.non_zero_index = np.nonzero(self.y_array)[0]
+        super().fit()
     
     def sample_z(self):
         """Override - Use slice sampling

@@ -16,6 +16,7 @@ class TimeSeriesElliptical(TimeSeriesSlice):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
+        self.n_sample = 10000
     
     def sample_reg(self):
         """Override - Uses elliptical slice sampling 
@@ -35,6 +36,7 @@ class TimeSeriesElliptical(TimeSeriesSlice):
         
         #keep sampling until one is accepted
         is_sampling = True
+        n_reject = 0
         while is_sampling:
             #get a sample (theta = 0 would just sample itself)
             #centre the parameter at zero mean (relative to the prior)
@@ -65,4 +67,6 @@ class TimeSeriesElliptical(TimeSeriesSlice):
                 else:
                     edges[1] = theta
                 theta =  self.rng.uniform(edges[0], edges[1])
+                n_reject += 1
+        self.accept_reg_array.append(1/(n_reject+1))
             

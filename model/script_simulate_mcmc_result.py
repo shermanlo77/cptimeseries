@@ -1,17 +1,16 @@
 import joblib
 import matplotlib.pyplot as plot
 import numpy as np
-from get_simulation import simulate_training, simulate_test
+from get_data import LondonSimulation
 from print_figure import print_time_series, print_forecast
 
 def main():
     
-    time_series = joblib.load("results/simulate_mcmc.zlib")
-    time_series.burn_in = 60000
+    time_series = joblib.load("results/london/simulation/elliptical.zlib")
+    directory = "../figures/london/simulation/elliptical"
     
-    directory = "../figures/simulation/mcmc/"
-    
-    time_series_true = simulate_training()
+    london = London()
+    time_series_true = london.get_time_series_training()
     true_parameter = time_series_true.get_parameter_vector()
     parameter_name = time_series_true.get_parameter_vector_name()
     
@@ -50,6 +49,7 @@ def main():
     plot.savefig(directory + "accept_z.pdf")
     plot.close()
     
+    """
     time_series_true = simulate_training()
     time_series_future = simulate_test()
     print_forecast(time_series, 
@@ -60,6 +60,7 @@ def main():
     
     time_series.simulate()
     print_time_series(time_series, directory + "fitted_")
+    """
 
 if __name__ == "__main__":
     main()

@@ -56,8 +56,8 @@ class TimeSeriesMcmc(TimeSeries):
         self.z_sample = []
         self.parameter_sample = []
         self.proposal_z_parameter = 1/len(self)
-        self.prior_mean = np.zeros(self.n_parameter)
-        self.prior_covariance = 0.25*np.identity(self.n_parameter)
+        self.prior_mean = self.get_parameter_vector()
+        self.prior_covariance = None
         self.n_till_adapt = 2*self.n_parameter
         self.prob_small_proposal = 0.05
         self.proposal_covariance_small = 1e-8 / self.n_parameter
@@ -70,12 +70,16 @@ class TimeSeriesMcmc(TimeSeries):
         self.n_accept_reg = 0
         self.accept_reg_array = []
         self.accept_z_array = []
+        
+        self.prior_covariance = 0.05 * np.identity(self.n_parameter)
+        parameter_name = self.get_parameter_vector_name()
+        for i in range(len(parameter_name)):
+            if parameter_name[i].endswith("const"):
+                self.prior_covariance[i, i] = 0.05
     
     def fit(self):
         """Do MCMC
         """
-        #set the prior mean to be the initial value
-        self.prior_mean = self.get_parameter_vector()
         self.e_step() #initalise the z using the E step
         self.z_array = self.z_array.round() #round it to get integer
         #z cannot be 0 if y is not 0
@@ -296,18 +300,39 @@ class TimeSeriesMcmc(TimeSeries):
             self.chain_covariance = np.outer(diff0, diff0)
             self.chain_covariance += np.outer(diff, diff)
         #online update the covariance matrix
-        elif n>2:
+        elif n > 2:
             self.chain_covariance *= (n-2)/(n-1)
             self.chain_covariance += (n/math.pow(n-1,2)) * np.outer(diff, diff)
     
     def instantiate_forecast_self(self):
+        """Override - Set the parameter from the MCMC sample
+        """
         self.set_parameter_from_sample(
             self.rng.randint(self.burn_in, self.n_sample))
         forecast = super().instantiate_forecast_self()
         return forecast
     
     def instantiate_forecast(self, x):
+        """Override - Set the parameter from the MCMC sample
+        """
         self.set_parameter_from_sample(
             self.rng.randint(self.burn_in, self.n_sample))
         forecast = super().instantiate_forecast(x)
         return forecast
+    
+    def simulate_from_prior(self):
+        """Simulate using a parameter from the prior
+        
+        Modifies itself, the prior mean and prior covariance unmod
+        """
+        while True:
+            try:
+                parameter = self.rng.multivariate_normal(
+                    self.prior_mean, self.prior_covariance)
+                self.set_parameter_vector(parameter)
+                self.simulate()
+                break
+            except(ValueError, OverflowError):
+                pass
+    
+    

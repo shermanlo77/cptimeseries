@@ -1,15 +1,15 @@
 import compound_poisson as cp
-from get_data import LondonSimulation
+from get_data import London
 import joblib
 
 def main():
-    london = LondonSimulation()
+    london = London()
     x = london.get_model_field_training()
     rainfall = london.get_rain_training()
-    time_series = cp.TimeSeriesSgd(x, rainfall, (2, 2), (2, 2))
+    time_series = cp.TimeSeriesElliptical(x, rainfall, (10, 5), (10, 5))
     time_series.time_array = london.get_time_training()
     time_series.fit()
-    joblib.dump(time_series, "results/london/simulation/sgd.zlib")
+    joblib.dump(time_series, "results/london/elliptical.zlib")
 
 if __name__ == "__main__":
     main()

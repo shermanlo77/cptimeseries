@@ -1,24 +1,28 @@
 import joblib
 import matplotlib.pyplot as plot
 import numpy as np
-from get_data import London2
+from get_data import LondonSimulation
 from print_figure import print_time_series, print_forecast
 
 def main():
     
-    time_series = joblib.load("results/mcmc_london2.zlib")
-    time_series.burn_in = 90000
+    time_series = joblib.load("results/london/simulation/elliptical.zlib")
+    forecast_directory = "results/london/simulation/elliptical_"
+    directory = "../figures/london/simulation/elliptical/"
     
-    directory = "../figures/london/mcmc2/"
-    london = London2()
+    time_series.burn_in = 8000
     
-    parameter_name = time_series.get_parameter_vector_name()
+    london = LondonSimulation()
+    time_series_true = london.get_time_series_training()
+    true_parameter = time_series_true.get_parameter_vector()
+    parameter_name = time_series_true.get_parameter_vector_name()
     
     chain = np.asarray(time_series.parameter_sample)
     for i in range(time_series.n_parameter):
         chain_i = chain[:,i]
         plot.figure()
         plot.plot(chain_i)
+        plot.hlines(true_parameter[i], 0, len(chain)-1)
         plot.ylabel(parameter_name[i])
         plot.xlabel("Sample number")
         plot.savefig(directory + "chain_parameter_" + str(i) + ".pdf")
@@ -48,14 +52,17 @@ def main():
     plot.savefig(directory + "accept_z.pdf")
     plot.close()
     
+    time_series_training = london.get_time_series_training()
+    time_series_test = london.get_time_series_test()
     print_forecast(time_series, 
-                   london.get_rain_training(), 
-                   np.asarray(london.get_model_field_test()),
-                   london.get_rain_test(),
-                   directory)
+                   time_series_training, 
+                   time_series_test,
+                   directory,
+                   forecast_directory)
     
     time_series.simulate()
     print_time_series(time_series, directory + "fitted_")
+    
 
 if __name__ == "__main__":
     main()

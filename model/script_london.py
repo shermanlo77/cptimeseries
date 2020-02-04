@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plot
-from get_data import LondonSimulation
+from get_data import London
 from print_figure import print_time_series
 
 def main():
-    directory = "../figures/london/simulation/"
-    london = LondonSimulation()
+    directory = "../figures/london/"
+    london = London()
     time_series = london.get_time_series_training()
     print_time_series(time_series, directory)
     

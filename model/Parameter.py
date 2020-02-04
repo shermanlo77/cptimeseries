@@ -47,8 +47,12 @@ class Parameter:
             n_arma: 2 element array, (n_ar, n_ma)
         """
         self.n_model_fields = n_model_fields
-        self.n_ar = n_arma[0]
-        self.n_ma = n_arma[1]
+        if n_arma is None:
+            self.n_ar = 0
+            self.n_ma = 0
+        else:
+            self.n_ar = n_arma[0]
+            self.n_ma = n_arma[1]
         self.reg_parameters = {
             "reg": np.zeros(n_model_fields),
             "const": 0.0,
@@ -514,7 +518,7 @@ class GammaMean(Parameter):
 
 class GammaDispersion(Parameter):
     def __init__(self, n_model_fields):
-        super().__init__(n_model_fields, (0, 0))
+        super().__init__(n_model_fields, None)
     def d_self_ln_l(self, index):
         z = self.time_series.z_array[index]
         if z == 0:
