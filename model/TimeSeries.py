@@ -24,12 +24,12 @@ class TimeSeries:
     
     Attributes:
         x: np.array as a design matrix of the model fields, shape
-            (n, n_model_fields)
+            (n, n_model_field)
         x_shift: mean of x along time
         x_scale: standard deviation of x along time
         model_field_name: array containing a name (string) for each model field
         time_array: time stamp for each time step (default range(n))
-        n_model_fields: number of dimensions of the model fields
+        n_model_field: number of dimensions of the model fields
         poisson_rate: PoissonRate object containing the parameter at each time
             step and parameters for the regressive and ARMA parameters elements
         gamma_mean:  GammaMean containing the parameter at each time step and
@@ -62,9 +62,11 @@ class TimeSeries:
                     provided initial value
             -x, cp_parameter_array
                 -to be used for simulating rainfall
+            -x, poisson_rate_n_arma, gamma_mean_n_arma
+                -to be used for simulating rainfall using the default parameters
         
         Args:
-            x: design matrix of the model fields, shape (n, n_model_fields)
+            x: design matrix of the model fields, shape (n, n_model_field)
             rainfall: array of rainfall data. If none, all rain is zero
             poisson_rate_n_arma: 2 element array, number of AR and MA terms for
                 the poisson rate. Ignored if cp_parameter_array is provided.
@@ -84,7 +86,7 @@ class TimeSeries:
         self.model_field_name = []
         
         self.time_array = range(n)
-        self.n_model_fields = self.x.shape[1]
+        self.n_model_field = self.x.shape[1]
         self.poisson_rate = None
         self.gamma_mean = None
         self.gamma_dispersion = None
@@ -101,7 +103,7 @@ class TimeSeries:
         if type(x) is pandas.core.frame.DataFrame:
             self.model_field_name = x.columns
         else:
-            for i in range(self.n_model_fields):
+            for i in range(self.n_model_field):
                 self.model_field_name.append("model_field_" + str(i))
         
         if rainfall is None:
@@ -111,7 +113,18 @@ class TimeSeries:
         
         #initalise parameters if none is provided, all regression parameters to
             #zero, constant is a naive estimate
-        if cp_parameter_array is None:
+        if rainfall is None:
+            poisson_rate = PoissonRate(
+                self.n_model_field, poisson_rate_n_arma)
+            gamma_mean = GammaMean(self.n_model_field, gamma_mean_n_arma)
+            gamma_dispersion = GammaDispersion(self.n_model_field)
+            cp_parameter_array = [
+                poisson_rate,
+                gamma_mean,
+                gamma_dispersion,
+            ]
+            self.set_new_parameter(cp_parameter_array)
+        elif cp_parameter_array is None:
             self.initalise_parameters(poisson_rate_n_arma, gamma_mean_n_arma)
         else:
             self.set_new_parameter(cp_parameter_array)
@@ -131,7 +144,7 @@ class TimeSeries:
         """
         y_array = self.y_array
         n = len(self)
-        n_model_fields = self.n_model_fields
+        n_model_field = self.n_model_field
         #estimate the parameters assuming the data is iid, use method of moments
             #estimators
         poisson_rate_guess = math.log(n/(n- np.count_nonzero(y_array)))
@@ -139,9 +152,9 @@ class TimeSeries:
         gamma_dispersion_guess = (np.var(y_array, ddof=1)
             /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
         #instantise parameters and set it
-        poisson_rate = PoissonRate(n_model_fields, poisson_rate_n_arma)
-        gamma_mean = GammaMean(n_model_fields, gamma_mean_n_arma)
-        gamma_dispersion = GammaDispersion(n_model_fields)
+        poisson_rate = PoissonRate(n_model_field, poisson_rate_n_arma)
+        gamma_mean = GammaMean(n_model_field, gamma_mean_n_arma)
+        gamma_dispersion = GammaDispersion(n_model_field)
         poisson_rate["const"] = math.log(poisson_rate_guess)
         gamma_mean["const"] = math.log(gamma_mean_guess)
         gamma_dispersion["const"] = math.log(gamma_dispersion_guess)

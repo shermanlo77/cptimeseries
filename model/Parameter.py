@@ -27,7 +27,7 @@ class Parameter:
         -d_reg_ma(self, index, key)
     
     Attributes:
-        n_model_fields: number of dimensions the model fields has
+        n_model_field: number of dimensions the model fields has
         n_ar: number of autoregressive terms
         n_ma: number of moving average terms
         reg_parameters: dictionary containing regressive (reg) parameters
@@ -40,13 +40,13 @@ class Parameter:
             of itself wrt reg parameters
     """
     
-    def __init__(self, n_model_fields, n_arma):
+    def __init__(self, n_model_field, n_arma):
         """
         Args:
-            n_model_fields: number of model fields
+            n_model_field: number of model fields
             n_arma: 2 element array, (n_ar, n_ma)
         """
-        self.n_model_fields = n_model_fields
+        self.n_model_field = n_model_field
         if n_arma is None:
             self.n_ar = 0
             self.n_ma = 0
@@ -54,7 +54,7 @@ class Parameter:
             self.n_ar = n_arma[0]
             self.n_ma = n_arma[1]
         self.reg_parameters = {
-            "reg": np.zeros(n_model_fields),
+            "reg": np.zeros(n_model_field),
             "const": 0.0,
         }
         self.arma = None
@@ -91,10 +91,10 @@ class Parameter:
         """
         #GammaDispersion does not hava ARMA terms
         if isinstance(self, GammaDispersion):
-            copy = self.__class__(self.n_model_fields)
+            copy = self.__class__(self.n_model_field)
         #any other parameters require ARMA terms
         else:
-            copy = self.__class__(self.n_model_fields, (self.n_ar, self.n_ma))
+            copy = self.__class__(self.n_model_field, (self.n_ar, self.n_ma))
         #deep copy regression parameters
         for key, value in self.reg_parameters.items():
             if type(value) is np.ndarray:
@@ -111,7 +111,7 @@ class Parameter:
         for key, value in self.reg_parameters.items():
             self[key] = np.asarray(value)
             if key == "reg":
-                self[key] = np.reshape(self[key], self.n_model_fields)
+                self[key] = np.reshape(self[key], self.n_model_field)
             elif key == "AR":
                 self[key] = np.reshape(self[key], self.n_ar)
             elif key == "MA":
@@ -235,7 +235,7 @@ class Parameter:
             else:
                 d_reg_ln_l[key] = np.sum(value, 0)
         #put the gradient in a Parameter object and return it
-        gradient = Parameter(self.n_model_fields, (self.n_ar, self.n_ma))
+        gradient = Parameter(self.n_model_field, (self.n_ar, self.n_ma))
         gradient.reg_parameters = d_reg_ln_l
         return gradient
     
@@ -460,8 +460,8 @@ class Parameter:
         return self
 
 class PoissonRate(Parameter):
-    def __init__(self, n_model_fields, n_arma):
-        super().__init__(n_model_fields, n_arma)
+    def __init__(self, n_model_field, n_arma):
+        super().__init__(n_model_field, n_arma)
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
         return (z - poisson_rate) / math.sqrt(poisson_rate)
     def d_self_ln_l(self, index):
@@ -475,8 +475,8 @@ class PoissonRate(Parameter):
             *self._d_reg_self_array[key][index])
 
 class GammaMean(Parameter):
-    def __init__(self, n_model_fields, n_arma):
-        super().__init__(n_model_fields, n_arma)
+    def __init__(self, n_model_field, n_arma):
+        super().__init__(n_model_field, n_arma)
     def ma(self, y, z, poisson_rate, gamma_mean, gamma_dispersion):
         if z > 0:
             return ((y - z* gamma_mean) / gamma_mean
@@ -517,8 +517,8 @@ class GammaMean(Parameter):
             return np.zeros_like(self[key])
 
 class GammaDispersion(Parameter):
-    def __init__(self, n_model_fields):
-        super().__init__(n_model_fields, None)
+    def __init__(self, n_model_field):
+        super().__init__(n_model_field, None)
     def d_self_ln_l(self, index):
         z = self.time_series.z_array[index]
         if z == 0:

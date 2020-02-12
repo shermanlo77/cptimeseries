@@ -18,14 +18,17 @@ def print_time_series(time_series, prefix):
     y = time_series.y_array
     z = time_series.z_array
     n = len(time_series)
-    n_model_fields = time_series.n_model_fields
+    n_model_field = time_series.n_model_field
     t = time_series.time_array
     poisson_rate_array = time_series.poisson_rate.value_array
     gamma_mean_array = time_series.gamma_mean.value_array
     gamma_dispersion_array = time_series.gamma_dispersion.value_array
     
     acf = stats.acf(y, nlags=20, fft=True)
-    pacf = stats.pacf(y, nlags=20)
+    try:
+        pacf = stats.pacf(y, nlags=20)
+    except(stats.LinAlgError):
+        pacf = np.full(21, np.nan)
     
     plot.figure()
     ax = plot.gca()
@@ -43,7 +46,11 @@ def print_time_series(time_series, prefix):
     cdf = np.asarray(range(n))
     plot.plot(rain_sorted, cdf)
     if np.any(rain_sorted == 0):
-        non_zero_index = rain_sorted.nonzero()[0][0] - 1
+        non_zero_index = rain_sorted.nonzero()[0]
+        if non_zero_index.size > 0:
+            non_zero_index = rain_sorted.nonzero()[0][0] - 1
+        else:
+            non_zero_index = len(cdf) - 1
         plot.scatter(0, cdf[non_zero_index])
     plot.xlabel("rainfall (mm)")
     plot.ylabel("cumulative frequency")

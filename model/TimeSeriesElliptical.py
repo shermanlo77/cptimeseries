@@ -26,8 +26,7 @@ class TimeSeriesElliptical(TimeSeriesSlice):
         
         parameter_before = self.get_parameter_vector()
         #sample from the prior (with zero mean for now)
-        prior_sample = self.rng.multivariate_normal(
-            np.zeros(self.n_parameter), self.prior_covariance)
+        prior_sample = self.simulate_parameter_from_prior()
         #sample the vertical line
         ln_y = self.get_joint_log_likelihood() + math.log(self.rng.rand())
         #sample from where on the ellipse

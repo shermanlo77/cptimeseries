@@ -3,7 +3,7 @@ import numpy as np
 import numpy.random as random
 
 from TimeSeries import TimeSeries
-from scipy.stats import multivariate_normal
+from scipy.stats import norm
 
 class TimeSeriesMcmc(TimeSeries):
     """Fit Compound Poisson time series using Bayesian setting
@@ -56,7 +56,7 @@ class TimeSeriesMcmc(TimeSeries):
         self.z_sample = []
         self.parameter_sample = []
         self.proposal_z_parameter = 1/len(self)
-        self.prior_mean = self.get_parameter_vector()
+        self.prior_mean = np.zeros(self.n_parameter)
         self.prior_covariance = None
         self.n_till_adapt = 2*self.n_parameter
         self.prob_small_proposal = 0.05
@@ -71,11 +71,20 @@ class TimeSeriesMcmc(TimeSeries):
         self.accept_reg_array = []
         self.accept_z_array = []
         
-        self.prior_covariance = 0.05 * np.identity(self.n_parameter)
-        parameter_name = self.get_parameter_vector_name()
-        for i in range(len(parameter_name)):
-            if parameter_name[i].endswith("const"):
-                self.prior_covariance[i, i] = 0.05
+        self.prior_covariance = 0.05 * np.ones(self.n_parameter)
+        parameter_name_array = self.get_parameter_vector_name()
+        for i, parameter_name in enumerate(parameter_name_array):
+            if parameter_name.endswith("const"):
+                self.prior_covariance[i] = 0.05
+                if parameter_name.startswith(
+                    self.poisson_rate.__class__.__name__):
+                    self.prior_mean[i] = -0.46
+                elif parameter_name.startswith(
+                    self.gamma_mean.__class__.__name__):
+                    self.prior_mean[i] = 1.44
+                elif parameter_name.startswith(
+                    self.gamma_dispersion.__class__.__name__):
+                    self.prior_mean[i] = -0.45
     
     def fit(self):
         """Do MCMC
@@ -257,8 +266,13 @@ class TimeSeriesMcmc(TimeSeries):
         
         Uses the current (member variable) parameter
         """
-        return multivariate_normal.logpdf(
-            self.get_parameter_vector(), self.prior_mean, self.prior_covariance)
+        ln_l_array = np.empty(self.n_parameter)
+        parameter = self.get_parameter_vector()
+        for i in range(self.n_parameter):
+            ln_l_array[i] = norm.logpdf(parameter[i],
+                                        self.prior_mean[i],
+                                        math.sqrt(self.prior_covariance[i]))
+        return np.sum(ln_l_array)
     
     def propose_reg(self, covariance):
         """Propose regression parameters
@@ -320,18 +334,33 @@ class TimeSeriesMcmc(TimeSeries):
         forecast = super().instantiate_forecast(x)
         return forecast
     
+    def simulate_parameter_from_prior(self):
+        """Return a parameter sampled from the prior
+        """
+        parameter = np.empty(self.n_parameter)
+        for i in range(self.n_parameter):
+            parameter[i] = self.rng.normal(
+                self.prior_mean[i], math.sqrt(self.prior_covariance[i]))
+        return parameter
+    
     def simulate_from_prior(self):
         """Simulate using a parameter from the prior
         
-        Modifies itself, the prior mean and prior covariance unmod
+        Modifies itself, the prior mean and prior covariance unmodified
         """
         while True:
             try:
-                parameter = self.rng.multivariate_normal(
-                    self.prior_mean, self.prior_covariance)
-                self.set_parameter_vector(parameter)
+                self.set_parameter_vector(self.simulate_parameter_from_prior())
                 self.simulate()
-                break
+                #check if any of the parameters are not nan
+                if np.any(np.isnan(self.poisson_rate.value_array)):
+                    pass
+                elif np.any(np.isnan(self.gamma_mean.value_array)):
+                    pass
+                elif np.any(np.isnan(self.gamma_dispersion.value_array)):
+                    pass
+                else:
+                    break
             except(ValueError, OverflowError):
                 pass
     

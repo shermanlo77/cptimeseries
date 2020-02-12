@@ -180,6 +180,21 @@ class LocationSimulation(Location):
         
         return np.concatenate(
             (self.time_series_training.y_array, self.time_series_test.y_array))
+
+class RandomLocation(Location):
+    def __init__(self, rng):
+        self.rng = rng
+        self.latitude_array = np.linspace(48.95, 59.15, 103)
+        self.longitude_array = np.linspace(-11.15, 3.15, 144)
+        latitude = self.rng.choice(self.latitude_array)
+        longitude = self.rng.choice(self.longitude_array)
+        super().__init__([latitude, longitude])
+    
+    def set_new_location(self):
+        self.coordinates = [
+            self.rng.choice(self.latitude_array),
+            self.rng.choice(self.longitude_array),
+        ]
     
 class London(Location):
     def __init__(self):
