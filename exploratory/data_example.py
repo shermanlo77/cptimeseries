@@ -8,29 +8,36 @@
 #scatter plot yesterday and today rainfall for each city
 #matrix plot of all the variables for each city
 
-import cartopy.crs as ccrs
 import math
+import os
+import sys
+
+import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
-import statsmodels.tsa.stattools as stats
 import pandas as pd
-import pandas.plotting as plotting
-from Data import Data
-import os
-
-import joblib
-
-from netCDF4 import Dataset, num2date
+import pandas.plotting as pdplotting
 from pandas.plotting import register_matplotlib_converters
+import statsmodels.tsa.stattools as stats
 
-import pdb
+sys.path.append("..")
+import dataset
 
 def main():
     #required so that python datetime can be converted and can be plotted on a
         #graph
     register_matplotlib_converters()
+    
+    try:
+        os.mkdir("figure")
+    except(FileExistsError):
+        pass
+    try:
+        os.mkdir(os.path.join("figure", "rain"))
+    except(FileExistsError):
+        pass
 
-    data = joblib.load("ana_input_1.gz")
+    data = dataset.Ana1()
     time = data.time_array
     latitude_grid = data.topography["latitude"]
     longitude_grid = data.topography["longitude"]
@@ -46,11 +53,11 @@ def main():
     plt.colorbar(im)
     ax.set_aspect("auto", adjustable=None)
     plt.title("mean precipitation (" + data.rain_units + ")")
-    plt.savefig(os.path.join("figures", "rainfall_mean.pdf"))
+    plt.savefig(os.path.join("figure", "rainfall_mean.pdf"))
     plt.close()
 
     #plot the rainfall as a time series for each city
-    for city in Data.city_location.keys():
+    for city in dataset.Data.city_location.keys():
         
         #get the time series for this city
         rainfall_series = data.get_rain_city(city)
@@ -64,7 +71,7 @@ def main():
         plt.title(city+": precipitation")
         plt.xlabel("time")
         plt.ylabel("precipitation (" + data.rain_units + ")")
-        plt.savefig(os.path.join("figures", "rainfall_" + city + ".pdf"))
+        plt.savefig(os.path.join("figure", "rainfall_" + city + ".pdf"))
         plt.close()
         
         #plot the acf
@@ -74,7 +81,7 @@ def main():
         plt.title(city+": autocorrelation of rain")
         plt.xlabel("lag (day)")
         plt.ylabel("autocorrelation")
-        plt.savefig(os.path.join("figures", "rainfall_acf_" + city + ".pdf"))
+        plt.savefig(os.path.join("figure", "rainfall_acf_" + city + ".pdf"))
         plt.close()
         
         #plot the pacf
@@ -84,7 +91,7 @@ def main():
         plt.title(city+": partial autocorrelation of rain")
         plt.xlabel("lag (day)")
         plt.ylabel("partial autocorrelation")
-        plt.savefig(os.path.join("figures", "rainfall_pacf_" + city + ".pdf"))
+        plt.savefig(os.path.join("figure", "rainfall_pacf_" + city + ".pdf"))
         plt.close()
     
     #plot the rain
@@ -103,7 +110,7 @@ def main():
         plt.title(
             "precipitation (" + data.rain_units + ") : "
             + str(data.time_array[i]))
-        plt.savefig(os.path.join("figures", "rain", str(i) + ".png"))
+        plt.savefig(os.path.join("figure", "rain", str(i) + ".png"))
         plt.close()
     
     #for each model field
@@ -120,11 +127,11 @@ def main():
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
         plt.title("mean " + model_field + " (" + units + ")")
-        plt.savefig(os.path.join("figures", model_field + "_mean.pdf"))
+        plt.savefig(os.path.join("figure", model_field + "_mean.pdf"))
         plt.close()
     
     #for each city time series
-    for city in Data.city_location.keys():
+    for city in dataset.Data.city_location.keys():
         
         #get the time series
         model_field_time_series = data.get_model_field_city(city)
@@ -147,7 +154,7 @@ def main():
             plt.xlabel("time")
             plt.ylabel(model_field + " (" + units + ")")
             plt.savefig(
-                os.path.join("figures", model_field + "_" + city + ".pdf"))
+                os.path.join("figure", model_field + "_" + city + ".pdf"))
             plt.close()
             
             #plot the autocorrelation of the time series
@@ -157,7 +164,7 @@ def main():
             plt.xlabel("lag (day)")
             plt.ylabel("autocorrelation")
             plt.savefig(
-                os.path.join("figures", model_field + "_acf_" + city + ".pdf"))
+                os.path.join("figure", model_field + "_acf_" + city + ".pdf"))
             plt.close()
             
             #plot the partial autocorrelation of the time series
@@ -167,13 +174,13 @@ def main():
             plt.xlabel("lag (day)")
             plt.ylabel("partial autocorrelation")
             plt.savefig(
-                os.path.join("figures", model_field + "_pacf_" + city + ".pdf"))
+                os.path.join("figure", model_field + "_pacf_" + city + ".pdf"))
             plt.close()
 
     ##########          MATRIX PLOT          ##########
 
     #for each captial, do matrix plot of all the variables
-    for city in Data.city_location.keys():
+    for city in dataset.Data.city_location.keys():
         
         data_frame = {}
         data_frame["rain"] = np.asarray(data.get_rain_city(city))
@@ -185,8 +192,8 @@ def main():
         #matrix plot
         plt.figure(figsize=(12, 10))
         ax = plt.gca()
-        plotting.scatter_matrix(data_frame, s=5, ax=ax)
-        plt.savefig(os.path.join("figures", "matrix_" + city + ".png"))
+        pdplotting.scatter_matrix(data_frame, s=5, ax=ax)
+        plt.savefig(os.path.join("figure", "matrix_" + city + ".png"))
         plt.close()
     
     

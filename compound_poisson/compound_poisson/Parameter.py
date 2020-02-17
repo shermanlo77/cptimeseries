@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from Arma import Arma
+from .Arma import Arma
 from scipy.special import digamma, polygamma
 
 class Parameter:

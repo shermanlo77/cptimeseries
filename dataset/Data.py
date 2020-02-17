@@ -1,9 +1,10 @@
-import joblib
 import math
+import os
+
+import joblib
+from netCDF4 import Dataset, num2date
 import numpy as np
 import numpy.ma as ma
-from netCDF4 import Dataset, num2date
-import os
 import pandas as pd
 
 class Data:
@@ -23,6 +24,7 @@ class Data:
         self.model_field = None
         self.model_field_units = None
         self.rain = None
+        self.mask = None
         self.rain_units = None
         self.time_array = None
         self.topography = {}
@@ -31,6 +33,15 @@ class Data:
             Data.longitude_array, Data.latitude_array)
         self.topography["longitude"] = longitude_grid
         self.topography["latitude"] = latitude_grid
+    
+    def copy_from(self, other):
+        self.model_field = other.model_field
+        self.model_field_units = other.model_field_units
+        self.rain = other.rain
+        self.mask = other.mask
+        self.rain_units = other.rain_units
+        self.time_array = other.time_array
+        self.topography = other.topography
     
     def load_model_field(self, file_name):
         
@@ -107,7 +118,7 @@ class Data:
             for i_key, model_field_name in enumerate(self.model_field.keys()):
                 if not model_field_name in derived_model_field:
                     model_field_day[model_field_name] = np.asarray(
-                        dataset[dataset_key[i_key]][i:i+4,:,:])
+                        dataset[dataset_key[i_key]][i:i+4])
             
             model_field_day["wind_speed"] = np.sqrt(
                 np.square(model_field_day["x_wind"])
@@ -180,10 +191,14 @@ class Data:
         time_array = num2date(time_array[:], time_array.units)
         
         self.rain = []
+        self.mask = rain[0].mask
         for i, time in enumerate(time_array):
             time = time.date()
             if time in self.time_array:
-                self.rain.append(rain[i,:,:])
+                self.rain.append(rain[i])
+                if not np.array_equal(self.mask, rain[i].mask):
+                    print("Mask in ", time, "is not consistent")
+                    raise
         self.rain = ma.asarray(self.rain)
     
     #FUNCTION: FIND NEAREST LATITUDE AND LONGITUDE
@@ -214,6 +229,26 @@ class Data:
                 min_longitude_error = longitude_error
         return(latitude_index, longitude_index)
     
+    def get_latitude_longitude_city(self, city):
+        return self.find_nearest_latitude_longitude(Data.city_location[city])
+    
+    def get_latitude_longitude_random(self, rng):
+        latitude_index = rng.randint(0, len(Data.latitude_array))
+        longitude_index = rng.randint(0, len(Data.longitude_array))
+        return(latitude_index, longitude_index)
+    
+    def get_latitude_longitude_random_mask(self, rng):
+        mask_index = np.where(np.logical_not(mask))
+        random_index = rng.randint(0, len(mask_index[0]))
+        latitude_index = mask_index[0][random_index]
+        longitude_index = mask_index[1][random_index]
+        return(latitude_index, longitude_index)
+    
+    def get_data(self, latitude_index, longitude_index):
+        model_field = self.get_model_field(latitude_index, longitude_index)
+        rain = self.get_rain(latitude_index, longitude_index)
+        return (model_field, rain)
+    
     def get_model_field(self, latitude_index, longitude_index):
         data_frame = {}
         for model_field_name, value in self.model_field.items():
@@ -224,21 +259,29 @@ class Data:
     def get_rain(self, latitude_index, longitude_index):
         return self.rain[:, latitude_index, longitude_index]
     
+    def get_data_city(self, city):
+        latitude_index, longitude_index = self.get_latitude_longitude_city(city)
+        return self.get_data(latitude_index, longitude_index)
+    
     def get_model_field_city(self, city):
-        latitude_index, longitude_index = self.find_nearest_latitude_longitude(
-            Data.city_location[city])
+        latitude_index, longitude_index = self.get_latitude_longitude_city(city)
         return self.get_model_field(latitude_index, longitude_index)
     
     def get_rain_city(self, city):
-        latitude_index, longitude_index = self.find_nearest_latitude_longitude(
-            Data.city_location[city])
+        latitude_index, longitude_index = self.get_latitude_longitude_city(city)
         return self.get_rain(latitude_index, longitude_index)
     
-def main():
-    data = Data()
-    data.load_model_field(os.path.join("Data", "Rain_Data_Nov19", "ana_input_1.nc"))
-    data.load_rain(os.path.join("Data", "Rain_Data_Nov19", "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-    joblib.dump(data, "ana_input_1.gz")
+    def get_data_random(self, rng):
+        latitude_index, longitude_index = (
+            self.get_latitude_longitude_random_mask(rng))
+        return self.get_data(latitude_index, longitude_index)
     
-if __name__ == "__main__":
-    main()
+    def get_model_field_random(self, rng):
+        latitude_index, longitude_index = self.get_latitude_longitude_random(
+            rng)
+        return self.get_model_field(latitude_index, longitude_index)
+    
+    def get_rain_random(self, rng):
+        latitude_index, longitude_index = (
+            self.get_latitude_longitude_random_mask(rng))
+        return self.get_rain(latitude_index, longitude_index)

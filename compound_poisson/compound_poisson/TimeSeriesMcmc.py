@@ -1,9 +1,9 @@
 import math
 import numpy as np
 import numpy.random as random
-
-from TimeSeries import TimeSeries
 from scipy.stats import norm
+
+from .TimeSeries import TimeSeries
 
 class TimeSeriesMcmc(TimeSeries):
     """Fit Compound Poisson time series using Bayesian setting

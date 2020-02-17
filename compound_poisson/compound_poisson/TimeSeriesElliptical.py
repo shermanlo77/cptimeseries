@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from TimeSeriesSlice import TimeSeriesSlice
+from .TimeSeriesSlice import TimeSeriesSlice
 
 class TimeSeriesElliptical(TimeSeriesSlice):
     

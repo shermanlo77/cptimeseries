@@ -1,4 +1,4 @@
-from TimeSeries import TimeSeries
+from .TimeSeries import TimeSeries
 
 class TimeSeriesGd(TimeSeries):
     """Compound Poisson Time Series with ARMA behaviour

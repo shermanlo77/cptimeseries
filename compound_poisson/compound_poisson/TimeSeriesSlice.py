@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from TimeSeriesMcmc import TimeSeriesMcmc
+from .TimeSeriesMcmc import TimeSeriesMcmc
 
 class TimeSeriesSlice(TimeSeriesMcmc):
     

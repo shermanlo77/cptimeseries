@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.random as random
 
-from TimeSeriesGd import TimeSeriesGd
+from .TimeSeriesGd import TimeSeriesGd
 
 class TimeSeriesSgd(TimeSeriesGd):
     """Compound Poisson Time Series which uses stochastic gradient descent

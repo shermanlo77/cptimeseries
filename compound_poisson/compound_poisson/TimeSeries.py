@@ -1,12 +1,14 @@
 import math
+
 import numpy as np
 import numpy.random as random
 import pandas
 from scipy.special import polygamma
-from Arma import Arma, ArmaForecast
-from Forecast import Forecast
-from Parameter import PoissonRate, GammaMean, GammaDispersion
-from Terms import Terms, TermsZ, TermsZ2
+
+from .Arma import Arma, ArmaForecast
+from .Forecast import Forecast
+from .Parameter import PoissonRate, GammaMean, GammaDispersion
+from .Terms import Terms, TermsZ, TermsZ2
 
 class TimeSeries:
     """Compound Poisson Time Series with ARMA behaviour
