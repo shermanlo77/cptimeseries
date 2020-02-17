@@ -1,4 +1,5 @@
 .DS_Store
+*.gz
 Data/
 Untitled.ipynb
 __pycache__
