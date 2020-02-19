@@ -1,5 +1,8 @@
 .DS_Store
 *.gz
+*.pdf
+*.png
+*.txt
 Data/
 Untitled.ipynb
 __pycache__

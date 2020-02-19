@@ -115,19 +115,22 @@ class TimeSeries:
         
         #initalise parameters if none is provided, all regression parameters to
             #zero, constant is a naive estimate
-        if rainfall is None:
-            poisson_rate = PoissonRate(
-                self.n_model_field, poisson_rate_n_arma)
-            gamma_mean = GammaMean(self.n_model_field, gamma_mean_n_arma)
-            gamma_dispersion = GammaDispersion(self.n_model_field)
-            cp_parameter_array = [
-                poisson_rate,
-                gamma_mean,
-                gamma_dispersion,
-            ]
-            self.set_new_parameter(cp_parameter_array)
-        elif cp_parameter_array is None:
-            self.initalise_parameters(poisson_rate_n_arma, gamma_mean_n_arma)
+        if cp_parameter_array is None:
+            #cannot estimate parameter if no rain
+            if rainfall is None:
+                poisson_rate = PoissonRate(
+                    self.n_model_field, poisson_rate_n_arma)
+                gamma_mean = GammaMean(self.n_model_field, gamma_mean_n_arma)
+                gamma_dispersion = GammaDispersion(self.n_model_field)
+                cp_parameter_array = [
+                    poisson_rate,
+                    gamma_mean,
+                    gamma_dispersion,
+                ]
+                self.set_new_parameter(cp_parameter_array)
+            else:
+                self.initalise_parameters(
+                    poisson_rate_n_arma, gamma_mean_n_arma)
         else:
             self.set_new_parameter(cp_parameter_array)
     
@@ -149,7 +152,8 @@ class TimeSeries:
         n_model_field = self.n_model_field
         #estimate the parameters assuming the data is iid, use method of moments
             #estimators
-        poisson_rate_guess = math.log(n/(n- np.count_nonzero(y_array)))
+        poisson_rate_guess = math.log(
+            (n + 0.5) / (n - np.count_nonzero(y_array) + 1))
         gamma_mean_guess = np.mean(y_array) / poisson_rate_guess
         gamma_dispersion_guess = (np.var(y_array, ddof=1)
             /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
