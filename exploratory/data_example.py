@@ -37,7 +37,7 @@ def main():
     except(FileExistsError):
         pass
 
-    data = dataset.Ana1()
+    data = dataset.Ana_1()
     time = data.time_array
     latitude_grid = data.topography["latitude"]
     longitude_grid = data.topography["longitude"]

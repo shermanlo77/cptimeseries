@@ -5,7 +5,7 @@ import joblib
 
 from .Data import Data
 
-class Ana1(Data):
+class Ana_1(Data):
     def __init__(self):
         super().__init__()
         path_here = pathlib.Path(__file__).parent.absolute()

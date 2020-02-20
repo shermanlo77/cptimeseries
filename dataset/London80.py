@@ -1,7 +1,6 @@
 import os
 
-from .Data import Data
-import joblib
+from .Ana_1 import Ana_1
 
 class London80:
     
@@ -15,7 +14,7 @@ class London80:
     
     def load_data(self):
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        data = joblib.load(os.path.join(dir_path, "ana_input_1.gz"))
+        data = Ana_1()
         self.time_array = data.time_array.copy()
         model_field, rain = data.get_data_city("London")
         self.model_field = model_field.copy()

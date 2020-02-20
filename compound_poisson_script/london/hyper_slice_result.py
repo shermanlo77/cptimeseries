@@ -18,8 +18,6 @@ def main():
     except(FileExistsError):
         pass
     
-    london = dataset.LondonSimulated80()
-    true_parameter = london.time_series.get_parameter_vector()
     parameter_name = time_series.get_parameter_vector_name()
     
     chain = np.asarray(time_series.parameter_mcmc.sample_array)
@@ -27,7 +25,6 @@ def main():
         chain_i = chain[:,i]
         plot.figure()
         plot.plot(chain_i)
-        plot.hlines(true_parameter[i], 0, len(chain)-1)
         plot.ylabel(parameter_name[i])
         plot.xlabel("Sample number")
         plot.savefig(
