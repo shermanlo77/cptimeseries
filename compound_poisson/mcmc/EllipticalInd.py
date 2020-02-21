@@ -61,6 +61,4 @@ class EllipticalInd(Mcmc):
     def simulate_from_prior(self):
         """Return a parameter sampled from the prior
         """
-        target = self.target
-        prior_sample = self.rng.normal(target.prior_mean, target.prior_cov_chol)
-        return prior_sample
+        return self.target.simulate_from_prior(self.rng)

@@ -99,7 +99,7 @@ class TimeSeries:
         self.z_var_array = np.zeros(n)
         self.y_array = None
         self.fitted_time_series = None
-        self.rng = random.RandomState(np.uint32(2057577976))
+        self.rng = random.RandomState()
         
         #name the model fields, or extract from pandas data frame
         if type(x) is pandas.core.frame.DataFrame:

@@ -55,8 +55,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         self.precision_mcmc = Rwmh(self.precision_target, self.rng)
         self.precision_mcmc.proposal_covariance_small = 1e-4
     
-    def sample_parameter_from_prior(self):
+    def simulate_parameter_from_prior(self):
         prior_precision = self.precision_target.simulate_from_prior(self.rng)
         self.update_precision()
-        prior_parameter = self.parameter_target.simulate_from_prior(self.rng)
-        return prior_parameter
+        return super().simulate_parameter_from_prior()

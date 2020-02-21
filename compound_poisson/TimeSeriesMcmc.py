@@ -57,6 +57,7 @@ class TimeSeriesMcmc(TimeSeries):
         self.parameter_mcmc = None
         self.z_target = TargetZ(self)
         self.z_mcmc = None
+        self.burn_in = 0
     
     def fit(self):
         """Do MCMC
@@ -89,13 +90,13 @@ class TimeSeriesMcmc(TimeSeries):
         self.parameter_mcmc = Rwmh(self.parameter_target, self.rng)
         self.z_mcmc = ZRwmh(self.z_target, self.rng)
     
-    def set_parameter_from_sample(self, index):
+    def set_parameter_from_sample(self):
         """Set parameter from MCMC sample
         
         Set the regression parameters and latent variables z from the MCMC
-            samples in parameter_sample and z_sample. NOTE: does a shallow copy
-            from the array of samples.
+            samples in parameter_sample and z_sample.
         """
+        index = self.rng.randint(self.burn_in, self.n_sample) 
         self.set_parameter_vector(self.parameter_mcmc[index])
         self.z_array = self.z_mcmc[index]
         self.update_all_cp_parameters()
@@ -103,27 +104,16 @@ class TimeSeriesMcmc(TimeSeries):
     def instantiate_forecast_self(self):
         """Override - Set the parameter from the MCMC sample
         """
-        self.set_parameter_from_sample(
-            self.rng.randint(self.burn_in, self.n_sample))
+        self.set_parameter_from_sample()
         forecast = super().instantiate_forecast_self()
         return forecast
     
     def instantiate_forecast(self, x):
         """Override - Set the parameter from the MCMC sample
         """
-        self.set_parameter_from_sample(
-            self.rng.randint(self.burn_in, self.n_sample))
+        self.set_parameter_from_sample()
         forecast = super().instantiate_forecast(x)
         return forecast
-    
-    def simulate_parameter_from_prior(self):
-        """Return a parameter sampled from the prior
-        """
-        parameter = np.empty(self.n_parameter)
-        for i in range(self.n_parameter):
-            parameter[i] = self.rng.normal(
-                self.prior_mean[i], math.sqrt(self.prior_covariance[i]))
-        return parameter
     
     def simulate_from_prior(self):
         """Simulate using a parameter from the prior
@@ -132,7 +122,7 @@ class TimeSeriesMcmc(TimeSeries):
         """
         while True:
             try:
-                prior_parameter = self.sample_parameter_from_prior()
+                prior_parameter = self.simulate_parameter_from_prior()
                 self.set_parameter_vector(prior_parameter)
                 self.simulate()
                 #check if any of the parameters are not nan
@@ -147,5 +137,5 @@ class TimeSeriesMcmc(TimeSeries):
             except(ValueError, OverflowError):
                 pass
     
-    def sample_parameter_from_prior(self):
+    def simulate_parameter_from_prior(self):
         return self.parameter_target.simulate_from_prior(self.rng)

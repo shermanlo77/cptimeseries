@@ -1,3 +1,4 @@
+from .Forecast import Forecast
 from .Parameter import PoissonRate
 from .Parameter import GammaMean
 from .Parameter import GammaDispersion
