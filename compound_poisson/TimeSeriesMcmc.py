@@ -53,7 +53,9 @@ class TimeSeriesMcmc(TimeSeries):
                          gamma_mean_n_arma,
                          cp_parameter_array)
         self.n_sample = 100000
+        self.parameter_target = TargetParameter(self)
         self.parameter_mcmc = None
+        self.z_target = TargetZ(self)
         self.z_mcmc = None
     
     def fit(self):
@@ -68,7 +70,8 @@ class TimeSeriesMcmc(TimeSeries):
         for i in range(self.n_sample):
             print("Sample",i)
             #select random component
-            if self.rng.rand() < 0.5:
+            rand = self.rng.rand()
+            if rand < 0.5:
                 self.z_mcmc.step()
                 self.parameter_mcmc.add_to_sample()
             else:
@@ -83,8 +86,8 @@ class TimeSeriesMcmc(TimeSeries):
         self.update_all_cp_parameters() #initalse cp parameters
     
     def instantiate_mcmc(self):
-        self.parameter_mcmc = Rwmh(TargetParameter(self), self.rng)
-        self.z_mcmc = ZRwmh(TargetZ(self), self.rng)
+        self.parameter_mcmc = Rwmh(self.parameter_target, self.rng)
+        self.z_mcmc = ZRwmh(self.z_target, self.rng)
     
     def set_parameter_from_sample(self, index):
         """Set parameter from MCMC sample
@@ -129,7 +132,8 @@ class TimeSeriesMcmc(TimeSeries):
         """
         while True:
             try:
-                self.set_parameter_vector(self.simulate_parameter_from_prior())
+                prior_parameter = self.sample_parameter_from_prior()
+                self.set_parameter_vector(prior_parameter)
                 self.simulate()
                 #check if any of the parameters are not nan
                 if np.any(np.isnan(self.poisson_rate.value_array)):
@@ -142,3 +146,6 @@ class TimeSeriesMcmc(TimeSeries):
                     break
             except(ValueError, OverflowError):
                 pass
+    
+    def sample_parameter_from_prior(self):
+        return self.parameter_target.simulate_from_prior(self.rng)

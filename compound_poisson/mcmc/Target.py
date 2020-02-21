@@ -5,23 +5,26 @@ class Target:
         self.prior_cov_chol = None #used by slice sampling
     
     def get_n_dim(self):
-        pass
+        raise NotImplementedError
     
     def get_state(self):
-        pass
+        raise NotImplementedError
     
     def update_state(self, state):
-        pass
+        raise NotImplementedError
     
     def get_log_likelihood(self):
-        pass
+        raise NotImplementedError
     
     def get_log_target(self):
-        pass
+        raise NotImplementedError
     
     def save_state(self):
-        pass
+        raise NotImplementedError
     
     def revert_state(self):
-        pass
+        raise NotImplementedError
+    
+    def simulate_from_prior(self, rng):
+        raise NotImplementedError
     

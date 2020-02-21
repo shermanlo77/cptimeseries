@@ -9,7 +9,7 @@ import statsmodels.tsa.stattools as stats
 from cycler import cycler
 from pandas.plotting import register_matplotlib_converters
 
-def time_series(time_series, directory):
+def time_series(time_series, directory, prefix=""):
     
     register_matplotlib_converters()
     
@@ -38,7 +38,7 @@ def time_series(time_series, directory):
     plot.plot(t, y)
     plot.xlabel("time")
     plot.ylabel("rainfall (mm)")
-    plot.savefig(os.path.join(directory, "rainfall.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "rainfall.pdf"))
     plot.close()
     
     plot.figure()
@@ -56,7 +56,7 @@ def time_series(time_series, directory):
         plot.scatter(0, cdf[non_zero_index])
     plot.xlabel("rainfall (mm)")
     plot.ylabel("cumulative frequency")
-    plot.savefig(os.path.join(directory, "cdf.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "cdf.pdf"))
     plot.close()
     
     plot.figure()
@@ -67,7 +67,7 @@ def time_series(time_series, directory):
     plot.axhline(-1/math.sqrt(n), linestyle='--', linewidth=1)
     plot.xlabel("time (day)")
     plot.ylabel("autocorrelation")
-    plot.savefig(os.path.join(directory, "acf.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "acf.pdf"))
     plot.close()
     
     plot.figure()
@@ -78,7 +78,7 @@ def time_series(time_series, directory):
     plot.axhline(-1/math.sqrt(n), linestyle='--', linewidth=1)
     plot.xlabel("time (day)")
     plot.ylabel("partial autocorrelation")
-    plot.savefig(os.path.join(directory, "pacf.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "pacf.pdf"))
     plot.close()
     
     plot.figure()
@@ -87,7 +87,7 @@ def time_series(time_series, directory):
     plot.plot(t, poisson_rate_array)
     plot.xlabel("time")
     plot.ylabel("poisson rate")
-    plot.savefig(os.path.join(directory, "poisson_rate.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "poisson_rate.pdf"))
     plot.close()
     
     plot.figure()
@@ -96,7 +96,7 @@ def time_series(time_series, directory):
     plot.plot(t, gamma_mean_array)
     plot.xlabel("time")
     plot.ylabel("gamma mean (mm)")
-    plot.savefig(os.path.join(directory, "gamma_mean.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "gamma_mean.pdf"))
     plot.close()
     
     plot.figure()
@@ -105,7 +105,7 @@ def time_series(time_series, directory):
     plot.plot(t, gamma_dispersion_array)
     plot.xlabel("time")
     plot.ylabel("gamma dispersion")
-    plot.savefig(os.path.join(directory, "gamma_dispersion.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "gamma_dispersion.pdf"))
     plot.close()
     
     plot.figure()
@@ -114,10 +114,10 @@ def time_series(time_series, directory):
     plot.plot(t, z)
     plot.xlabel("time")
     plot.ylabel("Z")
-    plot.savefig(os.path.join(directory, "z.pdf"))
+    plot.savefig(os.path.join(directory, prefix + "z.pdf"))
     plot.close()
     
-    file = open(os.path.join(directory, "parameter.txt"), "w")
+    file = open(os.path.join(directory, prefix + "parameter.txt"), "w")
     file.write(str(time_series))
     file.close()
 

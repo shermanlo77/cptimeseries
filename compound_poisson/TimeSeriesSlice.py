@@ -18,6 +18,6 @@ class TimeSeriesSlice(TimeSeriesMcmc):
         self.n_sample = 10000
     
     def instantiate_mcmc(self):
-        self.parameter_mcmc = EllipticalInd(TargetParameter(self), self.rng)
-        self.z_mcmc = ZSlice(TargetZ(self), self.rng)
+        self.parameter_mcmc = EllipticalInd(self.parameter_target, self.rng)
+        self.z_mcmc = ZSlice(self.z_target, self.rng)
     

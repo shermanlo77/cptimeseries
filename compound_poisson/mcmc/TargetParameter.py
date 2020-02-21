@@ -52,3 +52,6 @@ class TargetParameter(Target):
     
     def revert_state(self):
         self.time_series.set_parameter(self.cp_parameter_before)
+    
+    def simulate_from_prior(self, rng):
+        return rng.normal(self.prior_mean, self.prior_cov_chol)

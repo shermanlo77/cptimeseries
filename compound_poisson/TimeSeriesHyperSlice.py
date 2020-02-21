@@ -14,7 +14,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
-        self.target_parameter = None
+        self.precision_target = TargetPrecision(self.parameter_target)
         self.precision_mcmc = None
     
     def fit(self):
@@ -31,11 +31,12 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         for i in range(self.n_sample):
             print("Sample",i)
             #select random component
-            if self.rng.rand() < 1/3:
+            rand = self.rng.rand()
+            if rand < 1/3:
                 self.z_mcmc.step()
                 self.parameter_mcmc.add_to_sample()
                 self.precision_mcmc.add_to_sample()
-            elif self.rng.rand() < 2/3:
+            elif rand < 2/3:
                 self.parameter_mcmc.step()
                 self.z_mcmc.add_to_sample()
                 self.precision_mcmc.add_to_sample()
@@ -46,12 +47,16 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
                 self.update_precision()
     
     def update_precision(self):
-        self.target_parameter.prior_cov_chol = (
-            self.precision_mcmc.target.get_cov_chol())
+        self.parameter_target.prior_cov_chol = (
+            self.precision_target.get_cov_chol())
     
     def instantiate_mcmc(self):
         super().instantiate_mcmc()
-        self.target_parameter = self.parameter_mcmc.target
-        self.precision_mcmc = Rwmh(
-            TargetPrecision(self.target_parameter), self.rng)
+        self.precision_mcmc = Rwmh(self.precision_target, self.rng)
         self.precision_mcmc.proposal_covariance_small = 1e-4
+    
+    def sample_parameter_from_prior(self):
+        prior_precision = self.precision_target.simulate_from_prior(self.rng)
+        self.update_precision()
+        prior_parameter = self.parameter_target.simulate_from_prior(self.rng)
+        return prior_parameter

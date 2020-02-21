@@ -65,3 +65,10 @@ class TargetPrecision(Target):
     
     def revert_state(self):
         self.precision = self.precision_before
+    
+    def simulate_from_prior(self, rng):
+        prior_simulate = []
+        for prior in self.prior:
+            prior.random_state = rng
+            prior_simulate.append(prior.rvs())
+        return np.asarray(prior_simulate)
