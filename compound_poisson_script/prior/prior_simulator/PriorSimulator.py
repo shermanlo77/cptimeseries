@@ -7,7 +7,6 @@ import matplotlib.pyplot as plot
 import numpy as np
 import statsmodels.tsa.stattools as stats
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".."))
 import compound_poisson as cp
 from dataset import Ana_1
 
@@ -24,30 +23,30 @@ class PriorSimulator:
         if not os.path.isdir(figure_directory):
             os.mkdir(figure_directory)
     
-    def get_prior_time_series(self, x, prior_std):
+    def simulate_prior_time_series(self, x, prior_std):
         time_series = cp.TimeSeriesMcmc(
             x, poisson_rate_n_arma=self.n_arma,
             gamma_mean_n_arma=self.n_arma)
+        time_series.rng = self.rng
+        time_series.simulate_from_prior()
         return time_series
     
-    def get_hyper_time_series(self, x):
+    def simulate_hyper_time_series(self, x):
         time_series = cp.TimeSeriesHyperSlice(
             x, poisson_rate_n_arma=self.n_arma,
             gamma_mean_n_arma=self.n_arma)
+        time_series.rng = self.rng
+        time_series.simulate_from_prior()
         return time_series
     
     def get_time_series(self, prior_std=None):
         x = self.data.get_model_field_random(self.rng)
         if prior_std is None:
-            time_series = self.get_hyper_time_series(x)
+            time_series = self.simulate_hyper_time_series(x)
         else:
-            time_series = self.get_prior_time_series(x, prior_std)
+            time_series = self.simulate_prior_time_series(x, prior_std)
         time_series.time_array = self.data.time_array
-        self.marginalise_time_series(time_series)
         return time_series
-    
-    def marginalise_time_series(self, time_series):
-        pass
     
     def print(self, figure_directory=None, prior_std=None):
         
@@ -62,8 +61,6 @@ class PriorSimulator:
         
         for i_simulate in range(self.n_simulate):
             time_series = self.get_time_series(prior_std)
-            time_series.rng = self.rng
-            time_series.simulate_from_prior()
             cp.print.time_series(
                 time_series, figure_directory, str(i_simulate) + "_")
             y = time_series.y_array

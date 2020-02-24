@@ -1,9 +1,11 @@
 import math
 import os
+import sys
 
 import numpy as np
 
 from .PriorSimulator import PriorSimulator
+import compound_poisson as cp
 
 class PriorArmaSimulator(PriorSimulator):
     
@@ -13,7 +15,7 @@ class PriorArmaSimulator(PriorSimulator):
         time_series = self.get_time_series()
         parameter_name_array = time_series.get_parameter_vector_name()
         for parameter_name in parameter_name_array:
-            if "_AR" in parameter_name or "_MA" in parameter_name):
+            if "_AR" in parameter_name or "_MA" in parameter_name:
                 self.parameter_index.append(True)
             else:
                 self.parameter_index.append(False)
@@ -30,7 +32,7 @@ class PriorArmaSimulator(PriorSimulator):
         prior_cov_chol[np.logical_not(self.parameter_index)] = 0
     
     def __call__(self):
-        std_const_array = np.linspace(0, 0.5, 10)
+        std_const_array = np.linspace(0, 0.5, 11)
         for i, std_const in enumerate(std_const_array):
             figure_directory_i = os.path.join(self.figure_directory, str(i))
             self.print(figure_directory_i, std_const)

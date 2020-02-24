@@ -5,7 +5,7 @@ import numpy as np
 import numpy.random as random
 
 sys.path.append("..")
-from prior_simulator import PriorArmaSimulator
+from prior_simulator import PriorRegSimulator
 
 def main():
     

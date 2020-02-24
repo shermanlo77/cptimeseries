@@ -1,9 +1,11 @@
 import math
 import os
+import sys
 
 import numpy as np
 
 from .PriorSimulator import PriorSimulator
+import compound_poisson as cp
 
 class PriorConstSimulator(PriorSimulator):
     
@@ -18,19 +20,27 @@ class PriorConstSimulator(PriorSimulator):
             else:
                 self.parameter_index.append(False)
         self.parameter_index = np.asarray(self.parameter_index)
+        self.prior_mean = time_series.parameter_target.prior_mean
     
-    def get_prior_time_series(self, x, prior_std):
-        time_series = super().get_prior_time_series(x, prior_std)
-        prior_cov_chol = time_series.parameter_target.prior_cov_chol
-        prior_cov_chol[self.parameter_index] = prior_std
-        return time_series
-    
-    def marginalise_time_series(self, time_series):
+    def simulate_prior_time_series(self, x, prior_std):
+        time_series = cp.TimeSeriesMcmc(
+            x, poisson_rate_n_arma=self.n_arma,
+            gamma_mean_n_arma=self.n_arma)
+        time_series.rng = self.rng
         prior_cov_chol = time_series.parameter_target.prior_cov_chol
         prior_cov_chol[np.logical_not(self.parameter_index)] = 0
+        time_series.simulate_from_prior()
+        return time_series
+    
+    def simulate_hyper_time_series(self, x):
+        time_series = cp.TimeSeriesHyperSlice(
+            x, poisson_rate_n_arma=self.n_arma,
+            gamma_mean_n_arma=self.n_arma)
+        precision = time_series.precision_target.simulate_from_prior(self.rng)
+        return self.simulate_prior_time_series(x, 1 / math.sqrt(precision[0]))
     
     def __call__(self):
-        std_const_array = np.linspace(0, 1.0, 10)
+        std_const_array = np.linspace(0, 2, 11)
         for i, std_const in enumerate(std_const_array):
             figure_directory_i = os.path.join(self.figure_directory, str(i))
             self.print(figure_directory_i, std_const)

@@ -1,9 +1,11 @@
 import math
 import os
+import sys
 
 import numpy as np
 
 from .PriorSimulator import PriorSimulator
+import compound_poisson as cp
 
 class PriorRegSimulator(PriorSimulator):
     
@@ -32,7 +34,7 @@ class PriorRegSimulator(PriorSimulator):
         prior_cov_chol[np.logical_not(self.parameter_index)] = 0
     
     def __call__(self):
-        std_const_array = np.linspace(0, 1.0, 10)
+        std_const_array = np.linspace(0, 2, 11)
         for i, std_const in enumerate(std_const_array):
             figure_directory_i = os.path.join(self.figure_directory, str(i))
             self.print(figure_directory_i, std_const)

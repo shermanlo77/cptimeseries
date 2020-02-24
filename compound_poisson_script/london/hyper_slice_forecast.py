@@ -17,7 +17,7 @@ def main():
     figure_directory = os.path.join("figure", name)
     result_file = os.path.join(result_dir, name + ".gz")
     london = dataset.London80()
-    n_simulation = 100
+    n_simulation = 1000
     time_series = joblib.load(result_file)
     time_series.burn_in = 8000
     
