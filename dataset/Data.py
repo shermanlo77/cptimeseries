@@ -1,6 +1,7 @@
 import math
 import os
 
+import gdal
 import joblib
 from netCDF4 import Dataset, num2date
 import numpy as np
@@ -19,6 +20,8 @@ class Data:
     }
     latitude_array = np.linspace(58.95, 49.05, 100)
     longitude_array = np.linspace(-10.95, 2.95, 140)
+    radius_of_earth = 6371E3
+    resolution = 0.1*2*math.pi*radius_of_earth/360
     
     def __init__(self):
         self.model_field = None
@@ -69,8 +72,7 @@ class Data:
         longitude_grid, latitude_grid = np.meshgrid(
             longitude_array, latitude_array)
         
-        radius_of_earth = 6371E3
-        resolution = 0.1*2*math.pi*radius_of_earth/360
+        
         dataset_key = []
         
         for key, model_field in dataset.items():
@@ -124,9 +126,9 @@ class Data:
                 np.square(model_field_day["x_wind"])
                 + np.square(model_field_day["y_wind"]))
             model_field_day["specific_humidity_rate"] =  self.get_rate(
-                model_field_day, "specific_humidity", resolution)
+                model_field_day, "specific_humidity")
             model_field_day["total_column_water_rate"] = self.get_rate(
-                model_field_day, "total_column_water", resolution)
+                model_field_day, "total_column_water")
             
             for model_field_name in self.model_field.keys():
                 self.model_field[model_field_name].append(
@@ -160,8 +162,8 @@ class Data:
                 print(key, "does not have shape", target_shape)
                 raise
     
-    def get_rate(self, model_field, key, resolution):
-        grad = np.gradient(model_field[key], resolution, axis=(1,2))
+    def get_rate(self, model_field, key):
+        grad = np.gradient(model_field[key], Data.resolution, axis=(1,2))
         return np.sqrt(
             np.square(grad[0] * model_field["y_wind"])
             + np.square(- grad[1] * model_field["x_wind"]))
@@ -200,6 +202,18 @@ class Data:
                     print("Mask in ", time, "is not consistent")
                     raise
         self.rain = ma.asarray(self.rain)
+    
+    def load_topo(self, file_name):
+        gdal_dataset = gdal.Open(file_name)
+        raster_band = gdal_dataset.GetRasterBand(1)
+        topo = raster_band.ReadAsArray()
+        topo = np.flip(topo)
+        grad = np.gradient(topo, Data.resolution)
+        grad = np.sqrt(np.square(grad[0]) + np.square(grad[1]))
+        topo = topo[2:102, 2:142]
+        grad = grad[2:102, 2:142]
+        self.topography["elevation"] = np.flip(topo)
+        self.topography["gradient"] = np.flip(grad)
     
     #FUNCTION: FIND NEAREST LATITUDE AND LONGITUDE
     #Given coordinates of a place, returns the nearest latitude and longitude

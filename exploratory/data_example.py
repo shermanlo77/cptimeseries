@@ -197,5 +197,18 @@ def main():
         plt.close()
     
     
+    #topography
+    for key, value in data.topography.items():
+        plt.figure()
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        im = ax.pcolor(longitude_grid, latitude_grid, value)
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.title(key)
+        plt.savefig(os.path.join("figure", "topo_" + key + ".pdf"))
+        plt.show()
+        plt.close()
+    
 if __name__ == "__main__":
     main()
