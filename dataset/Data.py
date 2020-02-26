@@ -10,7 +10,7 @@ import pandas as pd
 
 class Data:
     
-    city_location = {
+    CITY_LOCATION = {
         "London": [51.5074, -0.1278],
         #+0.1 to avoid masking a coastal city
         "Cardiff": [51.4816 + 0.1, -3.1791], 
@@ -18,10 +18,11 @@ class Data:
         "Belfast": [54.5973, -5.9301],
         "Dublin": [53.3498, -6.2603],
     }
-    latitude_array = np.linspace(58.95, 49.05, 100)
-    longitude_array = np.linspace(-10.95, 2.95, 140)
-    radius_of_earth = 6371E3
-    resolution = 0.1*2*math.pi*radius_of_earth/360
+    LATITUDE_ARRAY = np.linspace(58.95, 49.05, 100)
+    LONGITUDE_ARRAY = np.linspace(-10.95, 2.95, 140)
+    RADIUS_OF_EARTH = 6371E3
+    RESOLUTION = 0.1*2*math.pi*RADIUS_OF_EARTH/360
+    GRAVITATIONAL_FIELD_STRENGTH = 9.81
     
     def __init__(self):
         self.model_field = None
@@ -33,7 +34,7 @@ class Data:
         self.topography = {}
         
         longitude_grid, latitude_grid = np.meshgrid(
-            Data.longitude_array, Data.latitude_array)
+            Data.LONGITUDE_ARRAY, Data.LATITUDE_ARRAY)
         self.topography["longitude"] = longitude_grid
         self.topography["latitude"] = latitude_grid
     
@@ -141,8 +142,8 @@ class Data:
                     raise
             self.time_array.append(date_array[0].date())
         
-        target_longitude = Data.longitude_array
-        target_latitude = Data.latitude_array
+        target_longitude = Data.LONGITUDE_ARRAY
+        target_latitude = Data.LATITUDE_ARRAY
         
         longitude_min = np.argwhere(
             np.isclose(longitude_array, np.min(target_longitude)))[0][0]
@@ -163,7 +164,7 @@ class Data:
                 raise
     
     def get_rate(self, model_field, key):
-        grad = np.gradient(model_field[key], Data.resolution, axis=(1,2))
+        grad = np.gradient(model_field[key], Data.RESOLUTION, axis=(1,2))
         return np.sqrt(
             np.square(grad[0] * model_field["y_wind"])
             + np.square(- grad[1] * model_field["x_wind"]))
@@ -206,9 +207,9 @@ class Data:
     def load_topo(self, file_name):
         gdal_dataset = gdal.Open(file_name)
         raster_band = gdal_dataset.GetRasterBand(1)
-        topo = raster_band.ReadAsArray()
+        topo = raster_band.ReadAsArray() / Data.GRAVITATIONAL_FIELD_STRENGTH
         topo = np.flip(topo)
-        grad = np.gradient(topo, Data.resolution)
+        grad = np.gradient(topo, Data.RESOLUTION)
         grad = np.sqrt(np.square(grad[0]) + np.square(grad[1]))
         topo = topo[2:102, 2:142]
         grad = grad[2:102, 2:142]
@@ -230,13 +231,13 @@ class Data:
         min_longitude_error = float("inf")
         min_latitude_error = float("inf")
         #find latitude
-        for i, latitude in enumerate(Data.latitude_array):
+        for i, latitude in enumerate(Data.LATITUDE_ARRAY):
             latitude_error = abs(latitude - coordinates[0])
             if min_latitude_error > latitude_error:
                 latitude_index = i
                 min_latitude_error = latitude_error
         #find longitude
-        for i, longitude in enumerate(Data.longitude_array):
+        for i, longitude in enumerate(Data.LONGITUDE_ARRAY):
             longitude_error = abs(longitude - coordinates[1])
             if min_longitude_error > longitude_error:
                 longitude_index = i
@@ -244,11 +245,11 @@ class Data:
         return(latitude_index, longitude_index)
     
     def get_latitude_longitude_city(self, city):
-        return self.find_nearest_latitude_longitude(Data.city_location[city])
+        return self.find_nearest_latitude_longitude(Data.CITY_LOCATION[city])
     
     def get_latitude_longitude_random(self, rng):
-        latitude_index = rng.randint(0, len(Data.latitude_array))
-        longitude_index = rng.randint(0, len(Data.longitude_array))
+        latitude_index = rng.randint(0, len(Data.LATITUDE_ARRAY))
+        longitude_index = rng.randint(0, len(Data.LONGITUDE_ARRAY))
         return(latitude_index, longitude_index)
     
     def get_latitude_longitude_random_mask(self, rng):

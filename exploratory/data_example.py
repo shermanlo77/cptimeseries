@@ -57,7 +57,7 @@ def main():
     plt.close()
 
     #plot the rainfall as a time series for each city
-    for city in dataset.Data.city_location.keys():
+    for city in dataset.Data.CITY_LOCATION.keys():
         
         #get the time series for this city
         rainfall_series = data.get_rain_city(city)
@@ -131,7 +131,7 @@ def main():
         plt.close()
     
     #for each city time series
-    for city in dataset.Data.city_location.keys():
+    for city in dataset.Data.CITY_LOCATION.keys():
         
         #get the time series
         model_field_time_series = data.get_model_field_city(city)
@@ -180,7 +180,7 @@ def main():
     ##########          MATRIX PLOT          ##########
 
     #for each captial, do matrix plot of all the variables
-    for city in dataset.Data.city_location.keys():
+    for city in dataset.Data.CITY_LOCATION.keys():
         
         data_frame = {}
         data_frame["rain"] = np.asarray(data.get_rain_city(city))
@@ -207,7 +207,6 @@ def main():
         ax.set_aspect("auto", adjustable=None)
         plt.title(key)
         plt.savefig(os.path.join("figure", "topo_" + key + ".pdf"))
-        plt.show()
         plt.close()
     
 if __name__ == "__main__":
