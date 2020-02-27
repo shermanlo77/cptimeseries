@@ -1,3 +1,4 @@
+from .Downscale import Downscale
 from .Forecast import Forecast
 from .Parameter import PoissonRate
 from .Parameter import GammaMean

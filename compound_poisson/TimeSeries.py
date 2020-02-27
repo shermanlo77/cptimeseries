@@ -100,6 +100,7 @@ class TimeSeries:
         self.y_array = None
         self.fitted_time_series = None
         self.rng = random.RandomState()
+        self.id = None
         
         #name the model fields, or extract from pandas data frame
         if type(x) is pandas.core.frame.DataFrame:
@@ -269,7 +270,10 @@ class TimeSeries:
         for parameter in self.cp_parameter_array:
             parameter_name = parameter.get_reg_vector_name()
             for name in parameter_name:
-                vector_name.append(name)
+                if self.id is None:
+                    vector_name.append(name)
+                else:
+                    vector_name.append(self.id + "_" + name)
         return vector_name
     
     def set_parameter_vector(self, parameter_vector):
