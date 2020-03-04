@@ -21,7 +21,8 @@ class Data:
     LATITUDE_ARRAY = np.linspace(58.95, 49.05, 100)
     LONGITUDE_ARRAY = np.linspace(-10.95, 2.95, 140)
     RADIUS_OF_EARTH = 6371E3
-    RESOLUTION = 0.1*2*math.pi*RADIUS_OF_EARTH/360
+    ANGLE_RESOLUTION = 0.1
+    RESOLUTION = ANGLE_RESOLUTION*2*math.pi*RADIUS_OF_EARTH/360
     GRAVITATIONAL_FIELD_STRENGTH = 9.81
     
     def __init__(self):
@@ -32,6 +33,7 @@ class Data:
         self.rain_units = None
         self.time_array = None
         self.topography = {}
+        self.topography_normalise = {}
         
         longitude_grid, latitude_grid = np.meshgrid(
             Data.LONGITUDE_ARRAY, Data.LATITUDE_ARRAY)
@@ -46,6 +48,7 @@ class Data:
         self.rain_units = other.rain_units
         self.time_array = other.time_array
         self.topography = other.topography
+        self.topography_normalise = other.topography_normalise
     
     def load_model_field(self, file_name):
         
@@ -215,6 +218,12 @@ class Data:
         grad = grad[2:102, 2:142]
         self.topography["elevation"] = np.flip(topo)
         self.topography["gradient"] = np.flip(grad)
+        
+        for key, value in self.topography.items():
+            topo_i = value.copy()
+            centre = np.mean(topo_i)
+            scale = np.std(topo_i, ddof=1)
+            self.topography_normalise[key] = (topo_i - centre) / scale
     
     #FUNCTION: FIND NEAREST LATITUDE AND LONGITUDE
     #Given coordinates of a place, returns the nearest latitude and longitude

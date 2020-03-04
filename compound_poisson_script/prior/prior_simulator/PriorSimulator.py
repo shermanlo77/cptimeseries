@@ -1,5 +1,4 @@
 import os
-import sys
 
 from cycler import cycler
 import matplotlib

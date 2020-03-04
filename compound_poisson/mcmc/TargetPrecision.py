@@ -1,7 +1,8 @@
 import numpy as np
-import scipy.stats as stats
 
 from .Target import Target
+from .Target import get_arma_index
+from .Target import get_precision_prior
 
 class TargetPrecision(Target):
     
@@ -9,25 +10,17 @@ class TargetPrecision(Target):
         super().__init__()
         self.target_parameter = target_parameter
         #reg then arma
-        self.prior = [
-            stats.gamma(a=2.8, scale=2.3),
-            stats.gamma(a=1.3, loc=16, scale=65),
-        ]
+        self.prior = get_precision_prior()
         self.precision = []
         for prior in self.prior:
             self.precision.append(prior.mean())
         self.precision = np.asarray(self.precision)
         self.precision_before = None
-        self.arma_index = []
-        time_series = target_parameter.time_series
-        parameter_name_array = time_series.get_parameter_vector_name()
-        for parameter_name in parameter_name_array:
-            if "_AR" in parameter_name:
-                self.arma_index.append(True)
-            elif "_MA" in parameter_name:
-                self.arma_index.append(True)
-            else:
-                self.arma_index.append(False)
+        self.arma_index = None
+        
+        time_series = self.target_parameter.time_series
+        self.arma_index = get_arma_index(
+            time_series.get_parameter_vector_name())
     
     def get_cov_chol(self):
         cov_chol = []

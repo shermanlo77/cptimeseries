@@ -290,6 +290,13 @@ class TimeSeries:
                 parameter_vector[
                 parameter_counter:parameter_counter+n_parameter])
             parameter_counter += n_parameter
+        
+    def simulate_i(self, i):
+        self.update_cp_parameters(i)
+        #simulate this compound Poisson
+        self[i], self.z_array[i] = self.simulate_cp(
+            self.poisson_rate[i], self.gamma_mean[i],
+            self.gamma_dispersion[i])
     
     def simulate(self):
         """Simulate a whole time series
@@ -304,12 +311,7 @@ class TimeSeries:
         """
         #simulate n times
         for i in range(len(self)):
-            #get the parameters of the compound Poisson at this time step
-            self.update_cp_parameters(i)
-            #simulate this compound Poisson
-            self[i], self.z_array[i] = self.simulate_cp(
-                self.poisson_rate[i], self.gamma_mean[i],
-                self.gamma_dispersion[i])
+            self.simulate_i(i)
     
     def simulate_given_z(self):
         """Return a simulated of a whole time series with given z

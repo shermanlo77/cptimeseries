@@ -2,28 +2,21 @@ import numpy as np
 from scipy.stats import norm
 
 from .Target import Target
+from .Target import get_parameter_mean_prior
+from .Target import get_parameter_std_prior
 
 class TargetParameter(Target):
     
     def __init__(self, time_series):
         super().__init__()
         self.time_series = time_series
-        self.prior_mean = np.zeros(self.get_n_dim())
-        self.prior_cov_chol = np.sqrt(0.25 * np.ones(self.get_n_dim()))
+        self.prior_mean = None
+        self.prior_cov_chol = (get_parameter_std_prior()
+            * np.ones(self.get_n_dim()))
         self.cp_parameter_before = None
         
         parameter_name_array = self.time_series.get_parameter_vector_name()
-        for i, parameter_name in enumerate(parameter_name_array):
-            if parameter_name.endswith("const"):
-                if parameter_name.startswith(
-                    self.time_series.poisson_rate.__class__.__name__):
-                    self.prior_mean[i] = -0.46
-                elif parameter_name.startswith(
-                    self.time_series.gamma_mean.__class__.__name__):
-                    self.prior_mean[i] = 1.44
-                elif parameter_name.startswith(
-                    self.time_series.gamma_dispersion.__class__.__name__):
-                    self.prior_mean[i] = -0.45
+        self.prior_mean = get_parameter_mean_prior(parameter_name_array)
     
     def get_n_dim(self):
         return self.time_series.n_parameter

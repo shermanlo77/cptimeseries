@@ -28,14 +28,10 @@ def main():
         #graph
     register_matplotlib_converters()
     
-    try:
+    if not os.path.isdir("figure"):
         os.mkdir("figure")
-    except(FileExistsError):
-        pass
-    try:
+    if not os.path.isdir(os.path.join("figure", "rain")):
         os.mkdir(os.path.join("figure", "rain"))
-    except(FileExistsError):
-        pass
 
     data = dataset.Ana_1()
     time = data.time_array
