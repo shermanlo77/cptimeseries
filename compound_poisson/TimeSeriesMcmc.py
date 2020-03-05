@@ -7,38 +7,22 @@ from .TimeSeries import TimeSeries
 from .mcmc import Rwmh, TargetParameter, TargetZ, ZRwmh
 
 class TimeSeriesMcmc(TimeSeries):
-    """Fit Compound Poisson time series using Bayesian setting
+    """Fit Compound Poisson time series using Rwmh from a Bayesian setting
     
     Method uses Metropolis Hastings within Gibbs. Sample either the z or the
         regression parameters. Uniform prior on z, Normal prior on the
         regression parameters. Adaptive MCMC from Roberts and Rosenthal (2009)
     
+    For more attributes, see the superclass
     Attributes:
         n_sample: number of MCMC samples
-        z_sample: array of z samples
-        parameter_sample: array of regression parameters in vector form
-        proposal_z_parameter: for proposal,probability of movingq z
-        prior_mean: prior mean for the regression parameters
-        prior_covariance: prior covariance for the regression parameters
-        n_till_adapt: the chain always use the small proposal initially, number
-            of steps till use the adaptive proposal covariance
-        prob_small_proposal: probability of using proposal_covariance_small as
-            the proposal covariance for the reggression parameters
-        proposal_covariance_small: the size of the small proposal covariance,
-            scalar, it is to be multipled by an identity matrix
-        proposal_scale: proposal covariance for the regression parameters is
-            proposal_scale times chain_covariance
-        chain_mean: mean of the regression parameter chain (excludes z step)
-        chain_covariance: covariance of the regression parameter chain (excludes
-            z step)
-        n_propose_z: number of z proposals
-        n_propose_reg: number of proposals for the regression parameters
-        n_accept_z: number of accept steps when sampling z
-        n_accept_reg: number of accept steps when sampling the regression
+        parameter_target: wrapper Target object to evaluate the posterior of the
             parameters
-        accept_reg_array: acceptance rate for the regression parameter chain
-        accept_z_array: acceptance rate for the z chain
-        rng: random number generator
+        parameter_mcmc: Mcmc object which does MCMC using parameter_target
+        z_target: wrapper Target object to evaluate the posterior of z
+        z_mcmc: Mcmc object which does MCMC using z_target
+        burn_in: integer, which samples to discard when doing posterior sampling
+            which is used for forecasting
     """
     
     def __init__(self, 
@@ -60,7 +44,9 @@ class TimeSeriesMcmc(TimeSeries):
         self.burn_in = 0
     
     def fit(self):
-        """Do MCMC
+        """Fit using Gibbs sampling
+        
+        Override
         """
         self.initalise_z()
         self.instantiate_mcmc()
@@ -80,6 +66,12 @@ class TimeSeriesMcmc(TimeSeries):
                 self.z_mcmc.add_to_sample()
     
     def initalise_z(self):
+        """Initalise all z in self.z_array and update all parameters
+        
+        Initalise all z in self.z_array using e_step() and update all parameters
+            using update_all_cp_parameters(). Required for e.g. likelihood
+            evaluation because z=0 if and only if y=0. 
+        """
         self.e_step() #initalise the z using the E step
         self.z_array = self.z_array.round() #round it to get integer
         #z cannot be 0 if y is not 0
@@ -87,6 +79,11 @@ class TimeSeriesMcmc(TimeSeries):
         self.update_all_cp_parameters() #initalse cp parameters
     
     def instantiate_mcmc(self):
+        """Instantiate all MCMC objects
+        
+        Instantiate all MCMC objects by passing the corresponding Target objects
+            and random number generators
+        """
         self.parameter_mcmc = Rwmh(self.parameter_target, self.rng)
         self.z_mcmc = ZRwmh(self.z_target, self.rng)
     
@@ -118,10 +115,15 @@ class TimeSeriesMcmc(TimeSeries):
     def simulate_from_prior(self):
         """Simulate using a parameter from the prior
         
-        Modifies itself, the prior mean and prior covariance unmodified
+        MODIFIES ITSELF
+        Replaces the parameter with a sample from the prior. The prior mean and
+            prior covariance unmodified.
         """
+        #keep sampling until the sampled parameter does not have numerical
+            #problems
         while True:
             try:
+                #sample from the prior and set it
                 prior_parameter = self.simulate_parameter_from_prior()
                 self.set_parameter_vector(prior_parameter)
                 self.simulate()
@@ -134,8 +136,13 @@ class TimeSeriesMcmc(TimeSeries):
                     pass
                 else:
                     break
+            #try again if there are numerical problems
             except(ValueError, OverflowError):
                 pass
     
     def simulate_parameter_from_prior(self):
+        """Simulate parameter from the prior
+        
+        Return a sample from the prior
+        """
         return self.parameter_target.simulate_from_prior(self.rng)

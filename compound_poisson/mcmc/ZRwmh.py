@@ -5,6 +5,16 @@ import numpy as np
 from .Mcmc import Mcmc
 
 class ZRwmh(Mcmc):
+    """Metropolis-Hastings for the latent variables z
+    
+    Uses a non-adaptive proposal on integer space
+    
+    Attributes:
+        z_parameter: probability a single z does a propose step
+        n_propose: number of proposals
+        n_accept: number of accept steps
+        accept_array: acceptance rate at each proposal
+    """
     
     def __init__(self, target, rng):
         super().__init__(target, rng)
@@ -16,6 +26,7 @@ class ZRwmh(Mcmc):
     def sample(self):
         """Use Metropolis Hastings to sample z
         
+        Implemented
         Uniform prior, proposal is step back, stay or step forward
         """
         #make a deep copy of the z, use it in case of rejection step

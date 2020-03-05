@@ -47,6 +47,7 @@ class TimeSeries:
         y_array: compound poisson variables at each time step
         fitted_time_series: time series before this one, used for forecasting
         rng: numpy.random.RandomState object
+        id: string to identify this time series
     """
     
     def __init__(self, 
@@ -292,6 +293,13 @@ class TimeSeries:
             parameter_counter += n_parameter
         
     def simulate_i(self, i):
+        """Simulate a time step of the time series
+        
+        MODIFIES ITSELF
+        Because of ARMA behaviour, this method should be called sequentially.
+            Modify the member variables poisson_rate, gamma_mean,
+            gamma_dispersion, z_array and y_array.
+        """
         self.update_cp_parameters(i)
         #simulate this compound Poisson
         self[i], self.z_array[i] = self.simulate_cp(
@@ -307,7 +315,6 @@ class TimeSeries:
             gamma_dispersion by updating its values at each time step.
             Also modifies self.z_array and self.y_array with the
             simulated values.
-        
         """
         #simulate n times
         for i in range(len(self)):

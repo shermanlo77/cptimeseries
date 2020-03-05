@@ -3,6 +3,12 @@ import numpy as np
 from .Target import Target
 
 class TargetZ(Target):
+    """Wrapper Target class for the latent variables z
+    
+    Attributes:
+        time_series: TimeSeries object being wrapped around
+        z_array_before: copy of time_series.z_array when save_state called
+    """
     
     def __init__(self, time_series):
         super().__init__()

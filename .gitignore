@@ -3,6 +3,7 @@
 *.pdf
 *.png
 *.txt
+*.pyc
 Data/
 Untitled.ipynb
 __pycache__

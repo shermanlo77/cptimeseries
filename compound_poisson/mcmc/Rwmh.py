@@ -5,6 +5,27 @@ import numpy as np
 from .Mcmc import Mcmc
 
 class Rwmh(Mcmc):
+    """Random walk Metropolis Hastings
+    
+    Adaptive MCMC from Roberts and Rosenthal (2009). Proposal covariance is
+        proportional to the sample covariance of the chain.
+    
+    Attributes:
+        n_till_adapt: the chain always use the small proposal initially, number
+            of steps till use the adaptive proposal covariance
+        prob_small_proposal: probability of using proposal_covariance_small as
+            the proposal covariance for the reggression parameters
+        proposal_covariance_small: the size of the small proposal covariance,
+            scalar, it is to be multipled by an identity matrix
+        proposal_scale: proposal covariance for the regression parameters is
+            proposal_scale times chain_covariance
+        chain_mean: mean of the regression parameter chain (excludes z step)
+        chain_covariance: covariance of the regression parameter chain (excludes
+            samples from sampling other dimensions)
+        n_propose: number of proposals
+        n_accept: number of accept steps
+        accept_array: acceptance rate at each proposal
+    """
     
     def __init__(self, target, rng):
         super().__init__(target, rng)
@@ -17,11 +38,11 @@ class Rwmh(Mcmc):
         self.n_propose = 0
         self.n_accept = 0
         self.accept_array = []
-        self.index_last_propose = 0
     
     def sample(self):
         """Use Metropolis Hastings to sample parameters
         
+        Implemented
         Normal prior, normal proposal
         """
         #decide to use small proposal or adaptive proposal
@@ -46,12 +67,13 @@ class Rwmh(Mcmc):
         self.save_state()
         #get posterior
         log_posterior_before = self.get_log_target()
-        #make a step, self.propose(proposal_covariance) returns False if there
-            #are numerical problems, treat it as a rejection step
-        if self.propose(proposal_covariance):
+        #make a step if there are numerical problems, treat it as a rejection
+            #step
+        try:
             #self.propose(proposal_covariance) changes the all the member
                 #variable parameters, the likelihood is evaulated with these new
                 #parameters
+            self.propose(proposal_covariance)
             log_posterior_after = self.get_log_target()
             if not self.is_accept_step(
                 log_posterior_before, log_posterior_after):
@@ -60,7 +82,7 @@ class Rwmh(Mcmc):
             else:
                 #acceptance step, keep track of acceptance rate
                 self.n_accept += 1
-        else:
+        except(ValueError, OverflowError):
             #treat numerical problems as a rejection step
             self.revert_state()
         #keep track of acceptance rate
@@ -76,18 +98,9 @@ class Rwmh(Mcmc):
         
         Args:
             covariance: proposal covariance
-        
-        Returns:
-            False if there are numerical problems, otherwise True
         """
         self.state = self.rng.multivariate_normal(self.state, covariance)
-        
-        try:
-            #update it's member variables with the proposed parameter
-            self.update_state()
-            return True
-        except (ValueError, OverflowError):
-            return False
+        self.update_state()
     
     def update_chain_statistics(self):
         """Update the statistics of the parameter chain

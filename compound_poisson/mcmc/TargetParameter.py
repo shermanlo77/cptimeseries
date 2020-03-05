@@ -6,8 +6,21 @@ from .Target import get_parameter_mean_prior
 from .Target import get_parameter_std_prior
 
 class TargetParameter(Target):
+    """Wrapper Target class to evaluate the posterior of the parameter
+    
+    Attributes:
+        time_series: TimeSeries object being wrapped around
+        prior_mean: prior mean vector
+        prior_cov_chol: prior std vector
+        cp_parameter_before: copy of time_series.cp_parameter_array when
+            save_state() is called
+    """
     
     def __init__(self, time_series):
+        """
+        Args:
+            time_series: TimeSeries object
+        """
         super().__init__()
         self.time_series = time_series
         self.prior_mean = None

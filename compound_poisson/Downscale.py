@@ -11,6 +11,34 @@ from .mcmc import TargetDownscalePrecision
 from .TimeSeriesSlice import TimeSeriesSlice
 
 class Downscale:
+    """Collection of multiple TimeSeries object
+    
+    Fit a compound Poisson time series on multiple locations in 2d space.
+        Parameters have a Gaussian process (GP) prior, with gamma precision
+        prior and gamma GP precision prior.
+    
+    Attributes:
+        n_arma: 2-tuple, containing number of AR and MA terms
+        time_series_array: 2d array containing TimeSeries objects
+        mask: 2d boolean, True if on water, therefore masked
+        parameter_mask_vector: mask as a vector
+        n_parameter: number of parameters for one location
+        n_total_parameter: n_parameter times number of unmasked time series
+        topography: dictonary of topography information
+        topography_normalise: dictonary of topography information normalised,
+            mean 0, std 1
+        shape: 2-tuple, shape of the space
+        area: area of the space
+        area_unmask: area of the unmasked space
+        rng: numpy.random.RandomState object
+        parameter_target: TargetDownscaleParameter object
+        precision_mcmc: TargetDownscalePrecision object
+        gp_target: TargetDownscaleGp object
+        parameter_mcmc: Mcmc object wrapping around parameter_target
+        precision_mcmc: Mcmc object wrapping around precision_target
+        gp_mcmc: Mcmc object wrapping around gp_target
+        n_sample: number of MCMC samples
+    """
     
     def __init__(self, data, n_arma=(0,0)):
         self.n_arma = n_arma
@@ -33,10 +61,14 @@ class Downscale:
         self.gp_mcmc = None
         self.n_sample = 10000
         
+        #copy data
         model_field = data.model_field
         rain = data.rain
         time_series_array = self.time_series_array
         
+        #instantiate time series for every point in space
+        #unmasked points have rain, provide it to the constructor to TimeSeries
+        #masked points do not have rain, cannot provide it
         for lat_i in range(self.shape[0]):
             
             time_series_array.append([])
@@ -64,6 +96,8 @@ class Downscale:
         self.set_target()
     
     def fit(self):
+        """Fit using Gibbs sampling
+        """
         self.initalise_z()
         self.instantiate_mcmc()
         self.update_reg_gp()
@@ -104,6 +138,10 @@ class Downscale:
                 self.z_mcmc_add_to_sample()
     
     def z_mcmc_add_to_sample(self):
+        """Duplicate z_array to the z chain
+        
+        For all time_series, add z_array to the sample_array
+        """
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
@@ -111,6 +149,8 @@ class Downscale:
                     time_series.z_mcmc.add_to_sample()
     
     def z_mcmc_step(self):
+        """All time_series sample z
+        """
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
@@ -118,11 +158,14 @@ class Downscale:
                     time_series.z_mcmc.step()
     
     def instantiate_mcmc(self):
+        """Instantiate MCMC objects
+        """
         self.parameter_mcmc = Elliptical(self.parameter_target, self.rng)
         self.precision_mcmc = Rwmh(self.precision_target, self.rng)
         self.precision_mcmc.proposal_covariance_small = 1e-4
         self.gp_mcmc = Rwmh(self.gp_target, self.rng)
         self.gp_mcmc.proposal_covariance_small = 1e-4
+        #all time series objects instantiate mcmc objects to store the z chain
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
@@ -130,6 +173,10 @@ class Downscale:
                     time_series.instantiate_mcmc()
     
     def initalise_z(self):
+        """Initalise z for all time series
+        """
+        #all time series initalise z, needed so that the likelihood can be
+            #evaluated, eg y=0 if and only if x=0
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
@@ -138,27 +185,39 @@ class Downscale:
         self.update_all_cp_parameters()
     
     def set_target(self):
+        """Instantiate target objects
+        """
         self.parameter_target = TargetDownscaleParameter(self)
         self.precision_target = TargetDownscalePrecision(self.parameter_target)
         self.gp_target = TargetDownscaleGp(self)
     
     def set_rng(self, rng):
+        """Set rng for all time series
+        """
         self.rng = rng
         for time_series_i in self.time_series_array:
             for time_series in time_series_i:
                 time_series.rng = rng
     
     def simulate_i(self, i):
+        """Simulate a point in time for all time series
+        """
         for time_series_i in self.time_series_array:
             for time_series in time_series_i:
                 time_series.simulate_i(i)
     
     def simulate(self):
+        """Simulate the entire time series for all time series
+        """
         for time_series_i in self.time_series_array:
             for time_series in time_series_i:
                 time_series.simulate()
     
     def get_parameter_3d(self):
+        """Return the parameters from all time series (3D)
+        
+        Return a 3D array of all the parameters in all unmasked time series
+        """
         parameter = []
         for time_series_lat in self.time_series_array:
             parameter.append([])
@@ -168,6 +227,12 @@ class Downscale:
         return parameter
     
     def get_parameter_vector(self):
+        """Return the parameters from all time series (vector)
+        
+        Return a vector of all the parameters in all unmasked time series. The
+            vector is arrange in a format suitable for block diagonal Gaussian
+            process
+        """
         parameter_3d = self.get_parameter_3d()
         parameter_vector = []
         for i in range(self.n_parameter):
@@ -176,6 +241,12 @@ class Downscale:
         return np.asarray(parameter_vector).flatten()
     
     def set_parameter_vector(self, parameter_vector):
+        """Set the parameter for each time series
+        
+        Args:
+            parameter_vector: vector of length area_unmask * n_parameter. See
+                get_parameter_vector for the format of parameter_vector
+        """
         parameter_3d = np.empty(
             (self.shape[0], self.shape[1], self.n_parameter))
         for i in range(self.n_parameter):
@@ -190,6 +261,8 @@ class Downscale:
                         parameter_i)
     
     def get_parameter_vector_name_3d(self):
+        """Get name of all parameters (3D)
+        """
         parameter_name = []
         for time_series_lat in self.time_series_array:
             parameter_name.append([])
@@ -200,6 +273,8 @@ class Downscale:
         return parameter_name
     
     def get_parameter_vector_name(self):
+        """Get name of all parameters (vector)
+        """
         parameter_name_3d = self.get_parameter_vector_name_3d()
         parameter_name_array = []
         for i in range(self.n_parameter):
@@ -208,6 +283,8 @@ class Downscale:
         return np.asarray(parameter_name_array).flatten()
     
     def update_all_cp_parameters(self):
+        """Update all compound Poisson parameters in all time series
+        """
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
@@ -215,6 +292,8 @@ class Downscale:
                     time_series.update_all_cp_parameters()
     
     def set_parameter_from_prior(self):
+        """Set parameter from a sample from the prior
+        """
         self.gp_target.precision = self.gp_target.simulate_from_prior(self.rng)
         self.precision_target.precision = (
             self.precision_target.simulate_from_prior(self.rng))
@@ -224,10 +303,14 @@ class Downscale:
         self.set_parameter_vector(parameter)
     
     def update_reg_gp(self):
+        """Propagate the GP precision to the parameter prior covariance
+        """
         cov_chol = self.gp_target.get_cov_chol()
         self.parameter_target.prior_cov_chol = cov_chol
     
     def update_reg_precision(self):
+        """Propagate the precision to the parameter prior covariance
+        """
         precision = self.precision_target.precision
         self.parameter_target.prior_scale_parameter = 1 / math.sqrt(
             precision[0])
@@ -235,6 +318,8 @@ class Downscale:
             precision[1])
     
     def get_log_likelihood(self):
+        """Return log likelihood
+        """
         ln_l_array = []
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):

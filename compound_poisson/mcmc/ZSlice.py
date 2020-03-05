@@ -5,6 +5,13 @@ import numpy as np
 from .Mcmc import Mcmc
 
 class ZSlice(Mcmc):
+    """Slice sampling on the z latent variables
+    
+    Does slice sampling for a randomly selected z. See Neal (2003).
+    
+    For more attributes, see the superclass
+    Attributes:
+    """
     
     def __init__(self, target, rng):
         super().__init__(target, rng)
@@ -13,8 +20,9 @@ class ZSlice(Mcmc):
         self.non_zero_index = np.nonzero(self.target.time_series.y_array)[0]
     
     def sample(self):
-        """Implemented - Use slice sampling
+        """Use slice sampling
         
+        Implemented
         See Neal (2003)
         Select a random z_t in the time series, then move it using slice
             samplingls

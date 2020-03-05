@@ -5,24 +5,45 @@ from .Target import get_arma_index
 from .Target import get_precision_prior
 
 class TargetPrecision(Target):
+    """Wrapper Target class to evaluate the posterior of the precision of the
+        parameter prior covariance
+    
+    Attributes:
+        parameter_target: TargetParameter object
+        prior: array containing 2 distributions, random_state are accessed,
+            rvs() are logpdf() are called. E.g. use distributions from
+            scipy.stats. 0th prior for regression parameter, 1st for ARMA
+            parameter
+        precision: 2 vector
+        precision_before: copy of precision
+        arma_index: array of boolean, pointing to each parameter, True if it the
+            parameter is an ARMA term 
+    """
     
     def __init__(self, parameter_target):
         super().__init__()
         self.parameter_target = parameter_target
-        #reg then arma
         self.prior = get_precision_prior()
-        self.precision = []
-        for prior in self.prior:
-            self.precision.append(prior.mean())
-        self.precision = np.asarray(self.precision)
+        self.precision = [] 
         self.precision_before = None
         self.arma_index = None
         
+        #initalise precision using the prior mean
+        for prior in self.prior:
+            self.precision.append(prior.mean())
+        self.precision = np.asarray(self.precision)
+        
+        #initalise arma_index
         time_series = self.parameter_target.time_series
         self.arma_index = get_arma_index(
             time_series.get_parameter_vector_name())
     
     def get_cov_chol(self):
+        """Return the vector of parameter prior std
+        
+        Returns:
+            vector, element of each parameter, prior std
+        """
         cov_chol = []
         for is_arma in self.arma_index:
             if is_arma:

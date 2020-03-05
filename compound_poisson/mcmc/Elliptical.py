@@ -3,6 +3,15 @@ import math
 from .Mcmc import Mcmc
 
 class Elliptical(Mcmc):
+    """Elliptical slice sampling
+    
+    Elliptical slice sampling, see Murray, Adams, MacKay (2010). Samples from a
+        Gaussian prior and do slice sampling
+    
+    For more attributes, see the superclass
+    Attributes:
+        n_reject_array: number of times a rejection was done for each sample
+    """
     
     def __init__(self, target, rng):
         super().__init__(target, rng)
@@ -11,6 +20,7 @@ class Elliptical(Mcmc):
     def sample(self):
         """Uses elliptical slice sampling 
         
+        Implemented
         See Murray, Adams, MacKay (2010)
         """
         target = self.target
@@ -60,5 +70,7 @@ class Elliptical(Mcmc):
     
     def simulate_from_prior(self):
         """Return a parameter sampled from the prior
+        
+        Must be a Gaussian prior
         """
         return self.target.simulate_from_prior(self.rng)
