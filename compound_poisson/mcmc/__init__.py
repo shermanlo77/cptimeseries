@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
 
 from .Rwmh import Rwmh
-from .EllipticalInd import EllipticalInd
+from .Elliptical import Elliptical
 
 from .ZRwmh import ZRwmh
 from .ZSlice import ZSlice

@@ -6,9 +6,9 @@ from .Target import get_precision_prior
 
 class TargetPrecision(Target):
     
-    def __init__(self, target_parameter):
+    def __init__(self, parameter_target):
         super().__init__()
-        self.target_parameter = target_parameter
+        self.parameter_target = parameter_target
         #reg then arma
         self.prior = get_precision_prior()
         self.precision = []
@@ -18,7 +18,7 @@ class TargetPrecision(Target):
         self.precision_before = None
         self.arma_index = None
         
-        time_series = self.target_parameter.time_series
+        time_series = self.parameter_target.time_series
         self.arma_index = get_arma_index(
             time_series.get_parameter_vector_name())
     
@@ -39,10 +39,10 @@ class TargetPrecision(Target):
         return self.precision
     
     def update_state(self, state):
-        self.precision = state
+        self.precision = state.copy()
     
     def get_log_likelihood(self):
-        return self.target_parameter.get_log_prior(self.get_cov_chol())
+        return self.parameter_target.get_log_prior(self.get_cov_chol())
     
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()

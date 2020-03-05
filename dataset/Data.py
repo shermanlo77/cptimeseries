@@ -309,3 +309,21 @@ class Data:
         latitude_index, longitude_index = (
             self.get_latitude_longitude_random_mask(rng))
         return self.get_rain(latitude_index, longitude_index)
+    
+    def crop(self, lat, long):
+        for key, model_field in self.model_field.items():
+            self.model_field[key] = model_field[
+                :, lat[0]:lat[1], long[0]:long[1]]
+        self.rain = self.rain[:, lat[0]:lat[1], long[0]:long[1]]
+        self.mask = self.rain[0].mask
+        for key in self.topography.keys():
+            self.topography[key] = self.topography[key][
+                lat[0]:lat[1], long[0]:long[1]]
+            self.topography_normalise[key] = self.topography_normalise[key][
+                lat[0]:lat[1], long[0]:long[1]]
+    
+    def trim(self, time):
+        for key, model_field in self.model_field.items():
+            self.model_field[key] = model_field[time[0]:time[1], :, :]
+        self.rain = self.rain[time[0]:time[1], :, :]
+        self.time_array = self.time_array[time[0]:time[1]]

@@ -9,9 +9,10 @@ from .Target import Target
 class TargetDownscaleGp(Target):
     
     def __init__(self, downscale):
-        self.downscale = downscale
+        self.parameter_target = downscale.parameter_target
         self.prior_precision = get_gp_precision_prior()
-        self.precision = self.prior_precision.mean()
+        self.precision = np.asarray([self.prior_precision.mean()])
+        self.precision_before = None
         self.area_unmask = downscale.area_unmask
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
         
@@ -31,7 +32,22 @@ class TargetDownscaleGp(Target):
         return self.precision
     
     def update_state(self, state):
-        self.precision = state
+        self.precision = state.copy()
+    
+    def get_log_likelihood(self):
+        return self.parameter_target.get_log_prior()
+    
+    def get_log_target(self):
+        return self.get_log_likelihood() + self.get_log_prior()
+    
+    def get_log_prior(self):
+        return self.prior_precision.logpdf(self.precision)[0]
+    
+    def save_state(self):
+        self.precision_before = self.precision.copy()
+    
+    def revert_state(self):
+        self.precision = self.precision_before
     
     def simulate_from_prior(self, rng):
         self.prior_precision.random_state = rng
@@ -39,7 +55,7 @@ class TargetDownscaleGp(Target):
     
     def get_cov_chol(self):
         cov_chol = self.square_error.copy()
-        cov_chol *= -self.precision/2
+        cov_chol *= - self.precision / 2
         cov_chol = np.exp(cov_chol)
         cov_chol = cholesky(cov_chol)
         return cov_chol

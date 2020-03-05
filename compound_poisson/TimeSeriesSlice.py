@@ -1,5 +1,5 @@
 from .TimeSeriesMcmc import TimeSeriesMcmc
-from .mcmc import EllipticalInd, TargetParameter, TargetZ, ZSlice
+from .mcmc import Elliptical, TargetParameter, TargetZ, ZSlice
 
 class TimeSeriesSlice(TimeSeriesMcmc):
     
@@ -14,10 +14,9 @@ class TimeSeriesSlice(TimeSeriesMcmc):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
-        self.non_zero_index = None
         self.n_sample = 10000
     
     def instantiate_mcmc(self):
-        self.parameter_mcmc = EllipticalInd(self.parameter_target, self.rng)
+        self.parameter_mcmc = Elliptical(self.parameter_target, self.rng)
         self.z_mcmc = ZSlice(self.z_target, self.rng)
     

@@ -6,9 +6,9 @@ from .Target import get_precision_prior
 
 class TargetDownscalePrecision(Target):
     
-    def __init__(self, target_downscale_parameter):
+    def __init__(self, parameter_target):
         super().__init__()
-        self.target_parameter = target_downscale_parameter
+        self.parameter_target = parameter_target
         #reg then arma
         self.prior = get_precision_prior()
         self.precision = []
@@ -24,7 +24,19 @@ class TargetDownscalePrecision(Target):
         return self.precision
     
     def update_state(self, state):
-        self.precision = state
+        self.precision = state.copy()
+    
+    def get_log_likelihood(self):
+        return self.parameter_target.get_log_prior()
+    
+    def get_log_target(self):
+        return self.get_log_likelihood() + self.get_log_prior()
+    
+    def get_log_prior(self):
+        ln_prior = 0
+        for i, prior in enumerate(self.prior):
+            ln_prior += prior.logpdf(self.precision[i])
+        return ln_prior
     
     def save_state(self):
         self.precision_before = self.precision.copy()

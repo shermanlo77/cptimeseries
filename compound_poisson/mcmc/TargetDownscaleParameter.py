@@ -2,6 +2,7 @@ import os
 import sys
 
 import numpy as np
+from numpy.linalg import lstsq
 
 import compound_poisson as cp
 from .Target import Target
@@ -38,6 +39,36 @@ class TargetDownscaleParameter(Target):
     def update_state(self, state):
         self.downscale.set_parameter_vector(state)
         self.downscale.update_all_cp_parameters()
+    
+    def get_log_likelihood(self):
+        return self.downscale.get_log_likelihood()
+    
+    def get_log_target(self):
+        return self.get_log_likelihood() + self.get_log_prior()
+    
+    def get_log_prior(self):
+        z = self.get_state()
+        z -= self.prior_mean
+        
+        ln_prior_term = []
+        
+        for i in range(self.n_parameter):
+            z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
+            chol = self.prior_cov_chol
+            if self.arma_index[i*self.area_unmask]:
+                z_i = lstsq(self.prior_scale_arma * chol, z_i)[0]
+            else:
+                z_i = lstsq(self.prior_scale_parameter * chol, z_i)[0]
+            ln_prior_term.append(-0.5 * np.dot(z_i, z_i))
+        
+        return (-np.sum(np.log(np.diagonal(self.prior_cov_chol)))
+            + np.sum(ln_prior_term))
+    
+    def save_state(self):
+        self.parameter_before = self.get_state()
+    
+    def revert_state(self):
+        self.update_state(self.parameter_before)
     
     def simulate_from_prior(self, rng):
         parameter_vector = self.prior_mean.copy()
