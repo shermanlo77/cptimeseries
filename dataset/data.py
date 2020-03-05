@@ -1,29 +1,30 @@
 import math
 import os
+import pathlib
 
 import gdal
 import joblib
-from netCDF4 import Dataset, num2date
+import netCDF4
 import numpy as np
-import numpy.ma as ma
+from numpy import ma
 import pandas as pd
 
-class Data:
-    
-    CITY_LOCATION = {
-        "London": [51.5074, -0.1278],
-        #+0.1 to avoid masking a coastal city
-        "Cardiff": [51.4816 + 0.1, -3.1791], 
-        "Edinburgh": [55.9533, -3.1883],
-        "Belfast": [54.5973, -5.9301],
-        "Dublin": [53.3498, -6.2603],
-    }
-    LATITUDE_ARRAY = np.linspace(58.95, 49.05, 100)
-    LONGITUDE_ARRAY = np.linspace(-10.95, 2.95, 140)
-    RADIUS_OF_EARTH = 6371E3
-    ANGLE_RESOLUTION = 0.1
-    RESOLUTION = ANGLE_RESOLUTION*2*math.pi*RADIUS_OF_EARTH/360
-    GRAVITATIONAL_FIELD_STRENGTH = 9.81
+CITY_LOCATION = {
+    "London": [51.5074, -0.1278],
+    #+0.1 to avoid masking a coastal city
+    "Cardiff": [51.4816 + 0.1, -3.1791], 
+    "Edinburgh": [55.9533, -3.1883],
+    "Belfast": [54.5973, -5.9301],
+    "Dublin": [53.3498, -6.2603],
+}
+LATITUDE_ARRAY = np.linspace(58.95, 49.05, 100)
+LONGITUDE_ARRAY = np.linspace(-10.95, 2.95, 140)
+RADIUS_OF_EARTH = 6371E3
+ANGLE_RESOLUTION = 0.1
+RESOLUTION = ANGLE_RESOLUTION*2*math.pi*RADIUS_OF_EARTH/360
+GRAVITATIONAL_FIELD_STRENGTH = 9.81
+
+class Data(object):
     
     def __init__(self):
         self.model_field = None
@@ -36,7 +37,7 @@ class Data:
         self.topography_normalise = {}
         
         longitude_grid, latitude_grid = np.meshgrid(
-            Data.LONGITUDE_ARRAY, Data.LATITUDE_ARRAY)
+            LONGITUDE_ARRAY, LATITUDE_ARRAY)
         self.topography["longitude"] = longitude_grid
         self.topography["latitude"] = latitude_grid
     
@@ -53,7 +54,7 @@ class Data:
     def load_model_field(self, file_name):
         
         #get model fields data via netcdf4
-        dataset = Dataset(file_name, "r", format="NETCDF4")
+        dataset = netCDF4.Dataset(file_name, "r", format="NETCDF4")
         dataset = dataset.variables
         
         #store data
@@ -68,14 +69,13 @@ class Data:
         
         self.time_array = []
         time_array = dataset["time"]
-        time_array = num2date(np.asarray(time_array), time_array.units)
+        time_array = netCDF4.num2date(np.asarray(time_array), time_array.units)
         
         #get the longitude and latitude in the model fields grid
         longitude_array = np.round_(np.asarray(dataset["longitude"]), 2)
         latitude_array = np.round_(np.asarray(dataset["latitude"]), 2)
         longitude_grid, latitude_grid = np.meshgrid(
             longitude_array, latitude_array)
-        
         
         dataset_key = []
         
@@ -121,7 +121,7 @@ class Data:
         
         for i in range(0, len(time_array), n_read_per_day):
             model_field_day = {}
-            for i_key, model_field_name in enumerate(self.model_field.keys()):
+            for i_key, model_field_name in enumerate(self.model_field):
                 if not model_field_name in derived_model_field:
                     model_field_day[model_field_name] = np.asarray(
                         dataset[dataset_key[i_key]][i:i+4])
@@ -134,7 +134,7 @@ class Data:
             model_field_day["total_column_water_rate"] = self.get_rate(
                 model_field_day, "total_column_water")
             
-            for model_field_name in self.model_field.keys():
+            for model_field_name in self.model_field:
                 self.model_field[model_field_name].append(
                     np.mean(model_field_day[model_field_name], 0))
             
@@ -145,8 +145,8 @@ class Data:
                     raise
             self.time_array.append(date_array[0].date())
         
-        target_longitude = Data.LONGITUDE_ARRAY
-        target_latitude = Data.LATITUDE_ARRAY
+        target_longitude = LONGITUDE_ARRAY
+        target_latitude = LATITUDE_ARRAY
         
         longitude_min = np.argwhere(
             np.isclose(longitude_array, np.min(target_longitude)))[0][0]
@@ -160,20 +160,20 @@ class Data:
         
         target_shape = self.topography["latitude"].shape
         for key, value in self.model_field.items():
-            self.model_field[key] = np.asarray(value)[:,
-                latitude_min:latitude_max, longitude_min:longitude_max]
+            self.model_field[key] = np.asarray(value)[
+                :,latitude_min:latitude_max, longitude_min:longitude_max]
             if self.model_field[key][0].shape != target_shape:
                 print(key, "does not have shape", target_shape)
                 raise
     
     def get_rate(self, model_field, key):
-        grad = np.gradient(model_field[key], Data.RESOLUTION, axis=(1,2))
+        grad = np.gradient(model_field[key], RESOLUTION, axis=(1,2))
         return np.sqrt(
             np.square(grad[0] * model_field["y_wind"])
             + np.square(- grad[1] * model_field["x_wind"]))
     
     def load_rain(self, file_name):
-        rain_data = Dataset(file_name, "r", format="NETCDF4")
+        rain_data = netCDF4.Dataset(file_name, "r", format="NETCDF4")
         rain = rain_data.variables["rr"]
         self.rain_units = rain.units
         
@@ -194,7 +194,7 @@ class Data:
         
         #get the times
         time_array = rain_data["time"]
-        time_array = num2date(time_array[:], time_array.units)
+        time_array = netCDF4.num2date(time_array[:], time_array.units)
         
         self.rain = []
         self.mask = rain[0].mask
@@ -210,9 +210,9 @@ class Data:
     def load_topo(self, file_name):
         gdal_dataset = gdal.Open(file_name)
         raster_band = gdal_dataset.GetRasterBand(1)
-        topo = raster_band.ReadAsArray() / Data.GRAVITATIONAL_FIELD_STRENGTH
+        topo = raster_band.ReadAsArray() / GRAVITATIONAL_FIELD_STRENGTH
         topo = np.flip(topo)
-        grad = np.gradient(topo, Data.RESOLUTION)
+        grad = np.gradient(topo, RESOLUTION)
         grad = np.sqrt(np.square(grad[0]) + np.square(grad[1]))
         topo = topo[2:102, 2:142]
         grad = grad[2:102, 2:142]
@@ -240,13 +240,13 @@ class Data:
         min_longitude_error = float("inf")
         min_latitude_error = float("inf")
         #find latitude
-        for i, latitude in enumerate(Data.LATITUDE_ARRAY):
+        for i, latitude in enumerate(LATITUDE_ARRAY):
             latitude_error = abs(latitude - coordinates[0])
             if min_latitude_error > latitude_error:
                 latitude_index = i
                 min_latitude_error = latitude_error
         #find longitude
-        for i, longitude in enumerate(Data.LONGITUDE_ARRAY):
+        for i, longitude in enumerate(LONGITUDE_ARRAY):
             longitude_error = abs(longitude - coordinates[1])
             if min_longitude_error > longitude_error:
                 longitude_index = i
@@ -254,11 +254,11 @@ class Data:
         return(latitude_index, longitude_index)
     
     def get_latitude_longitude_city(self, city):
-        return self.find_nearest_latitude_longitude(Data.CITY_LOCATION[city])
+        return self.find_nearest_latitude_longitude(CITY_LOCATION[city])
     
     def get_latitude_longitude_random(self, rng):
-        latitude_index = rng.randint(0, len(Data.LATITUDE_ARRAY))
-        longitude_index = rng.randint(0, len(Data.LONGITUDE_ARRAY))
+        latitude_index = rng.randint(0, len(LATITUDE_ARRAY))
+        longitude_index = rng.randint(0, len(LONGITUDE_ARRAY))
         return(latitude_index, longitude_index)
     
     def get_latitude_longitude_random_mask(self, rng):
@@ -316,7 +316,7 @@ class Data:
                 :, lat[0]:lat[1], long[0]:long[1]]
         self.rain = self.rain[:, lat[0]:lat[1], long[0]:long[1]]
         self.mask = self.rain[0].mask
-        for key in self.topography.keys():
+        for key in self.topography:
             self.topography[key] = self.topography[key][
                 lat[0]:lat[1], long[0]:long[1]]
             self.topography_normalise[key] = self.topography_normalise[key][
@@ -327,3 +327,17 @@ class Data:
             self.model_field[key] = model_field[time[0]:time[1], :, :]
         self.rain = self.rain[time[0]:time[1], :, :]
         self.time_array = self.time_array[time[0]:time[1]]
+
+class Ana_1(Data):
+    def __init__(self):
+        super().__init__()
+        path_here = pathlib.Path(__file__).parent.absolute()
+        self.copy_from(joblib.load(os.path.join(path_here, "ana_input_1.gz")))
+
+def init_ana():
+    ana_1 = Data()
+    path_here = pathlib.Path(__file__).parent.absolute()
+    ana_1.load_model_field(os.path.join(path_here, "..", "Data", "Rain_Data_Nov19", "ana_input_1.nc"))
+    ana_1.load_rain(os.path.join(path_here, "..", "Data", "Rain_Data_Nov19", "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
+    ana_1.load_topo(os.path.join(path_here, "..", "Data", "Rain_Data_Nov19", "topo_0.1_degree.grib"))
+    joblib.dump(ana_1, os.path.join(path_here, "ana_input_1.gz"))
