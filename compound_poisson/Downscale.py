@@ -328,3 +328,27 @@ class Downscale:
                     ln_l = time_series.get_joint_log_likelihood()
                     ln_l_array.append(ln_l)
         return np.sum(ln_l_array)
+    
+    def forecast(self, data, n_simulation):
+        forecast_array = []
+        i = 0
+        area_unmask = self.area_unmask
+        n_total_parameter = self.n_total_parameter
+        for lat_i in range(self.shape[0]):
+            forecast_array.append([])
+            for long_i in range(self.shape[1]):
+                x_i = data.get_model_field(lat_i, long_i)
+                is_mask = self.mask[lat_i, long_i]
+                if self.mask[lat_i, long_i]:
+                    forecast = None
+                else:
+                    time_series = self.time_series_array[lat_i][long_i]
+                    parameter_mcmc = np.array(
+                        self.parameter_mcmc.sample_array)
+                    parameter_mcmc = parameter_mcmc[
+                        :, range(i, n_total_parameter, area_unmask)]
+                    time_series.parameter_mcmc = parameter_mcmc
+                    forecast = time_series.forecast(x_i, n_simulation)
+                    i += 1
+                forecast_array[-1].append(forecast)
+        return forecast_array

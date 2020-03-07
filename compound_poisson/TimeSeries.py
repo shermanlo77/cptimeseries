@@ -337,21 +337,6 @@ class TimeSeries:
             self[i] = self.simulate_cp_given_z(
                 self.z_array[i], self.gamma_mean[i], self.gamma_dispersion[i])
     
-    def simulate_future(self, x):
-        """Return a simulation of the future
-        
-        Return a simulated time series given itself and future model fields
-        
-        Args:
-            x: future model fields
-        
-        Returns:
-            TimeSeries object containing a simulated future
-        """
-        forecast = self.instantise_future(x)
-        forecast.simulate()
-        return forecast
-    
     def simulate_cp(self, poisson_rate, gamma_mean, gamma_dispersion):
         """Simulate a single compound poisson random variable
         
@@ -566,12 +551,13 @@ class TimeSeries:
         forecast_array = Forecast()
         for i in range(n_simulation):
             print("Predictive sample", i)
-            forecast = self.simulate_future(x)
+            forecast = self.instantiate_forecast(x)
+            forecast.simulate()
             forecast_array.append(forecast)
         forecast_array.get_forecast()
         return forecast_array
     
-    def instantise_future(self, x):
+    def instantiate_forecast(self, x):
         """Instantiate TimeSeries for simulating the future given the current
             parameters
         
@@ -598,17 +584,6 @@ class TimeSeries:
             forecast.time_array.append(last_time + (i+1)*time_diff)
         
         return forecast
-    
-    def instantiate_forecast(self, x):
-        """Instantiate TimeSeries for forecasting
-        
-        Instantiate TimeSeries object containing future model fields. Deep copy
-            the parameters.
-        
-        Returns:
-            forecast: TimeSeries object
-        """
-        return self.instantise_future(x)
     
     def cast_arma(self, arma_class):
         """Cast the arma object
