@@ -1,16 +1,7 @@
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
-
-from .Rwmh import Rwmh
-from .Elliptical import Elliptical
-
-from .ZRwmh import ZRwmh
-from .ZSlice import ZSlice
-
-from .TargetDownscaleGp import TargetDownscaleGp
-from .TargetDownscaleParameter import TargetDownscaleParameter
-from .TargetDownscalePrecision import TargetDownscalePrecision
-from .TargetParameter import TargetParameter
-from .TargetPrecision import TargetPrecision
-from .TargetZ import TargetZ
+from compound_poisson.mcmc import target
+from compound_poisson.mcmc import target_downscale
+from compound_poisson.mcmc import target_time_series
+from compound_poisson.mcmc.mcmc_parameter import Rwmh
+from compound_poisson.mcmc.mcmc_parameter import Elliptical
+from compound_poisson.mcmc.mcmc_z import ZRwmh
+from compound_poisson.mcmc.mcmc_z import ZSlice

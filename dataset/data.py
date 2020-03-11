@@ -1,5 +1,6 @@
 import math
 import os
+from os import path
 import pathlib
 
 import gdal
@@ -332,12 +333,4 @@ class Ana_1(Data):
     def __init__(self):
         super().__init__()
         path_here = pathlib.Path(__file__).parent.absolute()
-        self.copy_from(joblib.load(os.path.join(path_here, "ana_input_1.gz")))
-
-def init_ana():
-    ana_1 = Data()
-    path_here = pathlib.Path(__file__).parent.absolute()
-    ana_1.load_model_field(os.path.join(path_here, "..", "Data", "Rain_Data_Nov19", "ana_input_1.nc"))
-    ana_1.load_rain(os.path.join(path_here, "..", "Data", "Rain_Data_Nov19", "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-    ana_1.load_topo(os.path.join(path_here, "..", "Data", "Rain_Data_Nov19", "topo_0.1_degree.grib"))
-    joblib.dump(ana_1, os.path.join(path_here, "ana_input_1.gz"))
+        self.copy_from(joblib.load(path.join(path_here, "ana_input_1.gz")))

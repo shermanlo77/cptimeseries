@@ -1,9 +1,11 @@
 import os
+from os import path
 
 import numpy as np
 from numpy import random
 
-import compound_poisson as cp
+import compound_poisson
+from compound_poisson import parameter
 import dataset
 
 class London80(object):
@@ -17,7 +19,7 @@ class London80(object):
         self.load_data()
     
     def load_data(self):
-        dir_path = os.path.dirname(os.path.realpath(__file__))
+        dir_path = path.dirname(path.realpath(__file__))
         data = dataset.Ana_1()
         self.time_array = data.time_array.copy()
         model_field, rain = data.get_data_city("London")
@@ -61,9 +63,9 @@ class LondonSimulated80(London80):
         rng = random.RandomState(np.uint32(3667413888))
         n_model_field = len(self.model_field.columns)
         n_arma = (5, 5)
-        poisson_rate = cp.PoissonRate(n_model_field, n_arma)
-        gamma_mean = cp.GammaMean(n_model_field, n_arma)
-        gamma_dispersion = cp.GammaDispersion(n_model_field)
+        poisson_rate = parameter.PoissonRate(n_model_field, n_arma)
+        gamma_mean = parameter.GammaMean(n_model_field, n_arma)
+        gamma_dispersion = parameter.GammaDispersion(n_model_field)
         cp_parameter_array = [poisson_rate, gamma_mean, gamma_dispersion]
         poisson_rate['reg'] = np.asarray([
             -0.11154721,
@@ -130,7 +132,7 @@ class LondonSimulated80(London80):
         ])
         gamma_dispersion['const'] = np.asarray([-0.26056112])
         
-        self.time_series = cp.TimeSeries(
+        self.time_series = compound_poisson.TimeSeries(
             self.model_field, cp_parameter_array=cp_parameter_array)
         self.time_series.rng = rng
         self.time_series.simulate()
