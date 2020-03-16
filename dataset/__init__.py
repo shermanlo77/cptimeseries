@@ -4,7 +4,7 @@ import pathlib
 import joblib
 
 from dataset import data
-from dataset.data import Ana_1
+from dataset.data import AnaInterpolate1
 from dataset.data import ANGLE_RESOLUTION 
 from dataset.data import CITY_LOCATION
 from dataset.data import GRAVITATIONAL_FIELD_STRENGTH

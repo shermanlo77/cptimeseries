@@ -329,7 +329,7 @@ class Data(object):
         self.rain = self.rain[time[0]:time[1], :, :]
         self.time_array = self.time_array[time[0]:time[1]]
 
-class Ana_1(Data):
+class AnaInterpolate1(Data):
     def __init__(self):
         super().__init__()
         path_here = pathlib.Path(__file__).parent.absolute()

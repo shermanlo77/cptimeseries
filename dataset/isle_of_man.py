@@ -1,6 +1,6 @@
 import dataset
 
-class IsleOfMan(dataset.Ana_1):
+class IsleOfMan(dataset.AnaInterpolate1):
     def __init__(self):
         super().__init__()
         lat = (43, 56)

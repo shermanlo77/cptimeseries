@@ -15,7 +15,8 @@ class PriorSimulator(object):
     def __init__(self, figure_directory, rng):
         self.figure_directory = figure_directory
         self.n_simulate = 10
-        self.downscale = compound_poisson.Downscale(dataset.Ana_1(), (5, 5))
+        self.downscale = compound_poisson.Downscale(
+            dataset.AnaInterpolate1(), (5, 5))
         self.downscale.set_rng(rng)
         self.angle_resolution = dataset.ANGLE_RESOLUTION
         self.rng = rng

@@ -14,7 +14,7 @@ def main():
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
     
-    data = dataset.Ana_1()
+    data = dataset.AnaInterpolate1()
     n_unmask = np.sum(np.logical_not(data.mask))
     area = data.mask.shape[0] * data.mask.shape[1]
     

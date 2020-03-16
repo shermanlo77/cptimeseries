@@ -36,7 +36,7 @@ def main():
     if not path.isdir(rain_dir):
         os.mkdir(rain_dir)
 
-    data = dataset.Ana_1()
+    data = dataset.AnaInterpolate1()
     time = data.time_array
     latitude_grid = data.topography["latitude"]
     longitude_grid = data.topography["longitude"]

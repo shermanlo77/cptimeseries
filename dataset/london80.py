@@ -20,7 +20,7 @@ class London80(object):
     
     def load_data(self):
         dir_path = path.dirname(path.realpath(__file__))
-        data = dataset.Ana_1()
+        data = dataset.AnaInterpolate1()
         self.time_array = data.time_array.copy()
         model_field, rain = data.get_data_city("London")
         self.model_field = model_field.copy()

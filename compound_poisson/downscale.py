@@ -35,6 +35,10 @@ class Downscale(object):
         precision_mcmc: Mcmc object wrapping around precision_target
         gp_mcmc: Mcmc object wrapping around gp_target
         n_sample: number of MCMC samples
+        model_field_shift: mean of model field, vector, entry for each model
+            field
+        model_field_scale: std of model field, vector, entry of reach model
+            field
     """
     
     def __init__(self, data, n_arma=(0,0)):
@@ -57,15 +61,21 @@ class Downscale(object):
         self.precision_mcmc = None
         self.gp_mcmc = None
         self.n_sample = 10000
+        self.model_field_shift = []
+        self.model_field_scale = []
         
-        #copy data
-        model_field = data.model_field
-        rain = data.rain
-        time_series_array = self.time_series_array
+        #get normalising info for model fields using mean and standard deviation
+            #over all space and time
+        for model_field in data.model_field.values():
+            self.model_field_shift.append(np.mean(model_field))
+            self.model_field_scale.append(np.std(model_field, ddof=1))
+        self.model_field_shift = np.asarray(self.model_field_shift)
+        self.model_field_scale = np.asarray(self.model_field_scale)
         
         #instantiate time series for every point in space
         #unmasked points have rain, provide it to the constructor to TimeSeries
         #masked points do not have rain, cannot provide it
+        time_series_array = self.time_series_array
         for lat_i in range(self.shape[0]):
             
             time_series_array.append([])
@@ -83,6 +93,8 @@ class Downscale(object):
                         x_i, rain_i.data, n_arma, n_arma)
                 time_series.id = str(lat_i) + "_" + str(long_i)
                 time_series.rng = self.rng
+                time_series.x_shift = self.model_field_shift
+                time_series.x_scale = self.model_field_scale
                 time_series_array[lat_i].append(time_series)
                 for i in range(time_series.n_parameter):
                     self.parameter_mask_vector.append(is_mask)
