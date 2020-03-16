@@ -83,7 +83,7 @@ class Data(object):
         for key, model_field in dataset.items():
             #some of the model_field include time and get_coordinates
             #interested in spatial temporal data, 3 dimensions
-            if len(model_field.shape)==3:
+            if len(model_field.shape) == 3:
                 #check the dimension names
                 if model_field.dimensions[1] != "latitude":
                     print(key, "does not have latitude as dimension 1")

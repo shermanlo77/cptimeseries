@@ -22,28 +22,30 @@ class PriorSimulator(object):
         self.max_rain = 100
         self.data = dataset.Ana_1()
     
-    def simulate_prior_time_series(self, x, prior_std):
+    def get_prior_time_series(self, x, prior_std):
         time_series = compound_poisson.TimeSeriesMcmc(
             x, poisson_rate_n_arma=self.n_arma,
             gamma_mean_n_arma=self.n_arma)
         time_series.rng = self.rng
-        time_series.simulate_from_prior()
         return time_series
     
-    def simulate_hyper_time_series(self, x):
+    def get_hyper_time_series(self, x):
         time_series = compound_poisson.TimeSeriesHyperSlice(
             x, poisson_rate_n_arma=self.n_arma,
             gamma_mean_n_arma=self.n_arma)
         time_series.rng = self.rng
-        time_series.simulate_from_prior()
         return time_series
+    
+    def get_precision_prior(self):
+        return compound_poisson.mcmc.target.get_precision_prior()
     
     def get_time_series(self, prior_std=None):
         x = self.data.get_model_field_random(self.rng)
         if prior_std is None:
-            time_series = self.simulate_hyper_time_series(x)
+            time_series = self.get_hyper_time_series(x)
         else:
-            time_series = self.simulate_prior_time_series(x, prior_std)
+            time_series = self.get_prior_time_series(x, prior_std)
+        time_series.simulate_from_prior()
         time_series.time_array = self.data.time_array
         return time_series
     
@@ -124,7 +126,7 @@ class PriorRegSimulator(PriorSimulator):
         time_series = self.get_time_series()
         parameter_name_array = time_series.get_parameter_vector_name()
         for parameter_name in parameter_name_array:
-            if not(parameter_name.endswith("const")
+            if not (parameter_name.endswith("const")
                 or "_AR" in parameter_name
                 or "_MA" in parameter_name):
                 self.parameter_index.append(True)
@@ -136,11 +138,15 @@ class PriorRegSimulator(PriorSimulator):
         time_series = super().get_prior_time_series(x, prior_std)
         prior_cov_chol = time_series.parameter_target.prior_cov_chol
         prior_cov_chol[self.parameter_index] = prior_std
+        prior_cov_chol[np.logical_not(self.parameter_index)] = 0
         return time_series
     
-    def marginalise_time_series(self, time_series):
-        prior_cov_chol = time_series.parameter_target.prior_cov_chol
-        prior_cov_chol[np.logical_not(self.parameter_index)] = 0
+    def get_hyper_time_series(self, x):
+        prior = self.get_precision_prior()[0]
+        prior.random_state = self.rng
+        precision = prior.rvs()
+        prior_std = 1 / math.sqrt(precision)
+        return self.get_prior_time_series(x, prior_std)
     
     def __call__(self):
         std_const_array = np.linspace(0, 2, 11)
@@ -152,7 +158,7 @@ class PriorRegSimulator(PriorSimulator):
             file.close()
         self.print()
 
-class PriorConstSimulator(PriorSimulator):
+class PriorConstSimulator(PriorRegSimulator):
     
     def __init__(self, figure_directory, rng):
         super().__init__(figure_directory, rng)
@@ -166,35 +172,8 @@ class PriorConstSimulator(PriorSimulator):
                 self.parameter_index.append(False)
         self.parameter_index = np.asarray(self.parameter_index)
         self.prior_mean = time_series.parameter_target.prior_mean
-    
-    def simulate_prior_time_series(self, x, prior_std):
-        time_series = compound_poisson.TimeSeriesMcmc(
-            x, poisson_rate_n_arma=self.n_arma,
-            gamma_mean_n_arma=self.n_arma)
-        time_series.rng = self.rng
-        prior_cov_chol = time_series.parameter_target.prior_cov_chol
-        prior_cov_chol[np.logical_not(self.parameter_index)] = 0
-        time_series.simulate_from_prior()
-        return time_series
-    
-    def simulate_hyper_time_series(self, x):
-        time_series = compound_poisson.TimeSeriesHyperSlice(
-            x, poisson_rate_n_arma=self.n_arma,
-            gamma_mean_n_arma=self.n_arma)
-        precision = time_series.precision_target.simulate_from_prior(self.rng)
-        return self.simulate_prior_time_series(x, 1 / math.sqrt(precision[0]))
-    
-    def __call__(self):
-        std_const_array = np.linspace(0, 2, 11)
-        for i, std_const in enumerate(std_const_array):
-            figure_directory_i = path.join(self.figure_directory, str(i))
-            self.print(figure_directory_i, std_const)
-            file = open(path.join(figure_directory_i, "std.txt"), "w")
-            file.write(str(std_const))
-            file.close()
-        self.print()
 
-class PriorArmaSimulator(PriorSimulator):
+class PriorArmaSimulator(PriorRegSimulator):
     
     def __init__(self, figure_directory, rng):
         super().__init__(figure_directory, rng)
@@ -208,15 +187,12 @@ class PriorArmaSimulator(PriorSimulator):
                 self.parameter_index.append(False)
         self.parameter_index = np.asarray(self.parameter_index)
     
-    def get_prior_time_series(self, x, prior_std):
-        time_series = super().get_prior_time_series(x, prior_std)
-        prior_cov_chol = time_series.parameter_target.prior_cov_chol
-        prior_cov_chol[self.parameter_index] = prior_std
-        return time_series
-    
-    def marginalise_time_series(self, time_series):
-        prior_cov_chol = time_series.parameter_target.prior_cov_chol
-        prior_cov_chol[np.logical_not(self.parameter_index)] = 0
+    def get_hyper_time_series(self, x):
+        prior = self.get_precision_prior()[1]
+        prior.random_state = self.rng
+        precision = prior.rvs()
+        prior_std = 1 / math.sqrt(precision)
+        return self.get_prior_time_series(x, prior_std)
     
     def __call__(self):
         std_const_array = np.linspace(0, 0.5, 11)

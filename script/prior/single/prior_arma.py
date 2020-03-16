@@ -19,7 +19,7 @@ def main():
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
     
-    prior_simulate = prior_simulator.time_series.PriorRegSimulator(
+    prior_simulate = prior_simulator.time_series.PriorArmaSimulator(
         figure_dir, rng)
     prior_simulate()
 
