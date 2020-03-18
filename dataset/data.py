@@ -340,6 +340,7 @@ class DataDualGrid(Data):
     
     def __init__(self):
         super().__init__()
+        self.model_field_interpolate_array = {}
         self.topography_coarse = {}
         self.topography_coarse_normalise = {}
     
@@ -347,6 +348,19 @@ class DataDualGrid(Data):
         super().copy_from(other)
         self.topography_coarse = other.topography_coarse
         self.topography_coarse_normalise = other.topography_coarse_normalise
+    
+    #override
+    def get_model_field(self, latitude_index, longitude_index):
+        data_frame = {}
+        latitude = LATITUDE_ARRAY[latitude_index]
+        longitude = LONGITUDE_ARRAY[longitude_index]
+        for key, interpolate_array in (
+            self.model_field_interpolate_array.items()):
+            model_field = []
+            for interpolate in interpolate_array:
+                model_field.append(interpolate(latitude, longitude))
+            data_frame[key] = model_field
+        return pd.DataFrame(data_frame)
     
     def load_topo(self, file_name):
         super().load_topo(file_name)
@@ -375,9 +389,10 @@ class DataDualGrid(Data):
             if i == 6:
                 coordinates = message.get_coordinates()
                 value = message.get_values()
-                self.model_field["temperature"] = []
-                self.model_field["temperature"].append(value)
-                self.model_field_units["temperature"] = "K"
+                key = "temperature"
+                self.model_field[key] = np.reshape(
+                    value, (1, value.shape[0], value.shape[1]))
+                self.model_field_units[key] = "K"
                 assert(
                     np.all(
                         np.isclose(coordinates[0][0,:],
@@ -388,6 +403,16 @@ class DataDualGrid(Data):
                                    LATITUDE_COARSE_ARRAY)))
         file.close()
         self.time_array = [datetime.date(1979, 1, 1)]
+        self.set_model_field_interpolation()
+    
+    def set_model_field_interpolation(self):
+        for key, model_field in self.model_field.items():
+            self.model_field_interpolate_array[key] = []
+            for i in range(len(self.time_array)):
+                interpolate = interpolate.RectBivariateSpline(
+                    np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY,
+                    model_field[i,:,:])
+                self.model_field_interpolate_array[key].append(interpolate)
 
 class AnaInterpolate1(Data):
     def __init__(self):
