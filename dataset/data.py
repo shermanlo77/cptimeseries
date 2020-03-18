@@ -356,7 +356,7 @@ class DataDualGrid(Data):
         data_frame = {}
         latitude = LATITUDE_ARRAY[latitude_index]
         longitude = LONGITUDE_ARRAY[longitude_index]
-        for key, interpolat_array in (
+        for key, interpolate_array in (
             self.model_field_interpolate_array.items()):
             model_field = []
             for interpolator in interpolate_array:
