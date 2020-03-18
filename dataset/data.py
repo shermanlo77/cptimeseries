@@ -360,7 +360,7 @@ class DataDualGrid(Data):
             self.model_field_interpolate_array.items()):
             model_field = []
             for interpolator in interpolate_array:
-                model_field.append(interpolator(latitude, longitude))
+                model_field.append(interpolator(latitude, longitude)[0,0])
             data_frame[key] = np.asarray(model_field)
         return pd.DataFrame(data_frame)
     
