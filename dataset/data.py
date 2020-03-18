@@ -354,11 +354,11 @@ class DataDualGrid(Data):
         data_frame = {}
         latitude = LATITUDE_ARRAY[latitude_index]
         longitude = LONGITUDE_ARRAY[longitude_index]
-        for key, interpolate_array in (
+        for key, interpolat_array in (
             self.model_field_interpolate_array.items()):
             model_field = []
-            for interpolate in interpolate_array:
-                model_field.append(interpolate(latitude, longitude))
+            for interpolator in interpolate_array:
+                model_field.append(interpolator(latitude, longitude))
             data_frame[key] = model_field
         return pd.DataFrame(data_frame)
     
@@ -409,10 +409,10 @@ class DataDualGrid(Data):
         for key, model_field in self.model_field.items():
             self.model_field_interpolate_array[key] = []
             for i in range(len(self.time_array)):
-                interpolate = interpolate.RectBivariateSpline(
+                interpolator = interpolate.RectBivariateSpline(
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY,
                     model_field[i,:,:])
-                self.model_field_interpolate_array[key].append(interpolate)
+                self.model_field_interpolate_array[key].append(interpolator)
 
 class AnaInterpolate1(Data):
     def __init__(self):
