@@ -1,3 +1,5 @@
+import math
+
 class Mcmc(object):
     """Abstract class for MCMC
     

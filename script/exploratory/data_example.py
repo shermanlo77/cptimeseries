@@ -18,6 +18,7 @@ import pathlib
 from cartopy import crs
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import ma
 import pandas as pd
 from statsmodels.tsa import stattools
 
@@ -48,7 +49,9 @@ def main():
     #heatmap plot the mean rainfall
     plt.figure()
     ax = plt.axes(projection=crs.PlateCarree())
-    im = ax.pcolor(longitude_grid, latitude_grid, mean_rainfall)
+    im = ax.pcolor(longitude_grid - angle_resolution / 2,
+                   latitude_grid + angle_resolution / 2,
+                   mean_rainfall)
     ax.coastlines(resolution="50m")
     plt.colorbar(im)
     ax.set_aspect("auto", adjustable=None)
@@ -126,7 +129,9 @@ def main():
         #plot the mean model field (over time) as a heat map
         plt.figure()
         ax = plt.axes(projection=crs.PlateCarree())
-        im = ax.pcolor(longitude_grid, latitude_grid, model_field_mean)
+        im = ax.pcolor(longitude_grid - angle_resolution / 2,
+                       latitude_grid + angle_resolution / 2,
+                       model_field_mean)
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
@@ -204,13 +209,31 @@ def main():
     for key, value in data.topography.items():
         plt.figure()
         ax = plt.axes(projection=crs.PlateCarree())
-        im = ax.pcolor(longitude_grid, latitude_grid, value)
+        im = ax.pcolor(longitude_grid - angle_resolution / 2,
+                       latitude_grid + angle_resolution / 2,
+                       value)
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
         plt.title(key)
         plt.savefig(path.join(figure_dir, "topo_" + key + ".pdf"))
         plt.close()
+        
+        if key in ["elevation", "gradient"]:
+            plot_value = ma.asarray(value)
+            plot_value.mask = data.topography["elevation"] < 0
+            
+            plt.figure()
+            ax = plt.axes(projection=crs.PlateCarree())
+            im = ax.pcolor(longitude_grid - angle_resolution / 2,
+                           latitude_grid + angle_resolution / 2,
+                           plot_value)
+            ax.coastlines(resolution="50m")
+            plt.colorbar(im)
+            ax.set_aspect("auto", adjustable=None)
+            plt.title(key)
+            plt.savefig(path.join(figure_dir, "topo_mask_" + key + ".pdf"))
+            plt.close()
     
 if __name__ == "__main__":
     main()

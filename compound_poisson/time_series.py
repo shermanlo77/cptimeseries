@@ -459,11 +459,11 @@ class TimeSeries(object):
             gamma_mean = self.gamma_mean[i]
             gamma_dispersion = self.gamma_dispersion[i]
             cp_term = terms.Terms(self, i)
-            terms = np.zeros(3)
-            terms[0] = -y/gamma_mean/gamma_dispersion
-            terms[1] = -math.log(y)
-            terms[2] = cp_term.ln_wz(z)
-            ln_l += np.sum(terms)
+            term_array = np.zeros(3)
+            term_array[0] = -y/gamma_mean/gamma_dispersion
+            term_array[1] = -math.log(y)
+            term_array[2] = cp_term.ln_wz(z)
+            ln_l += np.sum(term_array)
         return ln_l
     
     def e_step(self):
@@ -552,9 +552,9 @@ class TimeSeries(object):
         forecast_array = forecast.Forecast()
         for i in range(n_simulation):
             print("Predictive sample", i)
-            forecast = self.instantiate_forecast(x)
-            forecast.simulate()
-            forecast_array.append(forecast)
+            forecast_i = self.instantiate_forecast(x)
+            forecast_i.simulate()
+            forecast_array.append(forecast_i)
         forecast_array.get_forecast()
         return forecast_array
     

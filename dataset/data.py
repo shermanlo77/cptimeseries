@@ -1,3 +1,4 @@
+import datetime
 import math
 import os
 from os import path
@@ -9,6 +10,8 @@ import netCDF4
 import numpy as np
 from numpy import ma
 import pandas as pd
+import pupygrib
+from scipy import interpolate
 
 CITY_LOCATION = {
     "London": [51.5074, -0.1278],
@@ -20,6 +23,10 @@ CITY_LOCATION = {
 }
 LATITUDE_ARRAY = np.linspace(58.95, 49.05, 100)
 LONGITUDE_ARRAY = np.linspace(-10.95, 2.95, 140)
+LATITUDE_TOPO_ARRAY = np.linspace(59.15, 48.85, 104)
+LONGITUDE_TOPO_ARRAY = np.linspace(-11.15, 3.15, 144)
+LATITUDE_COARSE_ARRAY = np.linspace(59.445, 48.888, 20)
+LONGITUDE_COARSE_ARRAY = np.linspace(-12.5, 4.167, 21)
 RADIUS_OF_EARTH = 6371E3
 ANGLE_RESOLUTION = 0.1
 RESOLUTION = ANGLE_RESOLUTION*2*math.pi*RADIUS_OF_EARTH/360
@@ -28,12 +35,12 @@ GRAVITATIONAL_FIELD_STRENGTH = 9.81
 class Data(object):
     
     def __init__(self):
-        self.model_field = None
-        self.model_field_units = None
-        self.rain = None
+        self.model_field = {}
+        self.model_field_units = {}
+        self.rain = []
         self.mask = None
         self.rain_units = None
-        self.time_array = None
+        self.time_array = []
         self.topography = {}
         self.topography_normalise = {}
         
@@ -57,18 +64,6 @@ class Data(object):
         #get model fields data via netcdf4
         dataset = netCDF4.Dataset(file_name, "r", format="NETCDF4")
         dataset = dataset.variables
-        
-        #store data
-            #key: variable name
-            #value: 3d matrix, dim 1 and 2 for each coordinate, dim 3 for each
-                #time
-        self.model_field = {}
-        #store units of the model fields
-            #key: variable name
-            #value: string
-        self.model_field_units = {}
-        
-        self.time_array = []
         time_array = dataset["time"]
         time_array = netCDF4.num2date(np.asarray(time_array), time_array.units)
         
@@ -197,7 +192,6 @@ class Data(object):
         time_array = rain_data["time"]
         time_array = netCDF4.num2date(time_array[:], time_array.units)
         
-        self.rain = []
         self.mask = rain[0].mask
         for i, time in enumerate(time_array):
             time = time.date()
@@ -212,19 +206,32 @@ class Data(object):
         gdal_dataset = gdal.Open(file_name)
         raster_band = gdal_dataset.GetRasterBand(1)
         topo = raster_band.ReadAsArray() / GRAVITATIONAL_FIELD_STRENGTH
-        topo = np.flip(topo)
         grad = np.gradient(topo, RESOLUTION)
         grad = np.sqrt(np.square(grad[0]) + np.square(grad[1]))
-        topo = topo[2:102, 2:142]
-        grad = grad[2:102, 2:142]
-        self.topography["elevation"] = np.flip(topo)
-        self.topography["gradient"] = np.flip(grad)
+        
+        lat_index = []
+        long_index = []
+        for lat_i in LATITUDE_TOPO_ARRAY:
+            lat_index.append(np.any(np.isclose(LATITUDE_ARRAY, lat_i)))
+        for long_i in LONGITUDE_TOPO_ARRAY:
+            long_index.append(np.any(np.isclose(LONGITUDE_ARRAY, long_i)))
+        
+        lat_index = np.where(lat_index)[0]
+        long_index = np.where(long_index)[0]
+        
+        topo = topo[lat_index[0]:lat_index[-1]+1,
+                    long_index[0]:long_index[-1]+1]
+        grad = grad[lat_index[0]:lat_index[-1]+1,
+                    long_index[0]:long_index[-1]+1]
+        
+        self.topography["elevation"] = topo
+        self.topography["gradient"] = grad
         
         for key, value in self.topography.items():
             topo_i = value.copy()
-            centre = np.mean(topo_i)
+            shift = np.mean(topo_i)
             scale = np.std(topo_i, ddof=1)
-            self.topography_normalise[key] = (topo_i - centre) / scale
+            self.topography_normalise[key] = (topo_i - shift) / scale
     
     #FUNCTION: FIND NEAREST LATITUDE AND LONGITUDE
     #Given coordinates of a place, returns the nearest latitude and longitude
@@ -329,8 +336,67 @@ class Data(object):
         self.rain = self.rain[time[0]:time[1], :, :]
         self.time_array = self.time_array[time[0]:time[1]]
 
+class DataDualGrid(Data):
+    
+    def __init__(self):
+        super().__init__()
+        self.topography_coarse = {}
+        self.topography_coarse_normalise = {}
+    
+    def copy_from(self, other):
+        super().copy_from(other)
+        self.topography_coarse = other.topography_coarse
+        self.topography_coarse_normalise = other.topography_coarse_normalise
+    
+    def load_topo(self, file_name):
+        super().load_topo(file_name)
+        longitude_coarse_grid, latitude_coarse_grid = np.meshgrid(
+            LONGITUDE_COARSE_ARRAY, LATITUDE_COARSE_ARRAY)
+        self.topography_coarse["longitude"] = longitude_coarse_grid
+        self.topography_coarse["latitude"] = latitude_coarse_grid
+        
+        for key in ["elevation", "gradient"]:
+            topo_interpolate = interpolate.RectBivariateSpline(
+                np.flip(LATITUDE_ARRAY), LONGITUDE_ARRAY, self.topography[key])
+            self.topography_coarse[key] = topo_interpolate(
+                np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY)
+        
+        for key in self.topography:
+            topo_fine = self.topography[key]
+            shift = np.mean(topo_fine)
+            scale = np.std(topo_fine, ddof=1)
+            self.topography_coarse_normalise[key] = (topo_fine - shift) / scale
+    
+    def load_model_field_coarse_example(self, file_name):
+        file = open(file_name, "rb")
+        message_iter = pupygrib.read(file)
+        dataset = gdal.Open(file_name)
+        for i, message in enumerate(message_iter):
+            if i == 6:
+                coordinates = message.get_coordinates()
+                value = message.get_values()
+                self.model_field["temperature"] = []
+                self.model_field["temperature"].append(value)
+                self.model_field_units["temperature"] = "K"
+                assert(
+                    np.all(
+                        np.isclose(coordinates[0][0,:],
+                                   LONGITUDE_COARSE_ARRAY)))
+                assert(
+                    np.all(
+                        np.isclose(coordinates[1][:,0],
+                                   LATITUDE_COARSE_ARRAY)))
+        file.close()
+        self.time_array = [datetime.date(1979, 1, 1)]
+
 class AnaInterpolate1(Data):
     def __init__(self):
         super().__init__()
         path_here = pathlib.Path(__file__).parent.absolute()
-        self.copy_from(joblib.load(path.join(path_here, "ana_input_1.gz")))
+        self.copy_from(joblib.load(path.join(path_here, self.__class__.__name__ +".gz")))
+
+class AnaDualExample0(DataDualGrid):
+    def __init__(self):
+        super().__init__()
+        path_here = pathlib.Path(__file__).parent.absolute()
+        self.copy_from(joblib.load(path.join(path_here, self.__class__.__name__ +".gz")))
