@@ -361,7 +361,7 @@ class DataDualGrid(Data):
             model_field = []
             for interpolator in interpolate_array:
                 model_field.append(interpolator(latitude, longitude))
-            data_frame[key] = model_field
+            data_frame[key] = np.asarray(model_field)
         return pd.DataFrame(data_frame)
     
     def load_topo(self, file_name):
