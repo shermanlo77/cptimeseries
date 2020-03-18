@@ -413,7 +413,7 @@ class DataDualGrid(Data):
             for i in range(len(self.time_array)):
                 interpolator = interpolate.RectBivariateSpline(
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY,
-                    model_field[i,:,:])
+                    np.flip(model_field[i,:,:],0))
                 self.model_field_interpolate_array[key].append(interpolator)
 
 class AnaInterpolate1(Data):
