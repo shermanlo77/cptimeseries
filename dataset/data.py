@@ -346,6 +346,8 @@ class DataDualGrid(Data):
     
     def copy_from(self, other):
         super().copy_from(other)
+        self.model_field_interpolate_array = (
+            other.self.model_field_interpolate_array)
         self.topography_coarse = other.topography_coarse
         self.topography_coarse_normalise = other.topography_coarse_normalise
     
