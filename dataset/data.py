@@ -403,17 +403,19 @@ class DataDualGrid(Data):
     
     def interpolate_model_field(self):
         for key, model_field in self.model_field.items():
-            model_field_interpolate[key] = []
+            self.model_field_interpolate[key] = []
             for i in range(len(self.time_array)):
                 interpolator = interpolate.RectBivariateSpline(
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY,
                     np.flip(model_field[i,:,:], 0))
                 model_field_interpolate_i = interpolator(
                     np.flip(LATITUDE_ARRAY), LONGITUDE_ARRAY)
-                model_field_interpolate_i = np.flip(model_field_interpolate, 0)
-                model_field_interpolate[key].append(model_field_interpolate_i)
-            model_field_interpolate[key] = np.asarray(
-                model_field_interpolate[key])
+                model_field_interpolate_i = np.flip(
+                    model_field_interpolate_i, 0)
+                self.model_field_interpolate[key].append(
+                    model_field_interpolate_i)
+            self.model_field_interpolate[key] = np.asarray(
+                self.model_field_interpolate[key])
 
 class AnaInterpolate1(Data):
     def __init__(self):
