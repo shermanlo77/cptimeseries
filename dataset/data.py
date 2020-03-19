@@ -399,7 +399,7 @@ class DataDualGrid(Data):
                                    LATITUDE_COARSE_ARRAY)))
         file.close()
         self.time_array = [datetime.date(1979, 1, 1)]
-        self.set_model_field_interpolation()
+        self.interpolate_model_field()
     
     def interpolate_model_field(self):
         for key, model_field in self.model_field.items():
