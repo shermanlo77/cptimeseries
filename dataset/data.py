@@ -340,28 +340,22 @@ class DataDualGrid(Data):
     
     def __init__(self):
         super().__init__()
-        self.model_field_interpolate_array = {}
+        self.model_field_interpolate = {}
         self.topography_coarse = {}
         self.topography_coarse_normalise = {}
     
     def copy_from(self, other):
         super().copy_from(other)
-        self.model_field_interpolate_array = (
-            other.model_field_interpolate_array)
+        self.model_field_interpolate = other.model_field_interpolate
         self.topography_coarse = other.topography_coarse
         self.topography_coarse_normalise = other.topography_coarse_normalise
     
     #override
     def get_model_field(self, latitude_index, longitude_index):
         data_frame = {}
-        latitude = LATITUDE_ARRAY[latitude_index]
-        longitude = LONGITUDE_ARRAY[longitude_index]
-        for key, interpolate_array in (
-            self.model_field_interpolate_array.items()):
-            model_field = []
-            for interpolator in interpolate_array:
-                model_field.append(interpolator(latitude, longitude)[0,0])
-            data_frame[key] = np.asarray(model_field)
+        for model_field_name, value in self.model_field_interpolate.items():
+            data_frame[model_field_name] = value[
+                :, latitude_index, longitude_index]
         return pd.DataFrame(data_frame)
     
     def load_topo(self, file_name):
@@ -407,14 +401,19 @@ class DataDualGrid(Data):
         self.time_array = [datetime.date(1979, 1, 1)]
         self.set_model_field_interpolation()
     
-    def set_model_field_interpolation(self):
+    def interpolate_model_field(self):
         for key, model_field in self.model_field.items():
-            self.model_field_interpolate_array[key] = []
+            model_field_interpolate[key] = []
             for i in range(len(self.time_array)):
                 interpolator = interpolate.RectBivariateSpline(
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY,
-                    np.flip(model_field[i,:,:],0))
-                self.model_field_interpolate_array[key].append(interpolator)
+                    np.flip(model_field[i,:,:], 0))
+                model_field_interpolate_i = interpolator(
+                    np.flip(LATITUDE_ARRAY), LONGITUDE_ARRAY)
+                model_field_interpolate_i = np.flip(model_field_interpolate, 0)
+                model_field_interpolate[key].append(model_field_interpolate_i)
+            model_field_interpolate[key] = np.asarray(
+                model_field_interpolate[key])
 
 class AnaInterpolate1(Data):
     def __init__(self):
