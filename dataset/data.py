@@ -61,8 +61,8 @@ class Data(object):
     def load_model_field(self, file_name):
 
         #get model fields data via netcdf4
-        dataset = netCDF4.Dataset(file_name, "r", format="NETCDF4")
-        dataset = dataset.variables
+        dataset_file = netCDF4.Dataset(file_name, "r", format="NETCDF4")
+        dataset = dataset_file.variables
         time_array = dataset["time"]
         time_array = netCDF4.num2date(np.asarray(time_array), time_array.units)
 
@@ -160,6 +160,8 @@ class Data(object):
             if self.model_field[key][0].shape != target_shape:
                 print(key, "does not have shape", target_shape)
                 raise
+        
+        dataset_file.close()
 
     def get_rate(self, model_field, key):
         grad = np.gradient(model_field[key], RESOLUTION, axis=(1,2))
@@ -200,6 +202,8 @@ class Data(object):
                     print("Mask in ", time, "is not consistent")
                     raise
         self.rain = ma.asarray(self.rain)
+
+        rain_data.close()
 
     def load_topo(self, file_name):
         gdal_dataset = gdal.Open(file_name)

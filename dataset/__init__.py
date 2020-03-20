@@ -23,7 +23,7 @@ from dataset.isle_of_man import IsleOfManTraining
 from dataset.london80 import London80
 from dataset.london80 import LondonSimulated80
 
-def init_ana_interpolate():
+def init_ana_interpolate_1():
     ana = data.Data()
     path_here = pathlib.Path(__file__).parent.absolute()
     ana.load_model_field(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "ana_input_1.nc"))
