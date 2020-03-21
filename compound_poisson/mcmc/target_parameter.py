@@ -7,7 +7,7 @@ from scipy import stats
 from compound_poisson.mcmc import target
 
 class TargetParameter(target.Target):
-    
+
     def __init__(self, downscale):
         super().__init__()
         self.downscale = downscale
@@ -20,34 +20,34 @@ class TargetParameter(target.Target):
         self.prior_scale_arma = target.get_parameter_std_prior()
         self.parameter_before = None
         self.arma_index = None
-        
+
         parameter_name_array = self.downscale.get_parameter_vector_name()
         self.prior_mean = target.get_parameter_mean_prior(parameter_name_array)
         self.prior_cov_chol = np.identity(self.area_unmask)
         self.arma_index = target.get_arma_index(parameter_name_array)
-    
+
     def get_n_dim(self):
         return self.n_total_parameter
-    
+
     def get_state(self):
         return self.downscale.get_parameter_vector()
-    
+
     def update_state(self, state):
         self.downscale.set_parameter_vector(state)
         self.downscale.update_all_cp_parameters()
-    
+
     def get_log_likelihood(self):
         return self.downscale.get_log_likelihood()
-    
+
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
-    
+
     def get_log_prior(self):
         z = self.get_state()
         z -= self.prior_mean
-        
+
         ln_prior_term = []
-        
+
         for i in range(self.n_parameter):
             z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
             chol = self.prior_cov_chol
@@ -56,16 +56,16 @@ class TargetParameter(target.Target):
             else:
                 z_i = linalg.lstsq(self.prior_scale_parameter * chol, z_i)[0]
             ln_prior_term.append(-0.5 * np.dot(z_i, z_i))
-        
+
         return (-np.sum(np.log(np.diagonal(self.prior_cov_chol)))
             + np.sum(ln_prior_term))
-    
+
     def save_state(self):
         self.parameter_before = self.get_state()
-    
+
     def revert_state(self):
         self.update_state(self.parameter_before)
-    
+
     def simulate_from_prior(self, rng):
         parameter_vector = self.prior_mean.copy()
         for i in range(self.n_parameter):
@@ -81,7 +81,7 @@ class TargetParameter(target.Target):
         return parameter_vector.flatten()
 
 class TargetPrecision(target.Target):
-    
+
     def __init__(self, parameter_target):
         super().__init__()
         self.parameter_target = parameter_target
@@ -92,34 +92,34 @@ class TargetPrecision(target.Target):
             self.precision.append(prior.mean())
         self.precision = np.asarray(self.precision)
         self.precision_before = None
-    
+
     def get_n_dim(self):
         return len(self.precision)
-    
+
     def get_state(self):
         return self.precision
-    
+
     def update_state(self, state):
         self.precision = state.copy()
-    
+
     def get_log_likelihood(self):
         return self.parameter_target.get_log_prior()
-    
+
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
-    
+
     def get_log_prior(self):
         ln_prior = 0
         for i, prior in enumerate(self.prior):
             ln_prior += prior.logpdf(self.precision[i])
         return ln_prior
-    
+
     def save_state(self):
         self.precision_before = self.precision.copy()
-    
+
     def revert_state(self):
         self.precision = self.precision_before
-    
+
     def simulate_from_prior(self, rng):
         prior_simulate = []
         for prior in self.prior:
@@ -128,52 +128,42 @@ class TargetPrecision(target.Target):
         return np.asarray(prior_simulate)
 
 class TargetGp(target.Target):
-    
+
     def __init__(self, downscale):
         self.parameter_target = downscale.parameter_target
         self.prior_precision = get_gp_precision_prior()
         self.precision = np.asarray([self.prior_precision.mean()])
         self.precision_before = None
-        self.area_unmask = downscale.area_unmask
-        self.square_error = np.zeros((self.area_unmask, self.area_unmask))
-        
-        unmask = np.logical_not(downscale.mask).flatten()
-        for topo_i in downscale.topography_normalise.values():
-            topo_i = topo_i.flatten()
-            topo_i = topo_i[unmask]
-            for i in range(self.area_unmask):
-                for j in range(i+1, self.area_unmask):
-                    self.square_error[i,j] += math.pow(topo_i[i] - topo_i[j], 2)
-                    self.square_error[j,i] = self.square_error[i,j]
-    
+        self.square_error = downscale.square_error
+
     def get_n_dim(self):
         return 1
-    
+
     def get_state(self):
         return self.precision
-    
+
     def update_state(self, state):
         self.precision = state.copy()
-    
+
     def get_log_likelihood(self):
         return self.parameter_target.get_log_prior()
-    
+
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
-    
+
     def get_log_prior(self):
         return self.prior_precision.logpdf(self.precision)[0]
-    
+
     def save_state(self):
         self.precision_before = self.precision.copy()
-    
+
     def revert_state(self):
         self.precision = self.precision_before
-    
+
     def simulate_from_prior(self, rng):
         self.prior_precision.random_state = rng
         return self.prior_precision.rvs()
-    
+
     def get_cov_chol(self):
         cov_chol = self.square_error.copy()
         cov_chol *= - self.precision / 2

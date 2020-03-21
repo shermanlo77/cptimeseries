@@ -5,6 +5,7 @@ from numpy import random
 
 import compound_poisson
 from compound_poisson import mcmc
+from compound_poisson.mcmc import target_model_field
 from compound_poisson.mcmc import target_parameter
 
 class Downscale(object):
@@ -64,6 +65,17 @@ class Downscale(object):
         self.n_sample = 10000
         self.model_field_shift = []
         self.model_field_scale = []
+        self.square_error = np.zeros((self.area_unmask, self.area_unmask))
+
+        #get the square error matrix used for GP
+        unmask = np.logical_not(self.mask).flatten()
+        for topo_i in self.topography_normalise.values():
+            topo_i = topo_i.flatten()
+            topo_i = topo_i[unmask]
+            for i in range(self.area_unmask):
+                for j in range(i+1, self.area_unmask):
+                    self.square_error[i,j] += math.pow(topo_i[i] - topo_i[j], 2)
+                    self.square_error[j,i] = self.square_error[i,j]
 
         #get normalising info for model fields using mean and standard deviation
             #over all space and time
@@ -372,4 +384,16 @@ class DownscaleDual(Downscale):
         super().__init__(data, n_arma)
         self.model_field_coarse = data.model_field
         self.topography_coarse = data.topography_coarse
-        self.topography_normalise = data.topography_coarse_normalise
+        self.topography_coarse_normalise = data.topography_coarse_normalise
+        self.model_field_target = None
+        self.model_field_mcmc = None
+        self.n_coarse = None
+
+        for model_field in self.model_field_coarse.values():
+            self.n_coarse = model_field[0].size
+            break
+
+        self.model_field_target = target_model_field.TargetModelField(self, 0)
+        self.model_field_precision_target = target_model_field.TargetPrecision(
+            self)
+        self.model_field_gp_target = target_model_field.TargetGp(self)
