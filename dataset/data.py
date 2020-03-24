@@ -160,7 +160,7 @@ class Data(object):
             if self.model_field[key][0].shape != target_shape:
                 print(key, "does not have shape", target_shape)
                 raise
-        
+
         dataset_file.close()
 
     def get_rate(self, model_field, key):
@@ -377,10 +377,12 @@ class DataDualGrid(Data):
             self.topography_coarse[key] = np.flip(topo_interpolate, 0)
 
         for key in self.topography:
+            topo_coarse = self.topography_coarse[key]
             topo_fine = self.topography[key]
             shift = np.mean(topo_fine)
             scale = np.std(topo_fine, ddof=1)
-            self.topography_coarse_normalise[key] = (topo_fine - shift) / scale
+            self.topography_coarse_normalise[key] = (
+                (topo_coarse - shift) / scale)
 
     def load_model_field_interpolate_to_coarse(self, file_name):
         super().load_model_field(file_name)

@@ -42,6 +42,20 @@ def main():
         plt.savefig(path.join(figure_dir, model_field + "_mean.pdf"))
         plt.close()
 
+        plt.figure()
+        ax = plt.axes(projection=crs.PlateCarree())
+        if model_field == "air_temperature":
+            im = ax.pcolor(
+                longitude_grid, latitude_grid, value[0], vmin=256, vmax=265)
+        else:
+            im = ax.pcolor(longitude_grid, latitude_grid, value[0])
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.title(model_field + " (" + units + ")")
+        plt.savefig(path.join(figure_dir, model_field + "_0.pdf"))
+        plt.close()
+
     for key, value in data.topography_coarse.items():
         plt.figure()
         ax = plt.axes(projection=crs.PlateCarree())
@@ -51,6 +65,17 @@ def main():
         ax.set_aspect("auto", adjustable=None)
         plt.title(key)
         plt.savefig(path.join(figure_dir, "topo_" + key + ".pdf"))
+        plt.close()
+
+    for key, value in data.topography_coarse_normalise.items():
+        plt.figure()
+        ax = plt.axes(projection=crs.PlateCarree())
+        im = ax.pcolor(longitude_grid, latitude_grid, value)
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.title(key)
+        plt.savefig(path.join(figure_dir, "topo_normalise_" + key + ".pdf"))
         plt.close()
 
 if __name__ == "__main__":

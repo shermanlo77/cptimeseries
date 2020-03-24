@@ -46,6 +46,8 @@ class Downscale(object):
     def __init__(self, data, n_arma=(0,0)):
         self.n_arma = n_arma
         self.time_series_array = []
+        self.time_array = data.time_array
+        self.model_field_units = data.model_field_units
         self.mask = data.mask
         self.parameter_mask_vector = []
         self.n_parameter = None
@@ -108,6 +110,7 @@ class Downscale(object):
                 time_series.rng = self.rng
                 time_series.x_shift = self.model_field_shift
                 time_series.x_scale = self.model_field_scale
+                time_series.time_array = self.time_array
                 time_series_array[lat_i].append(time_series)
                 for i in range(time_series.n_parameter):
                     self.parameter_mask_vector.append(is_mask)
@@ -378,6 +381,9 @@ class Downscale(object):
                 forecast_array[-1].append(forecast)
         return forecast_array
 
+    def __len__(self):
+        return len(self.time_array)
+
 class DownscaleDual(Downscale):
 
     def __init__(self, data, n_arma=(0,0)):
@@ -393,7 +399,25 @@ class DownscaleDual(Downscale):
             self.n_coarse = model_field[0].size
             break
 
-        self.model_field_target = target_model_field.TargetModelField(self, 0)
-        self.model_field_precision_target = target_model_field.TargetPrecision(
-            self)
+        self.model_field_target = []
+        self.model_field_regulariser_target = (
+            target_model_field.TargetRegPrecision(self))
         self.model_field_gp_target = target_model_field.TargetGp(self)
+
+        for i in range(len(self)):
+            self.model_field_target.append(
+                target_model_field.TargetModelField(self, i))
+
+    def update_model_field_gp(self, time_step):
+        """Propagate the GP precision to the parameter prior covariance
+        """
+        self.model_field_target[time_step].prior_cov_chol = (
+            self.model_field_gp_target.cov_chol)
+        self.model_field_target[time_step].update_mean(
+            self.model_field_gp_target)
+
+    def update_model_field_regulariser(self):
+        """Propagate the precision to the parameter prior covariance
+        """
+        precision = self.model_field_regulariser_target.precision
+        self.model_field_gp_target.gp_regulariser = 1 / math.sqrt(precision)
