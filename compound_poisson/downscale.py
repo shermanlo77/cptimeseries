@@ -67,6 +67,7 @@ class Downscale(object):
         self.n_sample = 10000
         self.model_field_shift = []
         self.model_field_scale = []
+        self.n_model_field = len(data.model_field)
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
 
         #get the square error matrix used for GP
