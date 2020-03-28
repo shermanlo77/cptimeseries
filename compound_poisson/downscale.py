@@ -392,15 +392,19 @@ class DownscaleDual(Downscale):
         self.model_field_coarse = data.model_field
         self.topography_coarse = data.topography_coarse
         self.topography_coarse_normalise = data.topography_coarse_normalise
-        self.model_field_target = None
-        self.model_field_mcmc = None
         self.n_coarse = None
+        self.model_field_target = []
+        self.model_field_mcmc = None
+        self.model_field_precision_target = None
+        self.model_field_regulariser_target = None
+        self.model_field_gp_target = None
 
         for model_field in self.model_field_coarse.values():
             self.n_coarse = model_field[0].size
             break
 
-        self.model_field_target = []
+        self.model_field_precision_target = target_model_field.TargetPrecision(
+            self)
         self.model_field_regulariser_target = (
             target_model_field.TargetRegPrecision(self))
         self.model_field_gp_target = target_model_field.TargetGp(self)
@@ -422,3 +426,8 @@ class DownscaleDual(Downscale):
         """
         precision = self.model_field_regulariser_target.precision
         self.model_field_gp_target.gp_regulariser = 1 / math.sqrt(precision)
+
+    def update_model_field_precision(self):
+        precision = self.model_field_precision_target.precision
+        for target in self.model_field_target:
+            target.scale = 1 / math.sqrt(precision)

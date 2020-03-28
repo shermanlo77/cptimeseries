@@ -12,6 +12,7 @@ class TargetModelField(target.Target):
         self.time_step = time_step
         self.prior_mean = None
         self.prior_cov_chol = None
+        self.scale = get_precision_prior().mean()
         self.model_field_shift = []
         self.model_field_scale = []
         self.area_unmask = downscale.area_unmask
@@ -43,6 +44,7 @@ class TargetModelField(target.Target):
             model_field_i *= self.model_field_scale[i]
             model_field_vector[i*self.area_unmask : (i+1)*self.area_unmask] = (
                 model_field_i)
+        model_field_vector *= self.scale
         model_field_vector += self.prior_mean
         return model_field_vector
 
@@ -50,6 +52,17 @@ class TargetRegPrecision(target.Target):
 
     def __init__(self, downscale):
         self.prior = get_regulariser_precision_prior()
+        self.precision = self.prior.mean()
+        self.precision_before = None
+
+    def simulate_from_prior(self, rng):
+        self.prior.random_state = rng
+        return np.asarray(self.prior.rvs())
+
+class TargetPrecision(target.Target):
+
+    def __init__(self, downscale):
+        self.prior = get_precision_prior()
         self.precision = self.prior.mean()
         self.precision_before = None
 
@@ -116,7 +129,7 @@ class TargetGp(target.Target):
         model_field -= shift
         model_field /= scale
         k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
-        mean = np.matmul(k_12.T, linalg.lstsq(k_11, model_field)[0])
+        mean = np.matmul(k_12.T, linalg.lstsq(k_11, model_field, rcond=None)[0])
         mean *= scale
         mean += shift
         return mean
@@ -126,7 +139,7 @@ class TargetGp(target.Target):
         self.regularise_kernel(k_11_chol)
         k_11_chol = linalg.cholesky(k_11_chol)
         k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
-        cov_chol = linalg.lstsq(k_11_chol, k_12)[0]
+        cov_chol = linalg.lstsq(k_11_chol, k_12, rcond=None)[0]
         cov_chol = np.matmul(cov_chol.T, cov_chol)
         cov_chol = self.get_kernel_matrix(self.square_error_fine) - cov_chol
         cov_chol = linalg.cholesky(cov_chol)
@@ -136,9 +149,11 @@ class TargetGp(target.Target):
         for i in range(kernel.shape[0]):
             kernel[i, i] += self.gp_regulariser
 
+def get_precision_prior():
+    return stats.gamma(a=4/3, scale=3)
+
 def get_regulariser_precision_prior():
-    prior = stats.gamma(a=1, scale=0.1)
-    return prior
+    return stats.gamma(a=2, scale=1)
 
 def get_gp_precision_prior():
     return stats.gamma(a=0.72, loc=2.27, scale=8.1)
