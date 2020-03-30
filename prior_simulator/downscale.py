@@ -27,7 +27,16 @@ class PriorSimulator(object):
 
     def simulate(self, precision=None):
         downscale = self.downscale
-        downscale.set_parameter_from_prior()
+        downscale.parameter_gp_target.set_from_prior(self.rng)
+        if not precision is None:
+            downscale.parameter_gp_target.state["gp_precision"] = precision
+        downscale.update_parameter_gp()
+        #cannot use downscale.parameter_target.set_from_prior as this would
+            #require a cp parameter update for all time steps which can cause
+            #numerical problems
+        parameter = downscale.parameter_target.simulate_from_prior(
+            self.rng)
+        downscale.set_parameter_vector(parameter)
         downscale.simulate_i(0)
 
     def print_map(self, data, name, directory, clim=None):
@@ -61,6 +70,7 @@ class PriorSimulator(object):
             os.mkdir(figure_directory)
 
         downscale = self.downscale
+        downscale.update_parameter_gp()
         try:
             for i_simulate in range(self.n_simulate):
                 self.simulate(precision)
@@ -91,7 +101,7 @@ class PriorSimulator(object):
                                figure_directory,
                                [0, 50])
 
-                cov_chol = self.downscale.parameter_target.prior_cov_chol
+                cov_chol = self.downscale.parameter_gp_target.cov_chol
                 cov = np.dot(cov_chol, np.transpose(cov_chol))
                 plt.figure()
                 plt.imshow(cov)
@@ -110,17 +120,6 @@ class PriorGpSimulator(PriorSimulator):
 
     def __init__(self, figure_directory, rng):
         super().__init__(figure_directory, rng)
-
-    def simulate(self, precision):
-        downscale = self.downscale
-        downscale.gp_target.precision = precision
-        downscale.precision_target.precision = (
-            downscale.precision_target.simulate_from_prior(self.rng))
-        downscale.update_reg_gp()
-        downscale.update_reg_precision()
-        parameter = downscale.parameter_target.simulate_from_prior(self.rng)
-        downscale.set_parameter_vector(parameter)
-        downscale.simulate_i(0)
 
     def __call__(self):
         precision_array = np.linspace(2.27, 20, 10)

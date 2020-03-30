@@ -5,8 +5,8 @@ from numpy import random
 
 import compound_poisson
 from compound_poisson import mcmc
+from compound_poisson.mcmc import target_downscale
 from compound_poisson.mcmc import target_model_field
-from compound_poisson.mcmc import target_parameter
 
 class Downscale(object):
     """Collection of multiple TimeSeries object
@@ -59,10 +59,8 @@ class Downscale(object):
         self.area_unmask = np.sum(np.logical_not(self.mask))
         self.rng = random.RandomState()
         self.parameter_target = None
-        self.parameter_precision_target = None
         self.parameter_gp_target = None
         self.parameter_mcmc = None
-        self.parameter_precision_mcmc = None
         self.parameter_gp_mcmc = None
         self.n_sample = 10000
         self.model_field_shift = []
@@ -119,19 +117,18 @@ class Downscale(object):
 
         self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
         self.n_total_parameter = self.area_unmask * self.n_parameter
-        self.set_target()
+        self.parameter_target = target_downscale.TargetParameter(self)
+        self.parameter_gp_target = target_downscale.TargetGp(self)
 
     def fit(self):
         """Fit using Gibbs sampling
         """
         self.initalise_z()
         self.instantiate_mcmc()
-        self.update_reg_gp()
-        self.update_reg_precision()
+        self.update_parameter_gp()
 
         #initial value is a sample
         self.parameter_mcmc.add_to_sample()
-        self.parameter_precision_mcmc.add_to_sample()
         self.parameter_gp_mcmc.add_to_sample()
         self.z_mcmc_add_to_sample()
 
@@ -140,27 +137,18 @@ class Downscale(object):
             print("Sample",i)
             #select random component
             rand = self.rng.rand()
-            if rand < 0.25:
+            if rand < 1/3:
                 self.z_mcmc_step()
                 self.parameter_mcmc.add_to_sample()
-                self.parameter_precision_mcmc.add_to_sample()
                 self.parameter_gp_mcmc.add_to_sample()
-            elif rand < 0.5:
+            elif rand < 2/3:
                 self.parameter_mcmc.step()
-                self.parameter_precision_mcmc.add_to_sample()
-                self.parameter_gp_mcmc.add_to_sample()
-                self.z_mcmc_add_to_sample()
-            elif rand < 0.75:
-                self.parameter_precision_mcmc.step()
-                self.update_reg_precision()
-                self.parameter_mcmc.add_to_sample()
                 self.parameter_gp_mcmc.add_to_sample()
                 self.z_mcmc_add_to_sample()
             else:
                 self.parameter_gp_mcmc.step()
-                self.update_reg_gp()
+                self.update_parameter_gp()
                 self.parameter_mcmc.add_to_sample()
-                self.parameter_precision_mcmc.add_to_sample()
                 self.z_mcmc_add_to_sample()
 
     def z_mcmc_add_to_sample(self):
@@ -168,56 +156,33 @@ class Downscale(object):
 
         For all time_series, add z_array to the sample_array
         """
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    time_series.z_mcmc.add_to_sample()
+        for time_series in self.generate_unmask_time_series():
+            time_series.z_mcmc.add_to_sample()
 
     def z_mcmc_step(self):
         """All time_series sample z
         """
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    time_series.z_mcmc.step()
+        for time_series in self.generate_unmask_time_series():
+            time_series.z_mcmc.step()
 
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
         self.parameter_mcmc = mcmc.Elliptical(self.parameter_target, self.rng)
-        self.parameter_precision_mcmc = mcmc.Rwmh(
-            self.parameter_precision_target, self.rng)
-        self.parameter_precision_mcmc.proposal_covariance_small = 1e-4
         self.parameter_gp_mcmc = mcmc.Rwmh(self.parameter_gp_target, self.rng)
         self.parameter_gp_mcmc.proposal_covariance_small = 1e-4
         #all time series objects instantiate mcmc objects to store the z chain
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    time_series.instantiate_mcmc()
+        for time_series in self.generate_unmask_time_series():
+            time_series.instantiate_mcmc()
 
     def initalise_z(self):
         """Initalise z for all time series
         """
         #all time series initalise z, needed so that the likelihood can be
             #evaluated, eg y=0 if and only if x=0
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    time_series.initalise_z()
+        for time_series in self.generate_unmask_time_series():
+            time_series.initalise_z()
         self.update_all_cp_parameters()
-
-    def set_target(self):
-        """Instantiate target objects
-        """
-        self.parameter_target = target_parameter.TargetParameter(self)
-        self.parameter_precision_target = target_parameter.TargetPrecision(
-            self.parameter_target)
-        self.parameter_gp_target = target_parameter.TargetGp(self)
 
     def set_rng(self, rng):
         """Set rng for all time series
@@ -313,49 +278,21 @@ class Downscale(object):
     def update_all_cp_parameters(self):
         """Update all compound Poisson parameters in all time series
         """
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    time_series.update_all_cp_parameters()
+        for time_series in self.generate_unmask_time_series():
+            time_series.update_all_cp_parameters()
 
-    def set_parameter_from_prior(self):
-        """Set parameter from a sample from the prior
-        """
-        self.parameter_gp_target.precision = (
-            self.parameter_gp_target.simulate_from_prior(self.rng))
-        self.parameter_precision_target.precision = (
-            self.parameter_precision_target.simulate_from_prior(self.rng))
-        self.update_reg_gp()
-        self.update_reg_precision()
-        parameter = self.parameter_target.simulate_from_prior(self.rng)
-        self.set_parameter_vector(parameter)
-
-    def update_reg_gp(self):
+    def update_parameter_gp(self):
         """Propagate the GP precision to the parameter prior covariance
         """
-        cov_chol = self.parameter_gp_target.get_cov_chol()
-        self.parameter_target.prior_cov_chol = cov_chol
-
-    def update_reg_precision(self):
-        """Propagate the precision to the parameter prior covariance
-        """
-        precision = self.parameter_precision_target.precision
-        self.parameter_target.prior_scale_parameter = 1 / math.sqrt(
-            precision[0])
-        self.parameter_target.prior_scale_arma = 1 / math.sqrt(
-            precision[1])
+        self.parameter_gp_target.save_cov_chol()
 
     def get_log_likelihood(self):
         """Return log likelihood
         """
         ln_l_array = []
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    ln_l = time_series.get_joint_log_likelihood()
-                    ln_l_array.append(ln_l)
+        for time_series in self.generate_unmask_time_series():
+            ln_l = time_series.get_joint_log_likelihood()
+            ln_l_array.append(ln_l)
         return np.sum(ln_l_array)
 
     def forecast(self, data, n_simulation):
@@ -382,6 +319,12 @@ class Downscale(object):
                 forecast_array[-1].append(forecast)
         return forecast_array
 
+    def generate_unmask_time_series(self):
+        for lat_i in range(self.shape[0]):
+            for long_i in range(self.shape[1]):
+                if not self.mask[lat_i, long_i]:
+                    yield self.time_series_array[lat_i][long_i]
+
     def __len__(self):
         return len(self.time_array)
 
@@ -395,39 +338,61 @@ class DownscaleDual(Downscale):
         self.n_coarse = None
         self.model_field_target = []
         self.model_field_mcmc = None
-        self.model_field_precision_target = None
-        self.model_field_regulariser_target = None
         self.model_field_gp_target = None
 
         for model_field in self.model_field_coarse.values():
             self.n_coarse = model_field[0].size
             break
 
-        self.model_field_precision_target = target_model_field.TargetPrecision(
-            self)
-        self.model_field_regulariser_target = (
-            target_model_field.TargetRegPrecision(self))
         self.model_field_gp_target = target_model_field.TargetGp(self)
 
         for i in range(len(self)):
             self.model_field_target.append(
                 target_model_field.TargetModelField(self, i))
 
-    def update_model_field_gp(self, time_step):
+    def get_model_field(self, time_step):
+        """Return model field for all unmasked time_series
+
+        Return:
+            vector of length self.n_model_field * self.area_unmask, [0th model
+                field for all unmasked, 1st model field for all unmasked, ...]
+        """
+        model_field = []
+        for model_field_i in range(self.n_model_field):
+            for time_series in self.generate_unmask_time_series():
+                model_field.append(time_series.x[time_step, model_field_i])
+        return np.asarray(model_field)
+
+    def set_model_field(self, model_field_vector, time_step):
+        """Set the model field for all unmasked time_series
+
+        Args:
+            vector of length self.n_model_field * self.area_unmask, [0th model
+                field for all unmasked, 1st model field for all unmasked, ...]
+        """
+        i_counter = 0
+        for model_field_i in range(self.n_model_field):
+            for time_series in self.generate_unmask_time_series():
+                time_series.x[time_step, model_field_i] = model_field_vector[
+                    i_counter]
+                i_counter += 1
+
+    def get_model_field_log_pdf(self):
+        """Return the log pdf of all model fields for all time steps
+        """
+        ln_pdf = []
+        for model_field in self.model_field_target:
+            ln_pdf.append(model_field.get_log_prior())
+        return np.sum(ln_pdf)
+
+    def update_model_field_gp(self):
         """Propagate the GP precision to the parameter prior covariance
         """
-        self.model_field_target[time_step].prior_cov_chol = (
-            self.model_field_gp_target.cov_chol)
+        self.model_field_gp_target.save_cov_chol()
+        for target in self.model_field_target:
+            target.update_mean(self.model_field_gp_target)
+
+    def update_model_field_gp_i(self, time_step):
+        self.model_field_gp_target.save_cov_chol()
         self.model_field_target[time_step].update_mean(
             self.model_field_gp_target)
-
-    def update_model_field_regulariser(self):
-        """Propagate the precision to the parameter prior covariance
-        """
-        precision = self.model_field_regulariser_target.precision
-        self.model_field_gp_target.gp_regulariser = 1 / math.sqrt(precision)
-
-    def update_model_field_precision(self):
-        precision = self.model_field_precision_target.precision
-        for target in self.model_field_target:
-            target.scale = 1 / math.sqrt(precision)

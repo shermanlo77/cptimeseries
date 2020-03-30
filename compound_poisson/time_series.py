@@ -12,7 +12,7 @@ from compound_poisson import terms
 
 class TimeSeries(object):
     """Compound Poisson Time Series with ARMA behaviour
-    
+
     A time series distribued as compound Poisson with dynamic varying
         parameters. Objects from this class can simulate the model and/or fit
         onto provided data or simulated data
@@ -23,7 +23,7 @@ class TimeSeries(object):
     __len__(), __iter__(), __getitem__() and __setitem__() overridden to
         correspond to the array of rainfall
     Subclasses should implement the method fit() to fit the model onto the data
-    
+
     Attributes:
         x: np.array as a design matrix of the model fields, shape
             (n, n_model_field)
@@ -36,7 +36,7 @@ class TimeSeries(object):
             step and parameters for the regressive and ARMA parameters elements
         gamma_mean:  GammaMean containing the parameter at each time step and
             parameters for the regressive and ARMA parameters elements
-        gamma_dispersion:  GammaDispersion containing the parameter at each time 
+        gamma_dispersion:  GammaDispersion containing the parameter at each time
             step and parameters for the regressive and ARMA parameters elements
         n_parameter: number of total (from poisson_rate, gamma_mean,
             gamma_dispersion) reg parameters
@@ -49,8 +49,8 @@ class TimeSeries(object):
         rng: numpy.random.RandomState object
         id: string to identify this time series
     """
-    
-    def __init__(self, 
+
+    def __init__(self,
                  x,
                  rainfall=None,
                  poisson_rate_n_arma=None,
@@ -67,7 +67,7 @@ class TimeSeries(object):
                 -to be used for simulating rainfall
             -x, poisson_rate_n_arma, gamma_mean_n_arma
                 -to be used for simulating rainfall using the default parameters
-        
+
         Args:
             x: design matrix of the model fields, shape (n, n_model_field)
             rainfall: array of rainfall data. If none, all rain is zero
@@ -78,7 +78,7 @@ class TimeSeries(object):
             cp_parameter_array: array containing in order PoissonRate object,
                 GammaMean object, GammaDispersion object
         """
-        
+
         if type(x) is pandas.core.frame.DataFrame:
             self.x = np.asarray(x)
         else:
@@ -87,7 +87,7 @@ class TimeSeries(object):
         self.x_scale = np.std(self.x, 0, ddof=1)
         n = self.x.shape[0]
         self.model_field_name = []
-        
+
         self.time_array = range(n)
         self.n_model_field = self.x.shape[1]
         self.poisson_rate = None
@@ -102,19 +102,19 @@ class TimeSeries(object):
         self.fitted_time_series = None
         self.rng = random.RandomState()
         self.id = None
-        
+
         #name the model fields, or extract from pandas data frame
         if type(x) is pandas.core.frame.DataFrame:
             self.model_field_name = x.columns
         else:
             for i in range(self.n_model_field):
                 self.model_field_name.append("model_field_" + str(i))
-        
+
         if rainfall is None:
             self.y_array = np.zeros(n)
         else:
             self.y_array = rainfall
-        
+
         #initalise parameters if none is provided, all regression parameters to
             #zero, constant is a naive estimate
         if cp_parameter_array is None:
@@ -136,15 +136,15 @@ class TimeSeries(object):
                     poisson_rate_n_arma, gamma_mean_n_arma)
         else:
             self.set_new_parameter(cp_parameter_array)
-    
+
     def initalise_parameters(self, poisson_rate_n_arma, gamma_mean_n_arma):
         """Set the initial parameters
-        
+
         Modifies poisson_rate, gamma_mean, gamma_dispersion and
             cp_parameter_array
         Set the initial parameters to be naive estimates using method of moments
             and y=0 count
-        
+
         Args:
             poisson_rate_n_arma: 2 element array (n_ar, n_ma) for the Poisson
                 rate
@@ -168,10 +168,10 @@ class TimeSeries(object):
         gamma_mean["const"] = math.log(gamma_mean_guess)
         gamma_dispersion["const"] = math.log(gamma_dispersion_guess)
         self.set_new_parameter([poisson_rate, gamma_mean, gamma_dispersion])
-    
+
     def initalise_parameters_given_arma(self):
         """Set the initial parameters (using current number ARMA parameters)
-        
+
         Modifies poisson_rate, gamma_mean, gamma_dispersion and
             cp_parameter_array
         Set the initial parameters to be naive estimates using method of moments
@@ -180,16 +180,16 @@ class TimeSeries(object):
         poisson_rate_n_arma = (self.poisson_rate.n_ar, self.poisson_rate.n_ma)
         gamma_mean_n_arma = (self.gamma_mean.n_ar, self.gamma_mean.n_ma)
         self.initalise_parameters(poisson_rate_n_arma, gamma_mean_n_arma)
-    
+
     def get_normalise_x(self, index):
         """Return a model field vector at a specific time step which is
             normalised to have mean zero, std one along the time axis
         """
         return (self.x[index] - self.x_shift) / self.x_scale
-    
+
     def set_new_parameter(self, cp_parameter_array):
         """Set the member variables of newly instantised cp paramters
-        
+
         Set the member variables of poisson_rate, gamma_mean,
             gamma_dispersion and cp_parameter_array. Itself is assigned as the
             parent to these objects. The reg parameters in these objects are
@@ -208,13 +208,13 @@ class TimeSeries(object):
         for parameter in self.cp_parameter_array:
             for reg in parameter.values():
                 self.n_parameter += reg.shape[0]
-    
+
     def set_parameter(self, cp_parameter_array):
         """Set the member variables of the cp paramters
-        
+
         Set the member variables of poisson_rate, gamma_mean, gamma_dispersion
-            and cp_parameter_array. 
-        
+            and cp_parameter_array.
+
         Args:
             array containing in order: PoissonRate object, GammaMean object,
                 GammaDispersion object
@@ -223,14 +223,14 @@ class TimeSeries(object):
         self.gamma_mean = cp_parameter_array[1]
         self.gamma_dispersion = cp_parameter_array[2]
         self.cp_parameter_array = cp_parameter_array
-    
+
     def copy_parameter(self):
         """Deep copy compound Poisson parameters
-        
+
         Copy the compound Poisson parameters poisson_mean, gamma_mean and
             gamma_dispersion. Deep copies the regression parameters and also
             the value of itself at each time step
-        
+
         Returns:
             array containing in order: poisson_mean, gamma_mean,
                 gamma_dispersion
@@ -239,13 +239,13 @@ class TimeSeries(object):
         for parameter in self.cp_parameter_array:
             cp_parameter_array.append(parameter.copy())
         return cp_parameter_array
-    
+
     def copy_parameter_only_reg(self):
         """Deep copy the regression parameters of compound Poisson parameters
-        
+
         Copy the compound Poisson parameters poisson_mean, gamma_mean and
             gamma_dispersion. Deep copies the regression parameters only
-        
+
         Returns:
             array containing in order: poisson_mean, gamma_mean,
                 gamma_dispersion
@@ -254,7 +254,7 @@ class TimeSeries(object):
         for parameter in self.cp_parameter_array:
             cp_parameter_array.append(parameter.copy_reg())
         return cp_parameter_array
-    
+
     def get_parameter_vector(self):
         """Return the regression parameters as one vector
         """
@@ -264,7 +264,7 @@ class TimeSeries(object):
             parameter_vector = np.concatenate(
                 (parameter_vector, parameter.get_reg_vector()))
         return parameter_vector
-    
+
     def get_parameter_vector_name(self):
         """Return the name of each element of the regression parameter vector
         """
@@ -277,7 +277,7 @@ class TimeSeries(object):
                 else:
                     vector_name.append(self.id + "_" + name)
         return vector_name
-    
+
     def set_parameter_vector(self, parameter_vector):
         """Set the regression parameters using a single vector
         """
@@ -292,10 +292,10 @@ class TimeSeries(object):
                 parameter_vector[
                 parameter_counter:parameter_counter+n_parameter])
             parameter_counter += n_parameter
-        
+
     def simulate_i(self, i):
         """Simulate a time step of the time series
-        
+
         MODIFIES ITSELF
         Because of ARMA behaviour, this method should be called sequentially.
             Modify the member variables poisson_rate, gamma_mean,
@@ -306,10 +306,10 @@ class TimeSeries(object):
         self[i], self.z_array[i] = self.simulate_cp(
             self.poisson_rate[i], self.gamma_mean[i],
             self.gamma_dispersion[i])
-    
+
     def simulate(self):
         """Simulate a whole time series
-        
+
         MODIFIES ITSELF
         Simulate a time series given the model fields self.x and cp parameters.
             Modify the member variables poisson_rate, gamma_mean and
@@ -320,10 +320,10 @@ class TimeSeries(object):
         #simulate n times
         for i in range(len(self)):
             self.simulate_i(i)
-    
+
     def simulate_given_z(self):
         """Return a simulated of a whole time series with given z
-        
+
         MODIFIES ITSELF
         Simulate a time series given the model fields self.x, cp parameters and
             latent variables in self.z_array. Modify the member variables
@@ -337,15 +337,15 @@ class TimeSeries(object):
             #simulate this compound Poisson
             self[i] = self.simulate_cp_given_z(
                 self.z_array[i], self.gamma_mean[i], self.gamma_dispersion[i])
-    
+
     def simulate_cp(self, poisson_rate, gamma_mean, gamma_dispersion):
         """Simulate a single compound poisson random variable
-        
+
         Args:
             poisson_rate: scalar
             gamma_mean: scalar
             gamma_dispersion: scalar
-        
+
         Returns:
             tuple contain vectors of y (compound Poisson random variable) and z
                 (latent Poisson random variable)
@@ -358,12 +358,12 @@ class TimeSeries(object):
 
     def simulate_cp_given_z(self, z, gamma_mean, gamma_dispersion):
         """Simulate a single compound poisson random varible given z
-        
+
         Args:
             z: latent poisson variable
             gamma_mean: mean of the gamma random variable
             gamma_dispersion: dispersion of the gamma random variable
-        
+
         Returns:
             simulated compound Poisson random variable
         """
@@ -371,38 +371,38 @@ class TimeSeries(object):
         scale = gamma_mean * gamma_dispersion #gamma scale parameter
         y = self.rng.gamma(shape, scale=scale) #gamma random variable
         return y
-    
+
     def fit(self):
         """Fit the model onto the data
-        
+
         To be implemented by subclasses
         """
         pass
-    
+
     def update_all_cp_parameters(self):
         """Update all the member variables of the cp variables for all time
         steps
-        
+
         See the method update_cp_parameters(self, index)
         """
         for i in range(len(self)):
             self.update_cp_parameters(i)
-    
+
     def update_cp_parameters(self, index):
         """Update the variables of the cp variables
-        
+
         Updates and modifies the Poisson rate, gamma mean and gama dispersion
             parameters at a given time step
-        
+
         Args:
             index: the time step to update the parameters at
         """
         for parameter in self.cp_parameter_array:
             parameter.update_value_array(index)
-    
+
     def get_joint_log_likelihood(self):
         """Joint log likelihood
-        
+
         Returns the joint log likelihood of the compound Poisson time series
             assuming the latent variable z are observed (via simulation or
             estimating using the E step). Requires the method
@@ -410,8 +410,8 @@ class TimeSeries(object):
             update_cp_parameters(index) for index in range(len(self)) if only a
             few parameters has changed. Note that this is done after calling
             e_step(), thus this method can be called without any prerequisites
-            afer calling e_step(). 
-        
+            afer calling e_step().
+
         Returns:
             log likelihood
         """
@@ -419,10 +419,10 @@ class TimeSeries(object):
         for i in range(len(self)):
             ln_l_array[i] = self.get_joint_log_likelihood_i(i)
         return np.sum(ln_l_array)
-    
+
     def get_em_objective(self):
         """Return M step objective for a single data point
-        
+
         Requires the method update_all_cp_parameters() to be called beforehand
             or update_cp_parameters(index) for index in range(len(self)).
         """
@@ -430,10 +430,10 @@ class TimeSeries(object):
         for i in range(len(self)):
             ln_l_array[i] = self.get_em_objective_i(i)
         return np.sum(ln_l_array)
-    
+
     def get_em_objective_i(self, i):
         """Return M step objective for a single data point
-        
+
         Requires the method update_all_cp_parameters() to be called beforehand
             or update_cp_parameters(index) for index in range(len(self)).
         """
@@ -445,10 +445,10 @@ class TimeSeries(object):
             objective -= (0.5*z_var*special.polygamma(1, z/gamma_dispersion)
                 /math.pow(gamma_dispersion, 2))
         return objective
-    
+
     def get_joint_log_likelihood_i(self, i):
         """Return joint log likelihood for a single data point
-        
+
         Requires the method update_all_cp_parameters() to be called beforehand
             or update_cp_parameters(index) for index in range(len(self)).
         """
@@ -465,10 +465,10 @@ class TimeSeries(object):
             term_array[2] = cp_term.ln_wz(z)
             ln_l += np.sum(term_array)
         return ln_l
-    
+
     def e_step(self):
         """Does the E step of the EM algorithm
-        
+
         Make estimates of the z and updates the poisson rate, gamma mean and
             gamma dispersion parameters for each time step. Modifies the member
             variables z_array, poisson_rate, gamma_mean, and gamma_dispersion
@@ -477,7 +477,7 @@ class TimeSeries(object):
         for i in range(len(self)):
             #update the parameter at this time step
             self.update_cp_parameters(i)
-            
+
             #if the rainfall is zero, then z is zero (it has not rained)
             if self[i] == 0:
                 self.z_array[i] = 0
@@ -494,16 +494,16 @@ class TimeSeries(object):
                 self.z_var_array[i] = (math.exp(
                     sum.ln_sum_w() - normalisation_constant)
                     - math.pow(self.z_array[i],2))
-    
+
     def forecast_self(self, n_simulation):
         """Forecast itself
-        
+
         Forecast itself given its parameters and estimates of z. Use expectation
             of the predictive distribution using Monte Carlo.
-        
+
         Args:
             n_simulation: number of Monte Carlo simulations
-        
+
         Returns:
             forecast: Forecast object
         """
@@ -515,13 +515,13 @@ class TimeSeries(object):
             forecast_array.append(forecast)
         forecast_array.get_forecast()
         return forecast_array
-    
+
     def instantiate_forecast_self(self):
         """Instantiate TimeSeries for forecasting itself
-        
+
         Instantiate TimeSeries object which is a copy of itself. Deep copy the
             parameters and z_array. Soft copy x.
-        
+
         Returns:
             forecast: Forecast object
         """
@@ -534,18 +534,18 @@ class TimeSeries(object):
         forecast.time_array = self.time_array
         forecast.rng = self.rng
         return forecast
-    
+
     def forecast(self, x, n_simulation):
         """Forecast
-        
+
         Forecast itself given its parameters, estimates of z and future model
             fields. Use expectation of the predictive distribution using Monte
             Carlo.
-        
+
         Args:
             x: model fields, np.array, each element for each time step
             n_simulation: number of Monte Carlo simulations
-        
+
         Returns:
             forecast: Forecast object
         """
@@ -557,15 +557,15 @@ class TimeSeries(object):
             forecast_array.append(forecast_i)
         forecast_array.get_forecast()
         return forecast_array
-    
+
     def instantiate_forecast(self, x):
         """Instantiate TimeSeries for simulating the future given the current
             parameters
-        
+
         Instantiate TimeSeries object containing future model fields. Deep copy
             the parameters. This method is used by simulate_future() and
             instantiate_forecast()
-        
+
         Returns:
             forecast: TimeSeries object
         """
@@ -583,21 +583,21 @@ class TimeSeries(object):
         time_diff = last_time - self.time_array[len(self)-2]
         for i in range(len(x)):
             forecast.time_array.append(last_time + (i+1)*time_diff)
-        
+
         return forecast
-    
+
     def cast_arma(self, arma_class):
         """Cast the arma object
-        
+
         Update the member variable arma to be of another type using a provided
             class
-        
+
         Args:
             arma_class: class object, self will be passed into the constructor
         """
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
-    
+
     def __str__(self):
         #return the reg parameters for each cp parameter
         string = ""
@@ -609,15 +609,15 @@ class TimeSeries(object):
             if i != len(self.cp_parameter_array) - 1:
                 string += "\n"
         return string
-    
+
     def __iter__(self):
         return self.y_array.__iter__()
-    
+
     def __len__(self):
         return len(self.y_array)
-    
+
     def __getitem__(self, index):
         return self.y_array[index]
-    
+
     def __setitem__(self, index, value):
         self.y_array[index] = value

@@ -24,21 +24,13 @@ class PriorSimulator(prior_simulator.downscale.PriorSimulator):
 
     def simulate(self, reg_precision=None):
         downscale = self.downscale
-        if reg_precision is None:
-            reg_precision = (downscale.model_field_regulariser_target
-                .simulate_from_prior(self.rng))
-        downscale.model_field_regulariser_target.precision = reg_precision
-        downscale.model_field_gp_target.gp_precision = (
-            downscale.model_field_gp_target.simulate_from_prior(self.rng))
-        downscale.update_model_field_regulariser()
-        downscale.model_field_gp_target.save_cov_chol()
-        downscale.update_model_field_gp(0)
-        downscale.model_field_precision_target.precision = (
-            downscale.model_field_precision_target.simulate_from_prior(self.rng)
-            )
-        downscale.update_model_field_precision()
-        model_field = (downscale.model_field_target[0].
-            simulate_from_prior(self.rng))
+        model_field_gp_target = downscale.model_field_gp_target
+        model_field_gp_target.set_from_prior(self.rng)
+        if not reg_precision is None:
+            model_field_gp_target.state["reg_precision"] = reg_precision
+        downscale.update_model_field_gp_i(0)
+        model_field = (downscale.model_field_target[0]
+            .simulate_from_prior(self.rng))
         return model_field
 
     def print(self, figure_directory=None, reg_precision=None):
@@ -67,10 +59,10 @@ class PriorSimulator(prior_simulator.downscale.PriorSimulator):
                     break
                 except(linalg.LinAlgError):
                     print("Faill")
-                    print("gp precision",
-                          downscale.model_field_gp_target.gp_precision)
+                    gp_target = downscale.model_field_gp_target
+                    print("gp precision", gp_target.state["gp_precision"])
                     print("regulariser",
-                          downscale.model_field_gp_target.gp_regulariser)
+                          1/math.sqrt(gp_target.state["reg_precision"]))
 
     def __call__(self):
         self.print()

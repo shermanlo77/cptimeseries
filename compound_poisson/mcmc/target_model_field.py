@@ -9,15 +9,17 @@ from compound_poisson.mcmc import target
 class TargetModelField(target.Target):
 
     def __init__(self, downscale, time_step):
+        self.downscale = downscale
         self.time_step = time_step
         self.prior_mean = None
-        self.prior_cov_chol = None
-        self.scale = get_precision_prior().mean()
+        self.model_field_gp_target = downscale.model_field_gp_target
         self.model_field_shift = []
         self.model_field_scale = []
         self.area_unmask = downscale.area_unmask
         self.n_model_field = downscale.n_model_field
-        self.prior_mean = np.empty(self.area_unmask * self.n_model_field)
+        self.n_total_parameter = self.area_unmask * self.n_model_field
+
+        self.prior_mean = np.empty(self.n_total_parameter)
         for i, model_field_coarse in enumerate(
             downscale.model_field_coarse.values()):
             self.model_field_shift.append(
@@ -26,6 +28,30 @@ class TargetModelField(target.Target):
                 np.std(model_field_coarse[time_step], ddof=1))
             self.prior_mean[i*self.area_unmask:(i+1)*self.area_unmask] = (
                 self.model_field_shift[i])
+
+    def get_n_dim(self):
+        return self.n_total_parameter
+
+    def get_state(self):
+        return self.downscale.get_model_field(self.time_step)
+
+    def update_state(self, state):
+        self.downscale.set_model_field(state, self.time_step)
+        self.downscale.update_all_cp_parameters()
+
+    def get_log_prior(self):
+        z = self.get_state()
+        z -= self.prior_mean
+        ln_prior_term = []
+        chol = self.model_field_gp_target.cov_chol
+        precision = self.model_field_gp_target.state["precision"]
+        for i in range(self.n_model_field):
+            z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
+            z_i = linalg.lstsq(chol, z_i, rcond=None)[0]
+            ln_prior_term.append(-0.5 * precision * np.dot(z_i, z_i))
+        ln_det_cov = (2*np.sum(np.log(np.diagonal(chol))
+            - self.area_unmask * math.log(precision)))
+        return np.sum(ln_prior_term) - 0.5 * self.n_model_field * ln_det_cov
 
     def update_mean(self, gp_target):
         for i in range(self.n_model_field):
@@ -37,49 +63,34 @@ class TargetModelField(target.Target):
 
     def simulate_from_prior(self, rng):
         model_field_vector = np.empty(self.area_unmask * self.n_model_field)
-
+        scale = 1/math.sqrt(self.model_field_gp_target.state["precision"])
+        cov_chol = self.model_field_gp_target.cov_chol
         for i in range(self.n_model_field):
             model_field_i = np.asarray(rng.normal(size=self.area_unmask))
-            model_field_i = np.matmul(self.prior_cov_chol, model_field_i)
+            model_field_i = np.matmul(cov_chol, model_field_i)
             model_field_i *= self.model_field_scale[i]
             model_field_vector[i*self.area_unmask : (i+1)*self.area_unmask] = (
                 model_field_i)
-        model_field_vector *= self.scale
+        model_field_vector *= scale
         model_field_vector += self.prior_mean
         return model_field_vector
-
-class TargetRegPrecision(target.Target):
-
-    def __init__(self, downscale):
-        self.prior = get_regulariser_precision_prior()
-        self.precision = self.prior.mean()
-        self.precision_before = None
-
-    def simulate_from_prior(self, rng):
-        self.prior.random_state = rng
-        return np.asarray(self.prior.rvs())
-
-class TargetPrecision(target.Target):
-
-    def __init__(self, downscale):
-        self.prior = get_precision_prior()
-        self.precision = self.prior.mean()
-        self.precision_before = None
-
-    def simulate_from_prior(self, rng):
-        self.prior.random_state = rng
-        return np.asarray(self.prior.rvs())
 
 class TargetGp(target.Target):
 
     def __init__(self, downscale):
+        self.downscale = downscale
+        self.prior = {
+            "precision": get_precision_prior(),
+            "gp_precision": target.get_gp_precision_prior(),
+            "reg_precision": get_regulariser_precision_prior(),
+        }
+        self.state = {}
+        self.state_before = None
+
         self.model_field_coarse = downscale.model_field_coarse
         self.topography_coarse = downscale.topography_coarse_normalise
         self.topography = downscale.topography_normalise
-        self.gp_regulariser = get_regulariser_precision_prior().mean()
-        self.gp_prior = get_gp_precision_prior()
-        self.gp_precision = self.gp_prior.mean()
-        self.gp_precision_before = None
+
         self.mask = downscale.mask
         self.square_error_coarse = np.zeros(
             (downscale.n_coarse, downscale.n_coarse))
@@ -87,6 +98,9 @@ class TargetGp(target.Target):
         self.square_error_coarse_fine = np.empty(
             (downscale.n_coarse, downscale.area_unmask))
         self.cov_chol = None
+
+        for key, prior in self.prior.items():
+            self.state[key] = prior.mean()
 
         n_coarse = downscale.n_coarse
 
@@ -109,13 +123,44 @@ class TargetGp(target.Target):
                     self.square_error_coarse_fine[i, j] += math.pow(
                         topo_coarse[i] - topo_fine[j], 2)
 
+    def get_n_dim(self):
+        return len(self.prior)
+
+    def get_state(self):
+        return np.asarray(list(self.state))
+
+    def update_state(self, state):
+        for i, key in enumerate(self.state):
+            self.state[key] = state[i]
+
+    def get_log_likelihood(self):
+        return self.downscale.get_model_field_log_pdf()
+
+    def get_log_target(self):
+        return self.get_log_likelihood() + self.get_log_prior()
+
+    def get_log_prior(self):
+        ln_pdf = []
+        for key, prior in self.prior.items():
+            ln_pdf.append(prior.logpdf(self.state[key]))
+        return np.sum(ln_pdf)
+
+    def save_state(self):
+        self.state_before = self.state.copy()
+
+    def revert_state(self):
+        self.state = self.state_before
+
     def simulate_from_prior(self, rng):
-        self.gp_prior.random_state = rng
-        return np.asarray(self.gp_prior.rvs())
+        prior_simulate = []
+        for prior in self.prior.values():
+            prior.random_state = rng
+            prior_simulate.append(prior.rvs())
+        return np.asarray(prior_simulate)
 
     def get_kernel_matrix(self, square_error):
         kernel_matrix = square_error.copy()
-        kernel_matrix *= -self.gp_precision / 2
+        kernel_matrix *= -self.state["gp_precision"] / 2
         kernel_matrix = np.exp(kernel_matrix)
         return kernel_matrix
 
@@ -146,14 +191,12 @@ class TargetGp(target.Target):
         self.cov_chol = cov_chol
 
     def regularise_kernel(self, kernel):
+        regulariser = 1/math.sqrt(self.state["reg_precision"])
         for i in range(kernel.shape[0]):
-            kernel[i, i] += self.gp_regulariser
+            kernel[i, i] += regulariser
 
 def get_precision_prior():
     return stats.gamma(a=4/3, scale=3)
 
 def get_regulariser_precision_prior():
     return stats.gamma(a=2, scale=1)
-
-def get_gp_precision_prior():
-    return stats.gamma(a=0.72, loc=2.27, scale=8.1)

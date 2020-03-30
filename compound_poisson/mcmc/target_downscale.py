@@ -15,15 +15,11 @@ class TargetParameter(target.Target):
         self.n_total_parameter = downscale.n_total_parameter
         self.area_unmask = downscale.area_unmask
         self.prior_mean = None
-        self.prior_cov_chol = None
-        self.prior_scale_parameter = target.get_parameter_std_prior()
-        self.prior_scale_arma = target.get_parameter_std_prior()
         self.parameter_before = None
         self.arma_index = None
 
         parameter_name_array = self.downscale.get_parameter_vector_name()
         self.prior_mean = target.get_parameter_mean_prior(parameter_name_array)
-        self.prior_cov_chol = np.identity(self.area_unmask)
         self.arma_index = target.get_arma_index(parameter_name_array)
 
     def get_n_dim(self):
@@ -45,20 +41,21 @@ class TargetParameter(target.Target):
     def get_log_prior(self):
         z = self.get_state()
         z -= self.prior_mean
-
         ln_prior_term = []
-
+        gp_target = self.downscale.parameter_gp_target
+        chol = gp_target.cov_chol
         for i in range(self.n_parameter):
             z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
-            chol = self.prior_cov_chol
             if self.arma_index[i*self.area_unmask]:
-                z_i = linalg.lstsq(self.prior_scale_arma * chol, z_i)[0]
+                precision = gp_target.state["precision_arma"]
             else:
-                z_i = linalg.lstsq(self.prior_scale_parameter * chol, z_i)[0]
-            ln_prior_term.append(-0.5 * np.dot(z_i, z_i))
-
-        return (-np.sum(np.log(np.diagonal(self.prior_cov_chol)))
-            + np.sum(ln_prior_term))
+                precision = gp_target.state["precision_reg"]
+            z_i = linalg.lstsq(chol, z_i, rcond=None)[0]
+            ln_det_cov = (2*np.sum(np.log(np.diagonal(chol)))
+                - self.area_unmask * math.log(precision))
+            ln_prior_term.append(
+                -0.5 * (precision * np.dot(z_i, z_i) + ln_det_cov))
+        return np.sum(ln_prior_term)
 
     def save_state(self):
         self.parameter_before = self.get_state()
@@ -68,39 +65,46 @@ class TargetParameter(target.Target):
 
     def simulate_from_prior(self, rng):
         parameter_vector = self.prior_mean.copy()
+        gp_target = self.downscale.parameter_gp_target
+        chol = gp_target.cov_chol
         for i in range(self.n_parameter):
             parameter_i = np.asarray(rng.normal(size=self.area_unmask))
-            chol = self.prior_cov_chol.copy()
-            if self.arma_index[i*self.area_unmask]:
-                chol *= self.prior_scale_arma
-            else:
-                chol *= self.prior_scale_parameter
             parameter_i = np.matmul(chol, parameter_i)
+            if self.arma_index[i*self.area_unmask]:
+                precision = gp_target.state["precision_arma"]
+            else:
+                precision = gp_target.state["precision_reg"]
+            parameter_i *= 1/math.sqrt(precision)
             parameter_vector[i*self.area_unmask : (i+1)*self.area_unmask] += (
                 parameter_i)
-        return parameter_vector.flatten()
+        return parameter_vector
 
-class TargetPrecision(target.Target):
+class TargetGp(target.Target):
 
-    def __init__(self, parameter_target):
+    def __init__(self, downscale):
         super().__init__()
-        self.parameter_target = parameter_target
-        #reg then arma
+        self.parameter_target = downscale.parameter_target
+        self.prior = {}
+        self.state = {}
+        self.square_error = downscale.square_error
+        self.cov_chol = None
+
         self.prior = target.get_precision_prior()
-        self.precision = []
-        for prior in self.prior:
-            self.precision.append(prior.mean())
-        self.precision = np.asarray(self.precision)
-        self.precision_before = None
+        self.prior["gp_precision"] = target.get_gp_precision_prior()
+        for key, prior in self.prior.items():
+            self.state[key] = prior.mean()
+
+        self.state_before = None
 
     def get_n_dim(self):
-        return len(self.precision)
+        return len(self.state)
 
     def get_state(self):
-        return self.precision
+        return list(self.state.values())
 
     def update_state(self, state):
-        self.precision = state.copy()
+        for i, key in enumerate(self.prior):
+            self.state[key] = state[i]
 
     def get_log_likelihood(self):
         return self.parameter_target.get_log_prior()
@@ -110,66 +114,26 @@ class TargetPrecision(target.Target):
 
     def get_log_prior(self):
         ln_prior = 0
-        for i, prior in enumerate(self.prior):
-            ln_prior += prior.logpdf(self.precision[i])
+        for i, key in enumerate(self.prior):
+            ln_prior += self.prior[key].logpdf(self.state[key])
         return ln_prior
 
     def save_state(self):
-        self.precision_before = self.precision.copy()
+        self.state_before = self.state_copy()
 
     def revert_state(self):
-        self.precision = self.precision_before
+        self.state = self.state_before
 
     def simulate_from_prior(self, rng):
         prior_simulate = []
-        for prior in self.prior:
+        for prior in self.prior.values():
             prior.random_state = rng
             prior_simulate.append(prior.rvs())
         return np.asarray(prior_simulate)
 
-class TargetGp(target.Target):
-
-    def __init__(self, downscale):
-        self.parameter_target = downscale.parameter_target
-        self.prior_precision = get_gp_precision_prior()
-        self.precision = np.asarray([self.prior_precision.mean()])
-        self.precision_before = None
-        self.square_error = downscale.square_error
-
-    def get_n_dim(self):
-        return 1
-
-    def get_state(self):
-        return self.precision
-
-    def update_state(self, state):
-        self.precision = state.copy()
-
-    def get_log_likelihood(self):
-        return self.parameter_target.get_log_prior()
-
-    def get_log_target(self):
-        return self.get_log_likelihood() + self.get_log_prior()
-
-    def get_log_prior(self):
-        return self.prior_precision.logpdf(self.precision)[0]
-
-    def save_state(self):
-        self.precision_before = self.precision.copy()
-
-    def revert_state(self):
-        self.precision = self.precision_before
-
-    def simulate_from_prior(self, rng):
-        self.prior_precision.random_state = rng
-        return self.prior_precision.rvs()
-
-    def get_cov_chol(self):
+    def save_cov_chol(self):
         cov_chol = self.square_error.copy()
-        cov_chol *= - self.precision / 2
+        cov_chol *= -self.state["gp_precision"] / 2
         cov_chol = np.exp(cov_chol)
         cov_chol = linalg.cholesky(cov_chol)
-        return cov_chol
-
-def get_gp_precision_prior():
-    return stats.gamma(a=0.72, loc=2.27, scale=8.1)
+        self.cov_chol = cov_chol
