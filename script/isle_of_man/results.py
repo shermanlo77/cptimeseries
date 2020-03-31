@@ -31,28 +31,19 @@ def main():
         plt.savefig(path.join(chain_dir, "parameter_" + str(i) + ".pdf"))
         plt.close()
 
-    chain = np.asarray(downscale.parameter_precision_mcmc.sample_array)
-    for i in range(chain.shape[1]):
+    chain = np.asarray(downscale.parameter_gp_mcmc.sample_array)
+    key = downscale.parameter_gp_target.state.keys()
+    for i, key in enumerate(downscale.parameter_gp_target.state):
         chain_i = chain[:, i]
         plt.plot(chain_i)
         plt.xlabel("sample number")
-        plt.ylabel("parameter precision " + str(i))
-        plt.savefig(path.join(chain_dir, "precision_" + str(i) + ".pdf"))
+        plt.ylabel(key)
+        plt.savefig(path.join(chain_dir, key + ".pdf"))
         plt.close()
 
-    chain = np.asarray(downscale.parameter_gp_mcmc.sample_array)
-    plt.plot(chain)
-    plt.xlabel("sample number")
-    plt.ylabel("gp precision")
-    plt.savefig(path.join(chain_dir, "gp_precision.pdf"))
-    plt.close()
-
     chain = []
-    for lat_i in range(downscale.shape[0]):
-        for long_i in range(downscale.shape[1]):
-            if not downscale.mask[lat_i, long_i]:
-                time_series = downscale.time_series_array[lat_i][long_i]
-                chain.append(np.mean(time_series.z_mcmc.sample_array, 1))
+    for time_series in downscale.generate_unmask_time_series():
+        chain.append(np.mean(time_series.z_mcmc.sample_array, 1))
     plt.plot(np.transpose(np.asarray(chain)))
     plt.xlabel("sample number")
     plt.ylabel("mean z")

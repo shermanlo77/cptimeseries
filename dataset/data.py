@@ -420,10 +420,10 @@ class AnaInterpolate1(Data):
     def __init__(self):
         super().__init__()
         path_here = pathlib.Path(__file__).parent.absolute()
-        self.copy_from(joblib.load(path.join(path_here, self.__class__.__name__ +".gz")))
+        self.copy_from(joblib.load(path.join(path_here, AnaInterpolate1.__name__ +".gz")))
 
 class AnaDualExample1(DataDualGrid):
     def __init__(self):
         super().__init__()
         path_here = pathlib.Path(__file__).parent.absolute()
-        self.copy_from(joblib.load(path.join(path_here, self.__class__.__name__ +".gz")))
+        self.copy_from(joblib.load(path.join(path_here, AnaDualExample1.__name__ +".gz")))

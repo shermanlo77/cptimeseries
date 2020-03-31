@@ -100,7 +100,7 @@ class TargetGp(target.Target):
         return len(self.state)
 
     def get_state(self):
-        return list(self.state.values())
+        return np.asarray(list(self.state.values()))
 
     def update_state(self, state):
         for i, key in enumerate(self.prior):
@@ -119,7 +119,7 @@ class TargetGp(target.Target):
         return ln_prior
 
     def save_state(self):
-        self.state_before = self.state_copy()
+        self.state_before = self.state.copy()
 
     def revert_state(self):
         self.state = self.state_before
