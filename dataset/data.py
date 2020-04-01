@@ -356,10 +356,10 @@ class Data(object):
 class DataDualGrid(Data):
 
     def __init__(self):
-        super().__init__()
         self.model_field_interpolate = {}
         self.topography_coarse = {}
         self.topography_coarse_normalise = {}
+        super().__init__()
 
     def copy_from(self, other):
         super().copy_from(other)

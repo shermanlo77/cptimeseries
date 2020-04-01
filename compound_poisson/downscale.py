@@ -336,7 +336,7 @@ class DownscaleDual(Downscale):
         self.topography_coarse = data.topography_coarse
         self.topography_coarse_normalise = data.topography_coarse_normalise
         self.n_coarse = None
-        self.model_field_target = []
+        self.model_field_target = None
         self.model_field_mcmc = None
         self.model_field_gp_target = None
 
@@ -345,10 +345,7 @@ class DownscaleDual(Downscale):
             break
 
         self.model_field_gp_target = target_model_field.TargetGp(self)
-
-        for i in range(len(self)):
-            self.model_field_target.append(
-                target_model_field.TargetModelField(self, i))
+        self.model_field_target = target_model_field.TargetModelFieldArray(self)
 
     def get_model_field(self, time_step):
         """Return model field for all unmasked time_series
@@ -389,10 +386,8 @@ class DownscaleDual(Downscale):
         """Propagate the GP precision to the parameter prior covariance
         """
         self.model_field_gp_target.save_cov_chol()
-        for target in self.model_field_target:
-            target.update_mean(self.model_field_gp_target)
+        self.model_field_target.update_mean()
 
     def update_model_field_gp_i(self, time_step):
         self.model_field_gp_target.save_cov_chol()
-        self.model_field_target[time_step].update_mean(
-            self.model_field_gp_target)
+        self.model_field_target[time_step].update_mean()

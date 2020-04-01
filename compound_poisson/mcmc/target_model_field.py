@@ -53,7 +53,8 @@ class TargetModelField(target.Target):
             - self.area_unmask * math.log(precision)))
         return np.sum(ln_prior_term) - 0.5 * self.n_model_field * ln_det_cov
 
-    def update_mean(self, gp_target):
+    def update_mean(self):
+        gp_target = self.downscale.model_field_gp_target
         for i in range(self.n_model_field):
             self.prior_mean[i*self.area_unmask:(i+1)*self.area_unmask] = (
                 gp_target.get_mean(i,
@@ -74,6 +75,67 @@ class TargetModelField(target.Target):
         model_field_vector *= scale
         model_field_vector += self.prior_mean
         return model_field_vector
+
+class TargetModelFieldArray(target.Target):
+
+    def __init__(self, downscale):
+        self.downscale = downscale
+        self.model_field_target_array = []
+        self.area_unmask = downscale.area_unmask
+        self.n_model_field = downscale.n_model_field
+        self.n_parameter_i = self.area_unmask * self.n_model_field
+
+        for i in range(len(downscale)):
+            self.model_field_target_array.append(TargetModelField(downscale, i))
+
+    def get_n_dim(self):
+        n_parameter = 0
+        for target in self:
+            n_parameter += target.get_n_dim()
+        return n_total_parameter
+
+    def get_state(self):
+        state = []
+        for target in self:
+            state.append(target.get_state())
+        state = np.concatenate(state)
+        return state
+
+    def update_state(self, state):
+        for time_step, target in enumerate(self):
+            state_i = state[i*self.n_parameter_i : (i+1)*self.n_parameter_i]
+            self.downscale.set_model_field(state_i, time_step)
+        self.downscale.update_all_cp_parameters()
+
+    def get_log_prior(self):
+        ln_l = []
+        for target in self:
+            ln_l.append(target.get_log_prior())
+        ln_l = np.sum(ln_l)
+        return ln_l
+
+    def update_mean(self):
+        for target in self:
+            target.update_mean()
+
+    def simulate_from_prior(self, rng):
+        state = []
+        for target in self:
+            state.append(target.simulate_from_prior(rng))
+        state = np.concatenate(state)
+        return state
+
+    def __iter__(self):
+        return iter(self.model_field_target_array)
+
+    def __len__(self):
+        return len(self.model_field_target_array)
+
+    def __getitem__(self, index):
+        return self.model_field_target_array[index]
+
+    def __setitem__(self, index, value):
+        self.model_field_target_array[index] = value
 
 class TargetGp(target.Target):
 
