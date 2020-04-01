@@ -7,6 +7,7 @@ import compound_poisson
 from compound_poisson import mcmc
 from compound_poisson.mcmc import target_downscale
 from compound_poisson.mcmc import target_model_field
+from compound_poisson import time_series_mcmc
 
 class Downscale(object):
     """Collection of multiple TimeSeries object
@@ -99,11 +100,11 @@ class Downscale(object):
                 x_i, rain_i = data.get_data(lat_i, long_i)
                 is_mask = self.mask[lat_i, long_i]
                 if is_mask:
-                    time_series = compound_poisson.TimeSeriesSlice(
+                    time_series = TimeSeriesDownscale(
                         x_i, poisson_rate_n_arma=n_arma,
                         gamma_mean_n_arma=n_arma)
                 else:
-                    time_series = compound_poisson.TimeSeriesSlice(
+                    time_series = TimeSeriesDownscale(
                         x_i, rain_i.data, n_arma, n_arma)
                 time_series.id = str(lat_i) + "_" + str(long_i)
                 time_series.rng = self.rng
@@ -391,3 +392,17 @@ class DownscaleDual(Downscale):
     def update_model_field_gp_i(self, time_step):
         self.model_field_gp_target.save_cov_chol()
         self.model_field_target[time_step].update_mean()
+
+class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
+
+    def __init__(self,
+                 x,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
+        super().__init__(x,
+                         rainfall,
+                         poisson_rate_n_arma,
+                         gamma_mean_n_arma,
+                         cp_parameter_array)
