@@ -33,7 +33,7 @@ GRAVITATIONAL_FIELD_STRENGTH = 9.81
 
 class Data(object):
 
-    def __init__(self):
+    def __init__(self, path_to_storage=None):
         self.model_field = {}
         self.model_field_units = {}
         self.rain = []
@@ -43,10 +43,21 @@ class Data(object):
         self.topography = {}
         self.topography_normalise = {}
 
-        longitude_grid, latitude_grid = np.meshgrid(
-            LONGITUDE_ARRAY, LATITUDE_ARRAY)
-        self.topography["longitude"] = longitude_grid
-        self.topography["latitude"] = latitude_grid
+        if path_to_storage is None:
+            path_to_storage = pathlib.Path(__file__).parent.absolute()
+        storage_file =  path.join(
+            path_to_storage, self.__class__.__name__+".gz")
+        if path.isfile(storage_file):
+            print("Loading", storage_file)
+            self.copy_from(joblib.load(storage_file))
+        else:
+            longitude_grid, latitude_grid = np.meshgrid(
+                LONGITUDE_ARRAY, LATITUDE_ARRAY)
+            self.topography["longitude"] = longitude_grid
+            self.topography["latitude"] = latitude_grid
+            self.load_data()
+            print("Saving", storage_file)
+            joblib.dump(self, storage_file)
 
     def copy_from(self, other):
         self.model_field = other.model_field
@@ -57,6 +68,9 @@ class Data(object):
         self.time_array = other.time_array
         self.topography = other.topography
         self.topography_normalise = other.topography_normalise
+
+    def load_data(self):
+        raise NotImplementedError()
 
     def load_model_field(self, file_name):
 
@@ -417,13 +431,23 @@ class DataDualGrid(Data):
                 self.model_field_interpolate[key])
 
 class AnaInterpolate1(Data):
+
     def __init__(self):
         super().__init__()
+
+    def load_data(self):
         path_here = pathlib.Path(__file__).parent.absolute()
-        self.copy_from(joblib.load(path.join(path_here, AnaInterpolate1.__name__ +".gz")))
+        self.load_model_field(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "ana_input_1.nc"))
+        self.load_rain(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
+        self.load_topo(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "topo_0.1_degree.grib"))
 
 class AnaDualExample1(DataDualGrid):
+
     def __init__(self):
         super().__init__()
+
+    def load_data(self):
         path_here = pathlib.Path(__file__).parent.absolute()
-        self.copy_from(joblib.load(path.join(path_here, AnaDualExample1.__name__ +".gz")))
+        self.load_model_field_interpolate_to_coarse(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "ana_input_1.nc"))
+        self.load_rain(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
+        self.load_topo(path.join(path_here, "..", "Data", "Rain_Data_Nov19", "topo_0.1_degree.grib"))

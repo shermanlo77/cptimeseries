@@ -1,5 +1,6 @@
 import os
 from os import path
+import pathlib
 
 import numpy as np
 from numpy import random
@@ -9,15 +10,32 @@ from compound_poisson import parameter
 import dataset
 
 class London80(object):
-    
+
     def __init__(self):
         self.training_range = range(0, 3653)
         self.test_range = range(3653, 4018)
         self.model_field = None
         self.rain = None
         self.time_array = None
-        self.load_data()
-    
+
+        path_to_storage = pathlib.Path(__file__).parent.absolute()
+        storage_file =  path.join(
+            path_to_storage, self.__class__.__name__+".gz")
+        if path.isfile(storage_file):
+            print("Loading", storage_file)
+            self.copy_from(joblib.load(storage_file))
+        else:
+            self.load_data()
+            print("Saving", storage_file)
+            joblib.dump(self, storage_file)
+
+    def copy_from(self, other):
+        self.training_range = other.training_range
+        self.test_range = other.test_range
+        self.model_field = other.model_field
+        self.rain = other.rain
+        self.time_array = other.time_array
+
     def load_data(self):
         dir_path = path.dirname(path.realpath(__file__))
         data = dataset.AnaInterpolate1()
@@ -25,39 +43,43 @@ class London80(object):
         model_field, rain = data.get_data_city("London")
         self.model_field = model_field.copy()
         self.rain = rain.copy()
-    
+
     def get_data_training(self):
         return self.get_model_field_training(), self.get_rain_training()
-    
+
     def get_data_test(self):
         return self.get_model_field_test(), self.get_rain_test()
-    
+
     def get_model_field_training(self):
         return self.model_field[
             self.training_range.start : self.training_range.stop]
-    
+
     def get_model_field_test(self):
         return self.model_field[self.test_range.start : self.test_range.stop]
-    
+
     def get_rain_training(self):
         return self.rain[self.training_range.start : self.training_range.stop]
-    
+
     def get_rain_test(self):
         return self.rain[self.test_range.start : self.test_range.stop]
-    
+
     def get_time_training(self):
         return self.time_array[
             self.training_range.start : self.training_range.stop]
-    
+
     def get_time_test(self):
         return self.time_array[self.test_range.start : self.test_range.stop]
-    
+
 class LondonSimulated80(London80):
-    
+
     def __init__(self):
         self.time_series = None
         super().__init__()
-    
+
+    def copy_from(self, other):
+        super().copy_from(other)
+        self.time_series = other.time_series
+
     def load_data(self):
         super().load_data()
         rng = random.RandomState(np.uint32(3667413888))
@@ -95,7 +117,7 @@ class LondonSimulated80(London80):
         ])
         gamma_mean['reg'] = np.asarray([
             -0.09376735,
-            -0.01028988, 
+            -0.01028988,
             0.02133337,
             0.15878673,
             -0.15329763,
@@ -131,7 +153,7 @@ class LondonSimulated80(London80):
             -0.13569733,
         ])
         gamma_dispersion['const'] = np.asarray([-0.26056112])
-        
+
         self.time_series = compound_poisson.TimeSeries(
             self.model_field, cp_parameter_array=cp_parameter_array)
         self.time_series.rng = rng
