@@ -356,24 +356,16 @@ class Data(object):
 class DataDualGrid(Data):
 
     def __init__(self):
-        self.model_field_interpolate = {}
+        self.model_field_coarse = {}
         self.topography_coarse = {}
         self.topography_coarse_normalise = {}
         super().__init__()
 
     def copy_from(self, other):
         super().copy_from(other)
-        self.model_field_interpolate = other.model_field_interpolate
+        self.model_field_coarse = other.model_field_coarse
         self.topography_coarse = other.topography_coarse
         self.topography_coarse_normalise = other.topography_coarse_normalise
-
-    #override
-    def get_model_field(self, latitude_index, longitude_index):
-        data_frame = {}
-        for model_field_name, value in self.model_field_interpolate.items():
-            data_frame[model_field_name] = value[
-                :, latitude_index, longitude_index]
-        return pd.DataFrame(data_frame)
 
     def load_topo(self, file_name):
         super().load_topo(file_name)
@@ -400,9 +392,9 @@ class DataDualGrid(Data):
 
     def load_model_field_interpolate_to_coarse(self, file_name):
         super().load_model_field(file_name)
-        self.model_field_interpolate = self.model_field.copy()
-        self.model_field = {}
-        for key, model_field in self.model_field_interpolate.items():
+        self.model_field = self.model_field.copy()
+        self.model_field_coarse = {}
+        for key, model_field in self.model_field.items():
             model_field_coarse = []
             for i in range(len(self.time_array)):
                 interpolator = interpolate.RectBivariateSpline(
@@ -412,11 +404,11 @@ class DataDualGrid(Data):
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY)
                 model_field_interpolate = np.flip(model_field_interpolate, 0)
                 model_field_coarse.append(model_field_interpolate)
-            self.model_field[key] = model_field_coarse
+            self.model_field_coarse[key] = model_field_coarse
 
     def interpolate_model_field(self):
-        for key, model_field in self.model_field.items():
-            self.model_field_interpolate[key] = []
+        for key, model_field in self.model_field_coarse.items():
+            self.model_field[key] = []
             for i in range(len(self.time_array)):
                 interpolator = interpolate.RectBivariateSpline(
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY,
@@ -425,10 +417,8 @@ class DataDualGrid(Data):
                     np.flip(LATITUDE_ARRAY), LONGITUDE_ARRAY)
                 model_field_interpolate_i = np.flip(
                     model_field_interpolate_i, 0)
-                self.model_field_interpolate[key].append(
-                    model_field_interpolate_i)
-            self.model_field_interpolate[key] = np.asarray(
-                self.model_field_interpolate[key])
+                self.model_field[key].append(model_field_interpolate_i)
+            self.model_field[key] = np.asarray(self.model_field[key])
 
 class AnaInterpolate1(Data):
 

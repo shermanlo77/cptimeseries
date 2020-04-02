@@ -92,7 +92,7 @@ class TargetModelFieldArray(target.Target):
         n_parameter = 0
         for target in self:
             n_parameter += target.get_n_dim()
-        return n_total_parameter
+        return n_parameter
 
     def get_state(self):
         state = []
@@ -107,12 +107,20 @@ class TargetModelFieldArray(target.Target):
             self.downscale.set_model_field(state_i, time_step)
         self.downscale.update_all_cp_parameters()
 
+    def get_log_likelihood(self):
+        return self.downscale.get_log_likelihood()
+
     def get_log_prior(self):
         ln_l = []
         for target in self:
             ln_l.append(target.get_log_prior())
         ln_l = np.sum(ln_l)
         return ln_l
+
+    def get_log_target(self):
+        """Return the log target distribution (posterior distribution)
+        """
+        return self.get_log_likelihood() + self.get_log_prior()
 
     def update_mean(self):
         for target in self:
@@ -189,14 +197,14 @@ class TargetGp(target.Target):
         return len(self.prior)
 
     def get_state(self):
-        return np.asarray(list(self.state))
+        return np.asarray(list(self.state.values()))
 
     def update_state(self, state):
         for i, key in enumerate(self.state):
             self.state[key] = state[i]
 
     def get_log_likelihood(self):
-        return self.downscale.get_model_field_log_pdf()
+        return self.downscale.model_field_target.get_log_prior()
 
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()

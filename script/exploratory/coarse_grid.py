@@ -26,7 +26,7 @@ def main():
     longitude_grid = data.topography_coarse["longitude"]
 
     #for each model field
-    for model_field, value in data.model_field.items():
+    for model_field, value in data.model_field_coarse.items():
 
         model_field_mean = np.mean(value, 0)
         units = data.model_field_units[model_field]

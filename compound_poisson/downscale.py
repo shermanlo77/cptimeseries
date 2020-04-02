@@ -333,13 +333,13 @@ class DownscaleDual(Downscale):
 
     def __init__(self, data, n_arma=(0,0)):
         super().__init__(data, n_arma)
-        self.model_field_coarse = data.model_field
-        self.topography_coarse = data.topography_coarse
+        self.model_field_coarse = data.model_field_coarse
         self.topography_coarse_normalise = data.topography_coarse_normalise
         self.n_coarse = None
         self.model_field_target = None
         self.model_field_mcmc = None
         self.model_field_gp_target = None
+        self.model_field_gp_mcmc = None
 
         for model_field in self.model_field_coarse.values():
             self.n_coarse = model_field[0].size
@@ -347,6 +347,69 @@ class DownscaleDual(Downscale):
 
         self.model_field_gp_target = target_model_field.TargetGp(self)
         self.model_field_target = target_model_field.TargetModelFieldArray(self)
+
+    def fit(self):
+        """Fit using Gibbs sampling
+        """
+        self.initalise_z()
+        self.instantiate_mcmc()
+        self.update_parameter_gp()
+        self.update_model_field_gp()
+
+        #initial value is a sample
+        self.parameter_mcmc.add_to_sample()
+        self.parameter_gp_mcmc.add_to_sample()
+        self.model_field_mcmc.add_to_sample()
+        self.model_field_gp_mcmc.add_to_sample()
+        self.z_mcmc_add_to_sample()
+
+        #Gibbs sampling
+        for i in range(self.n_sample):
+            print("Sample",i)
+            #select random component
+            rand = self.rng.rand()
+            if rand < 1/5:
+                self.z_mcmc_step()
+                self.parameter_mcmc.add_to_sample()
+                self.parameter_gp_mcmc.add_to_sample()
+                self.model_field_mcmc.add_to_sample()
+                self.model_field_gp_mcmc.add_to_sample()
+            elif rand < 2/5:
+                self.parameter_mcmc.step()
+                self.parameter_gp_mcmc.add_to_sample()
+                self.z_mcmc_add_to_sample()
+                self.model_field_mcmc.add_to_sample()
+                self.model_field_gp_mcmc.add_to_sample()
+            elif rand < 3/5:
+                self.parameter_gp_mcmc.step()
+                self.update_parameter_gp()
+                self.parameter_mcmc.add_to_sample()
+                self.z_mcmc_add_to_sample()
+                self.model_field_mcmc.add_to_sample()
+                self.model_field_gp_mcmc.add_to_sample()
+            elif rand < 4/5:
+                self.model_field_mcmc.step()
+                self.z_mcmc_add_to_sample()
+                self.parameter_mcmc.add_to_sample()
+                self.parameter_gp_mcmc.add_to_sample()
+                self.model_field_gp_mcmc.add_to_sample()
+            else:
+                self.model_field_gp_mcmc.step()
+                self.update_model_field_gp()
+                self.model_field_mcmc.add_to_sample()
+                self.z_mcmc_add_to_sample()
+                self.parameter_mcmc.add_to_sample()
+                self.parameter_gp_mcmc.add_to_sample()
+
+    def instantiate_mcmc(self):
+        """Instantiate MCMC objects
+        """
+        super().instantiate_mcmc()
+        self.model_field_mcmc = mcmc.Elliptical(
+            self.model_field_target, self.rng)
+        self.model_field_gp_mcmc = mcmc.Rwmh(
+            self.model_field_gp_target, self.rng)
+        self.model_field_gp_mcmc.proposal_covariance_small = 1e-4
 
     def get_model_field(self, time_step):
         """Return model field for all unmasked time_series
@@ -374,14 +437,6 @@ class DownscaleDual(Downscale):
                 time_series.x[time_step, model_field_i] = model_field_vector[
                     i_counter]
                 i_counter += 1
-
-    def get_model_field_log_pdf(self):
-        """Return the log pdf of all model fields for all time steps
-        """
-        ln_pdf = []
-        for model_field in self.model_field_target:
-            ln_pdf.append(model_field.get_log_prior())
-        return np.sum(ln_pdf)
 
     def update_model_field_gp(self):
         """Propagate the GP precision to the parameter prior covariance
