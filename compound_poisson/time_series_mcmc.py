@@ -288,8 +288,8 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         Override - Sample the precision from the prior and then sample the
             parameter from the prior
         """
-        prior_precision = self.precision_target.simulate_from_prior(self.rng)
-        self.update_precision()
+        self.precision_target.set_from_prior(self.rng)
+        self.precision_target.prograte_precision()
         return super().simulate_parameter_from_prior()
 
     def print_chain_property(self, directory):

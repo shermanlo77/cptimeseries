@@ -178,7 +178,7 @@ class TargetPrecision(target.Target):
 
     def simulate_from_prior(self, rng):
         prior_simulate = []
-        for prior in self.prior:
+        for prior in self.prior.values():
             prior.random_state = rng
             prior_simulate.append(prior.rvs())
         return np.asarray(prior_simulate)

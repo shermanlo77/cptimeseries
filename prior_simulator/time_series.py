@@ -142,7 +142,7 @@ class PriorRegSimulator(PriorSimulator):
         return time_series
 
     def get_hyper_time_series(self, x):
-        prior = self.get_precision_prior()[0]
+        prior = self.get_precision_prior()["precision_reg"]
         prior.random_state = self.rng
         precision = prior.rvs()
         prior_std = 1 / math.sqrt(precision)
@@ -188,7 +188,7 @@ class PriorArmaSimulator(PriorRegSimulator):
         self.parameter_index = np.asarray(self.parameter_index)
 
     def get_hyper_time_series(self, x):
-        prior = self.get_precision_prior()[1]
+        prior = self.get_precision_prior()["precision_arma"]
         prior.random_state = self.rng
         precision = prior.rvs()
         prior_std = 1 / math.sqrt(precision)
