@@ -12,7 +12,6 @@ class TargetModelField(target.Target):
         self.downscale = downscale
         self.time_step = time_step
         self.prior_mean = None
-        self.model_field_gp_target = downscale.model_field_gp_target
         self.model_field_shift = []
         self.model_field_scale = []
         self.area_unmask = downscale.area_unmask
@@ -40,11 +39,12 @@ class TargetModelField(target.Target):
         self.downscale.update_all_cp_parameters()
 
     def get_log_prior(self):
+        gp_target = self.downscale.model_field_gp_target
         z = self.get_state()
         z -= self.prior_mean
         ln_prior_term = []
-        chol = self.model_field_gp_target.cov_chol
-        precision = self.model_field_gp_target.state["precision"]
+        chol = gp_target.cov_chol
+        precision = gp_target.state["precision"]
         for i in range(self.n_model_field):
             z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
             z_i = linalg.lstsq(chol, z_i, rcond=None)[0]
@@ -62,10 +62,14 @@ class TargetModelField(target.Target):
                                    self.model_field_shift[i],
                                    self.model_field_scale[i]))
 
+    def set_mean(self, mean):
+        self.prior_mean = mean
+
     def simulate_from_prior(self, rng):
+        gp_target = self.downscale.model_field_gp_target
         model_field_vector = np.empty(self.area_unmask * self.n_model_field)
-        scale = 1/math.sqrt(self.model_field_gp_target.state["precision"])
-        cov_chol = self.model_field_gp_target.cov_chol
+        scale = 1/math.sqrt(gp_target.state["precision"])
+        cov_chol = gp_target.cov_chol
         for i in range(self.n_model_field):
             model_field_i = np.asarray(rng.normal(size=self.area_unmask))
             model_field_i = np.matmul(cov_chol, model_field_i)
@@ -75,6 +79,9 @@ class TargetModelField(target.Target):
         model_field_vector *= scale
         model_field_vector += self.prior_mean
         return model_field_vector
+
+    def get_prior_mean(self):
+        return self.prior_mean
 
 class TargetModelFieldArray(target.Target):
 
@@ -102,9 +109,9 @@ class TargetModelFieldArray(target.Target):
         return state
 
     def update_state(self, state):
-        for time_step, target in enumerate(self):
+        for i, target in enumerate(self):
             state_i = state[i*self.n_parameter_i : (i+1)*self.n_parameter_i]
-            self.downscale.set_model_field(state_i, time_step)
+            self.downscale.set_model_field(state_i, i)
         self.downscale.update_all_cp_parameters()
 
     def get_log_likelihood(self):
@@ -126,12 +133,24 @@ class TargetModelFieldArray(target.Target):
         for target in self:
             target.update_mean()
 
+    def set_mean(self, mean):
+        for i, target in enumerate(self):
+            mean_i = mean[i*self.n_parameter_i : (i+1)*self.n_parameter_i]
+            target.set_mean(mean_i)
+
     def simulate_from_prior(self, rng):
         state = []
         for target in self:
             state.append(target.simulate_from_prior(rng))
         state = np.concatenate(state)
         return state
+
+    def get_prior_mean(self):
+        mean = []
+        for target in self:
+            mean.append(target.get_prior_mean())
+        mean = np.concatenate(mean)
+        return mean
 
     def __iter__(self):
         return iter(self.model_field_target_array)
@@ -169,6 +188,9 @@ class TargetGp(target.Target):
             (downscale.n_coarse, downscale.area_unmask))
         self.cov_chol = None
 
+        self.mean_before = None
+        self.cov_chol_before = None
+
         for key, prior in self.prior.items():
             self.state[key] = prior.mean()
 
@@ -202,6 +224,8 @@ class TargetGp(target.Target):
     def update_state(self, state):
         for i, key in enumerate(self.state):
             self.state[key] = state[i]
+        self.save_cov_chol()
+        self.downscale.model_field_target.update_mean()
 
     def get_log_likelihood(self):
         return self.downscale.model_field_target.get_log_prior()
@@ -217,9 +241,13 @@ class TargetGp(target.Target):
 
     def save_state(self):
         self.state_before = self.state.copy()
+        self.cov_chol_before = self.cov_chol.copy()
+        self.mean_before = self.downscale.model_field_target.get_prior_mean()
 
     def revert_state(self):
         self.state = self.state_before
+        self.cov_chol_before = self.cov_chol_before
+        self.downscale.model_field_target.set_mean(self.mean_before)
 
     def simulate_from_prior(self, rng):
         prior_simulate = []

@@ -9,21 +9,21 @@ import dataset
 import fitter
 
 def main():
-    
+
     rng = random.RandomState(np.uint32(2443707582))
     name = "hyper"
-    
+
     path_here = pathlib.Path(__file__).parent.absolute()
-    
+
     figure_dir = path.join(path_here, "figure")
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
-    
+
     result_dir = path.join(path_here, "result")
     if not path.isdir(result_dir):
         os.mkdir(result_dir)
-    
-    fit = FitterHyperSlice(
+
+    fit = fitter.FitterHyperSlice(
         dataset.London80(), rng, name, result_dir, figure_dir)
     fit()
 

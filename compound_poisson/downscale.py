@@ -63,6 +63,7 @@ class Downscale(object):
         self.parameter_gp_target = None
         self.parameter_mcmc = None
         self.parameter_gp_mcmc = None
+        self.z_mcmc = None
         self.n_sample = 10000
         self.model_field_shift = []
         self.model_field_scale = []
@@ -125,56 +126,25 @@ class Downscale(object):
         """Fit using Gibbs sampling
         """
         self.initalise_z()
-        self.instantiate_mcmc()
-        self.update_parameter_gp()
-
-        #initial value is a sample
-        self.parameter_mcmc.add_to_sample()
-        self.parameter_gp_mcmc.add_to_sample()
-        self.z_mcmc_add_to_sample()
-
-        #Gibbs sampling
-        for i in range(self.n_sample):
-            print("Sample",i)
-            #select random component
-            rand = self.rng.rand()
-            if rand < 1/3:
-                self.z_mcmc_step()
-                self.parameter_mcmc.add_to_sample()
-                self.parameter_gp_mcmc.add_to_sample()
-            elif rand < 2/3:
-                self.parameter_mcmc.step()
-                self.parameter_gp_mcmc.add_to_sample()
-                self.z_mcmc_add_to_sample()
-            else:
-                self.parameter_gp_mcmc.step()
-                self.update_parameter_gp()
-                self.parameter_mcmc.add_to_sample()
-                self.z_mcmc_add_to_sample()
-
-    def z_mcmc_add_to_sample(self):
-        """Duplicate z_array to the z chain
-
-        For all time_series, add z_array to the sample_array
-        """
-        for time_series in self.generate_unmask_time_series():
-            time_series.z_mcmc.add_to_sample()
-
-    def z_mcmc_step(self):
-        """All time_series sample z
-        """
-        for time_series in self.generate_unmask_time_series():
-            time_series.z_mcmc.step()
+        mcmc_array = self.instantiate_mcmc()
+        mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
 
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
         self.parameter_mcmc = mcmc.Elliptical(self.parameter_target, self.rng)
         self.parameter_gp_mcmc = mcmc.Rwmh(self.parameter_gp_target, self.rng)
-        self.parameter_gp_mcmc.proposal_covariance_small = 1e-4
         #all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
             time_series.instantiate_mcmc()
+        self.z_mcmc = mcmc.ZMcmcArray(self)
+        self.parameter_gp_target.save_cov_chol()
+        mcmc_array = [
+            self.z_mcmc,
+            self.parameter_mcmc,
+            self.parameter_gp_mcmc,
+        ]
+        return mcmc_array
 
     def initalise_z(self):
         """Initalise z for all time series
@@ -282,11 +252,6 @@ class Downscale(object):
         for time_series in self.generate_unmask_time_series():
             time_series.update_all_cp_parameters()
 
-    def update_parameter_gp(self):
-        """Propagate the GP precision to the parameter prior covariance
-        """
-        self.parameter_gp_target.save_cov_chol()
-
     def get_log_likelihood(self):
         """Return log likelihood
         """
@@ -345,71 +310,22 @@ class DownscaleDual(Downscale):
             self.n_coarse = model_field[0].size
             break
 
-        self.model_field_gp_target = target_model_field.TargetGp(self)
         self.model_field_target = target_model_field.TargetModelFieldArray(self)
-
-    def fit(self):
-        """Fit using Gibbs sampling
-        """
-        self.initalise_z()
-        self.instantiate_mcmc()
-        self.update_parameter_gp()
-        self.update_model_field_gp()
-
-        #initial value is a sample
-        self.parameter_mcmc.add_to_sample()
-        self.parameter_gp_mcmc.add_to_sample()
-        self.model_field_mcmc.add_to_sample()
-        self.model_field_gp_mcmc.add_to_sample()
-        self.z_mcmc_add_to_sample()
-
-        #Gibbs sampling
-        for i in range(self.n_sample):
-            print("Sample",i)
-            #select random component
-            rand = self.rng.rand()
-            if rand < 1/5:
-                self.z_mcmc_step()
-                self.parameter_mcmc.add_to_sample()
-                self.parameter_gp_mcmc.add_to_sample()
-                self.model_field_mcmc.add_to_sample()
-                self.model_field_gp_mcmc.add_to_sample()
-            elif rand < 2/5:
-                self.parameter_mcmc.step()
-                self.parameter_gp_mcmc.add_to_sample()
-                self.z_mcmc_add_to_sample()
-                self.model_field_mcmc.add_to_sample()
-                self.model_field_gp_mcmc.add_to_sample()
-            elif rand < 3/5:
-                self.parameter_gp_mcmc.step()
-                self.update_parameter_gp()
-                self.parameter_mcmc.add_to_sample()
-                self.z_mcmc_add_to_sample()
-                self.model_field_mcmc.add_to_sample()
-                self.model_field_gp_mcmc.add_to_sample()
-            elif rand < 4/5:
-                self.model_field_mcmc.step()
-                self.z_mcmc_add_to_sample()
-                self.parameter_mcmc.add_to_sample()
-                self.parameter_gp_mcmc.add_to_sample()
-                self.model_field_gp_mcmc.add_to_sample()
-            else:
-                self.model_field_gp_mcmc.step()
-                self.update_model_field_gp()
-                self.model_field_mcmc.add_to_sample()
-                self.z_mcmc_add_to_sample()
-                self.parameter_mcmc.add_to_sample()
-                self.parameter_gp_mcmc.add_to_sample()
+        self.model_field_gp_target = target_model_field.TargetGp(self)
 
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
-        super().instantiate_mcmc()
+        mcmc_array = super().instantiate_mcmc()
         self.model_field_mcmc = mcmc.Elliptical(
             self.model_field_target, self.rng)
         self.model_field_gp_mcmc = mcmc.Rwmh(
             self.model_field_gp_target, self.rng)
-        self.model_field_gp_mcmc.proposal_covariance_small = 1e-4
+        mcmc_array.append(self.model_field_mcmc)
+        mcmc_array.append(self.model_field_gp_mcmc)
+        self.model_field_gp_target.save_cov_chol()
+        self.model_field_target.update_mean()
+        return mcmc_array
 
     def get_model_field(self, time_step):
         """Return model field for all unmasked time_series
@@ -437,16 +353,6 @@ class DownscaleDual(Downscale):
                 time_series.x[time_step, model_field_i] = model_field_vector[
                     i_counter]
                 i_counter += 1
-
-    def update_model_field_gp(self):
-        """Propagate the GP precision to the parameter prior covariance
-        """
-        self.model_field_gp_target.save_cov_chol()
-        self.model_field_target.update_mean()
-
-    def update_model_field_gp_i(self, time_step):
-        self.model_field_gp_target.save_cov_chol()
-        self.model_field_target[time_step].update_mean()
 
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
 

@@ -1,15 +1,16 @@
 import math
 
 import numpy as np
+from numpy import linalg
 
 from compound_poisson.mcmc import mcmc_abstract
 
 class Rwmh(mcmc_abstract.Mcmc):
     """Random walk Metropolis Hastings
-    
+
     Adaptive MCMC from Roberts and Rosenthal (2009). Proposal covariance is
         proportional to the sample covariance of the chain.
-    
+
     Attributes:
         n_till_adapt: the chain always use the small proposal initially, number
             of steps till use the adaptive proposal covariance
@@ -26,22 +27,22 @@ class Rwmh(mcmc_abstract.Mcmc):
         n_accept: number of accept steps
         accept_array: acceptance rate at each proposal
     """
-    
+
     def __init__(self, target, rng):
         super().__init__(target, rng)
         self.n_till_adapt = 2*self.n_dim
         self.prob_small_proposal = 0.05
-        self.proposal_covariance_small = 1e-8 / self.n_dim
+        self.proposal_covariance_small = 1e-4 / self.n_dim
         self.proposal_scale = math.pow(2.38,2) / self.n_dim
         self.chain_mean = self.state.copy()
         self.chain_covariance = np.zeros((self.n_dim, self.n_dim))
         self.n_propose = 0
         self.n_accept = 0
         self.accept_array = []
-    
+
     def sample(self):
         """Use Metropolis Hastings to sample parameters
-        
+
         Implemented
         Normal prior, normal proposal
         """
@@ -62,7 +63,7 @@ class Rwmh(mcmc_abstract.Mcmc):
                 * np.identity(self.n_dim))
         else:
             proposal_covariance = self.proposal_scale * self.chain_covariance
-        
+
         #copy the reg_parameters, in case of rejection step
         self.save_state()
         #get posterior
@@ -82,7 +83,7 @@ class Rwmh(mcmc_abstract.Mcmc):
             else:
                 #acceptance step, keep track of acceptance rate
                 self.n_accept += 1
-        except(ValueError, OverflowError):
+        except(ValueError, OverflowError, linalg.LinAlgError):
             #treat numerical problems as a rejection step
             self.revert_state()
         #keep track of acceptance rate
@@ -90,21 +91,21 @@ class Rwmh(mcmc_abstract.Mcmc):
         self.accept_array.append(self.n_accept / self.n_propose)
         #update the proposal covariance
         self.update_chain_statistics()
-    
+
     def propose(self, covariance):
         """Propose parameters
-        
+
         Update itself with the proposed regression parameters.
-        
+
         Args:
             covariance: proposal covariance
         """
         self.state = self.rng.multivariate_normal(self.state, covariance)
         self.update_state()
-    
+
     def update_chain_statistics(self):
         """Update the statistics of the parameter chain
-        
+
         Update the chain mean and chain covariance of the parameter
             chain. This is used for the adaptive proposal for the regression
             parameter chain.
@@ -128,22 +129,22 @@ class Rwmh(mcmc_abstract.Mcmc):
 
 class Elliptical(mcmc_abstract.Mcmc):
     """Elliptical slice sampling
-    
+
     Elliptical slice sampling, see Murray, Adams, MacKay (2010). Samples from a
         Gaussian prior and do slice sampling
-    
+
     For more attributes, see the superclass
     Attributes:
         n_reject_array: number of times a rejection was done for each sample
     """
-    
+
     def __init__(self, target, rng):
         super().__init__(target, rng)
         self.n_reject_array = []
-    
+
     def sample(self):
-        """Uses elliptical slice sampling 
-        
+        """Uses elliptical slice sampling
+
         Implemented
         See Murray, Adams, MacKay (2010)
         """
@@ -156,17 +157,17 @@ class Elliptical(mcmc_abstract.Mcmc):
         #sample from where on the ellipse
         theta = self.rng.uniform(0, 2 * math.pi)
         edges = [theta - 2 * math.pi, theta]
-        
+
         #keep sampling until one is accepted
         is_sampling = True
         n_reject = 0
         while is_sampling:
             #get a sample (theta = 0 would just sample itself)
             #centre the parameter at zero mean (relative to the prior)
-            self.state = ((state_before - target.prior_mean) * math.cos(theta)
-                + prior_sample * math.sin(theta))
+            self.state = ((state_before - target.get_prior_mean())
+                * math.cos(theta) + prior_sample * math.sin(theta))
             #re-centre the parameter
-            self.state += target.prior_mean
+            self.state += target.get_prior_mean()
             #set the new proposed parameter
             #attempt to update all the parameters, reject if there are any
                 #numerical problems or when the log likelihood is not large
@@ -191,10 +192,10 @@ class Elliptical(mcmc_abstract.Mcmc):
                 theta =  self.rng.uniform(edges[0], edges[1])
                 n_reject += 1
         self.n_reject_array.append(n_reject)
-    
+
     def simulate_from_prior(self):
         """Return a parameter sampled from the prior
-        
+
         Must be a Gaussian prior
         """
         return self.target.simulate_from_prior(self.rng)

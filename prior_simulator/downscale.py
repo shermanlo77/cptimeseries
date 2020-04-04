@@ -27,15 +27,21 @@ class PriorSimulator(object):
 
     def simulate(self, precision=None):
         downscale = self.downscale
-        downscale.parameter_gp_target.set_from_prior(self.rng)
+        gp_target = downscale.parameter_gp_target
         if not precision is None:
-            downscale.parameter_gp_target.state["gp_precision"] = precision
-        downscale.update_parameter_gp()
+            gp_parameter = gp_target.simulate_from_prior(self.rng)
+            for i, key in enumerate(gp_target.state):
+                if key == "gp_precision":
+                    gp_parameter.state[key] = precision
+                else:
+                    gp_parameter.state[key] = gp_parameter[i]
+            gp_target.save_cov_chol()
+        else:
+            gp_target.set_from_prior(self.rng)
         #cannot use downscale.parameter_target.set_from_prior as this would
             #require a cp parameter update for all time steps which can cause
             #numerical problems
-        parameter = downscale.parameter_target.simulate_from_prior(
-            self.rng)
+        parameter = downscale.parameter_target.simulate_from_prior(self.rng)
         downscale.set_parameter_vector(parameter)
         downscale.simulate_i(0)
 

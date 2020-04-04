@@ -79,22 +79,25 @@ class TargetParameter(target.Target):
                 parameter_i)
         return parameter_vector
 
+    def get_prior_mean(self):
+        return self.prior_mean
+
 class TargetGp(target.Target):
 
     def __init__(self, downscale):
         super().__init__()
-        self.parameter_target = downscale.parameter_target
+        self.downscale = downscale
         self.prior = {}
         self.state = {}
-        self.square_error = downscale.square_error
+        self.state_before = None
         self.cov_chol = None
+        self.cov_chol_before = None
+        self.square_error = downscale.square_error
 
         self.prior = target.get_precision_prior()
         self.prior["gp_precision"] = target.get_gp_precision_prior()
         for key, prior in self.prior.items():
             self.state[key] = prior.mean()
-
-        self.state_before = None
 
     def get_n_dim(self):
         return len(self.state)
@@ -105,9 +108,10 @@ class TargetGp(target.Target):
     def update_state(self, state):
         for i, key in enumerate(self.prior):
             self.state[key] = state[i]
+        self.save_cov_chol()
 
     def get_log_likelihood(self):
-        return self.parameter_target.get_log_prior()
+        return self.downscale.parameter_target.get_log_prior()
 
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
@@ -120,9 +124,11 @@ class TargetGp(target.Target):
 
     def save_state(self):
         self.state_before = self.state.copy()
+        self.cov_chol_before = self.cov_chol.copy()
 
     def revert_state(self):
         self.state = self.state_before
+        self.cov_chol = self.cov_chol_before
 
     def simulate_from_prior(self, rng):
         prior_simulate = []

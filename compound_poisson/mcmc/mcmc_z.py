@@ -6,26 +6,26 @@ from compound_poisson.mcmc import mcmc_abstract
 
 class ZRwmh(mcmc_abstract.Mcmc):
     """Metropolis-Hastings for the latent variables z
-    
+
     Uses a non-adaptive proposal on integer space
-    
+
     Attributes:
         z_parameter: probability a single z does a propose step
         n_propose: number of proposals
         n_accept: number of accept steps
         accept_array: acceptance rate at each proposal
     """
-    
+
     def __init__(self, target, rng):
         super().__init__(target, rng)
         self.z_parameter = 1 / target.get_n_dim()
         self.n_propose = 0
         self.n_accept = 0
         self.accept_array = []
-    
+
     def sample(self):
         """Use Metropolis Hastings to sample z
-        
+
         Implemented
         Uniform prior, proposal is step back, stay or step forward
         """
@@ -65,17 +65,17 @@ class ZRwmh(mcmc_abstract.Mcmc):
         #keep track of acceptance rate
         self.n_propose += 1
         self.accept_array.append(self.n_accept/ self.n_propose)
-    
+
     def propose_z(self, z):
         """Return a proposed z
-        
+
         Return a transitioned z. Probability that it will move is
             self.proposal_z_parameter, otherwise move one step. Cannot move to
             0.
-        
+
         Args:
             z: z at this step of MCMC
-        
+
         Returns:
             Proposed z
         """
@@ -91,22 +91,22 @@ class ZRwmh(mcmc_abstract.Mcmc):
 
 class ZSlice(mcmc_abstract.Mcmc):
     """Slice sampling on the z latent variables
-    
+
     Does slice sampling for a randomly selected z. See Neal (2003).
-    
+
     For more attributes, see the superclass
     Attributes:
     """
-    
+
     def __init__(self, target, rng):
         super().__init__(target, rng)
         self.n_propose = 0
         self.slice_width_array = []
         self.non_zero_index = np.nonzero(self.target.time_series.y_array)[0]
-    
+
     def sample(self):
         """Use slice sampling
-        
+
         Implemented
         See Neal (2003)
         Select a random z_t in the time series, then move it using slice
@@ -123,7 +123,7 @@ class ZSlice(mcmc_abstract.Mcmc):
         #proposal range contains the limits of what integers to propose, both
             #excluse for now
         proposal_range = [z_t, z_t+1]
-        
+
         #keep decreasing proposal_range[0] until it is zero or when the log
             #likelihood is less than ln_y
         #NOTE: proposal_range is exclusive for now
@@ -145,7 +145,7 @@ class ZSlice(mcmc_abstract.Mcmc):
                     is_in_slice = False
         #NOTE: now make proposal range left inclusive
         proposal_range[0] += 1
-        
+
         #keep increasing proposal_range[1] until the log likelihood is less than
             #ln_y
         #NOTE: proposal_range is left inclusive and right exclusive for the rest
@@ -164,9 +164,40 @@ class ZSlice(mcmc_abstract.Mcmc):
                     proposal_range[1] += 1
             except(ValueError, OverflowError):
                 is_in_slice = False
-        
+
         #set the proposed z
         self.state[t] = self.rng.randint(proposal_range[0], proposal_range[1])
         self.update_state()
         self.slice_width_array.append(proposal_range[1] - proposal_range[0])
         self.n_propose += 1
+
+class ZMcmcArray(mcmc_abstract.Mcmc):
+    """Wrapper class
+
+    Does MCMC on all z in Downscale
+    """
+
+    def __init__(self, downscale):
+        super().__init__()
+        self.downscale = downscale
+
+    def step(self):
+        """Do a MCMC step
+
+        Sample once from the posterior and append it to sample_array
+        """
+        self.sample()
+
+    def sample(self):
+        """Duplicate z_array to the z chain
+
+        For all time_series, add z_array to the sample_array
+        """
+        for time_series in self.downscale.generate_unmask_time_series():
+            time_series.z_mcmc.add_to_sample()
+
+    def add_to_sample(self):
+        """All time_series sample z
+        """
+        for time_series in self.downscale.generate_unmask_time_series():
+            time_series.z_mcmc.step()

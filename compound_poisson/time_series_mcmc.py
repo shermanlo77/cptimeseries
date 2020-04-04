@@ -1,5 +1,7 @@
 import math
+from os import path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from compound_poisson import mcmc
@@ -46,24 +48,12 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     def fit(self):
         """Fit using Gibbs sampling
 
-        Override
+        Override - Gibbs sample either z, regression parameters or the
+            precision.
         """
         self.initalise_z()
-        self.instantiate_mcmc()
-        #initial value is a sample
-        self.parameter_mcmc.add_to_sample()
-        self.z_mcmc.add_to_sample()
-        #Gibbs sampling
-        for i in range(self.n_sample):
-            print("Sample",i)
-            #select random component
-            rand = self.rng.rand()
-            if rand < 0.5:
-                self.z_mcmc.step()
-                self.parameter_mcmc.add_to_sample()
-            else:
-                self.parameter_mcmc.step()
-                self.z_mcmc.add_to_sample()
+        mcmc_array = self.instantiate_mcmc()
+        mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
 
     def initalise_z(self):
         """Initalise all z in self.z_array and update all parameters
@@ -86,6 +76,11 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         """
         self.parameter_mcmc = mcmc.Rwmh(self.parameter_target, self.rng)
         self.z_mcmc = mcmc.ZRwmh(self.z_target, self.rng)
+        mcmc_array = [
+            self.z_mcmc,
+            self.parameter_mcmc,
+        ]
+        return mcmc_array
 
     def set_parameter_from_sample(self):
         """Set parameter from MCMC sample
@@ -147,6 +142,49 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         """
         return self.parameter_target.simulate_from_prior(self.rng)
 
+    def print_mcmc(self, directory, true_parameter=None):
+        parameter_name = self.get_parameter_vector_name()
+        chain = np.asarray(self.parameter_mcmc.sample_array)
+        for i in range(self.n_parameter):
+            chain_i = chain[:,i]
+            plt.figure()
+            plt.plot(chain_i)
+            if not true_parameter is None:
+                plt.hlines(true_parameter[i], 0, len(chain)-1)
+            plt.ylabel(parameter_name[i])
+            plt.xlabel("Sample number")
+            plt.savefig(
+                path.join(directory, "chain_parameter_" + str(i) + ".pdf"))
+            plt.close()
+
+        chain = []
+        z_chain = np.asarray(self.z_mcmc.sample_array)
+        for z in z_chain:
+            chain.append(np.mean(z))
+        plt.figure()
+        plt.plot(chain)
+        plt.ylabel("Mean of latent variables")
+        plt.xlabel("Sample number")
+        plt.savefig(path.join(directory, "chain_z.pdf"))
+        plt.close()
+
+        self.print_chain_property(directory)
+
+    def print_chain_property(self, directory):
+        plt.figure()
+        plt.plot(np.asarray(self.parameter_mcmc.accept_array))
+        plt.ylabel("Acceptance rate of parameters")
+        plt.xlabel("Parameter sample number")
+        plt.savefig(path.join(directory, "accept_parameter.pdf"))
+        plt.close()
+
+        plt.figure()
+        plt.plot(np.asarray(self.z_mcmc.accept_array))
+        plt.ylabel("Acceptance self of latent variables")
+        plt.xlabel("Latent variable sample number")
+        plt.savefig(path.join(directory, "accept_z.pdf"))
+        plt.close()
+
 class TimeSeriesSlice(TimeSeriesMcmc):
     """Fit Compound Poisson time series using slice sampling from a Bayesian
     setting
@@ -180,6 +218,26 @@ class TimeSeriesSlice(TimeSeriesMcmc):
         """
         self.parameter_mcmc = mcmc.Elliptical(self.parameter_target, self.rng)
         self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
+        mcmc_array = [
+            self.z_mcmc,
+            self.parameter_mcmc,
+        ]
+        return mcmc_array
+
+    def print_chain_property(self, directory):
+        plt.figure()
+        plt.plot(np.asarray(self.parameter_mcmc.n_reject_array))
+        plt.ylabel("Number of rejects in parameter slicing")
+        plt.xlabel("Parameter sample number")
+        plt.savefig(path.join(directory, "n_reject_parameter.pdf"))
+        plt.close()
+
+        plt.figure()
+        plt.plot(np.asarray(self.z_mcmc.slice_width_array))
+        plt.ylabel("Latent variable slice width")
+        plt.xlabel("Latent variable sample number")
+        plt.savefig(path.join(directory, "slice_width_z.pdf"))
+        plt.close()
 
 class TimeSeriesHyperSlice(TimeSeriesSlice):
     """Fit Compound Poisson time series using slice sampling with a prior on the
@@ -209,58 +267,20 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
-        self.precision_target = target_time_series.TargetPrecision(
-            self.parameter_target)
+        self.precision_target = target_time_series.TargetPrecision(self)
         #mcmc object evaluated at instantiate_mcmc
         self.precision_mcmc = None
-
-    def fit(self):
-        """Fit using Gibbs sampling
-
-        Override - Gibbs sample either z, regression parameters or the
-            precision.
-        """
-        self.initalise_z()
-        self.instantiate_mcmc()
-        self.update_precision()
-        #initial value is a sample
-        self.parameter_mcmc.add_to_sample()
-        self.z_mcmc.add_to_sample()
-        self.precision_mcmc.add_to_sample()
-        #Gibbs sampling
-        for i in range(self.n_sample):
-            print("Sample",i)
-            #select random component
-            rand = self.rng.rand()
-            if rand < 1/3:
-                self.z_mcmc.step()
-                self.parameter_mcmc.add_to_sample()
-                self.precision_mcmc.add_to_sample()
-            elif rand < 2/3:
-                self.parameter_mcmc.step()
-                self.z_mcmc.add_to_sample()
-                self.precision_mcmc.add_to_sample()
-            else:
-                self.precision_mcmc.step()
-                self.parameter_mcmc.add_to_sample()
-                self.z_mcmc.add_to_sample()
-                #update the prior covariance in parameter_target
-                self.update_precision()
-
-    def update_precision(self):
-        """Propagate the precision in precision_target to parameter_target
-        """
-        self.parameter_target.prior_cov_chol = (
-            self.precision_target.get_cov_chol())
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
 
         Override - instantiate the MCMC for the precision
         """
-        super().instantiate_mcmc()
+        mcmc_array = super().instantiate_mcmc()
+        self.precision_target.prograte_precision()
         self.precision_mcmc = mcmc.Rwmh(self.precision_target, self.rng)
-        self.precision_mcmc.proposal_covariance_small = 1e-4
+        mcmc_array.append(self.precision_mcmc)
+        return mcmc_array
 
     def simulate_parameter_from_prior(self):
         """Simulate parameter from the prior
@@ -271,3 +291,23 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         prior_precision = self.precision_target.simulate_from_prior(self.rng)
         self.update_precision()
         return super().simulate_parameter_from_prior()
+
+    def print_chain_property(self, directory):
+        super().print_chain_property(directory)
+        precision_chain = np.asarray(self.precision_mcmc.sample_array)
+        for i in range(2):
+            chain_i = precision_chain[:, i]
+            plt.figure()
+            plt.plot(chain_i)
+            plt.ylabel("precision" + str(i))
+            plt.xlabel("Sample number")
+            plt.savefig(
+                path.join(directory, "chain_precision_" + str(i) + ".pdf"))
+            plt.close()
+
+        plt.figure()
+        plt.plot(np.asarray(self.precision_mcmc.accept_array))
+        plt.ylabel("Acceptance rate of parameters")
+        plt.xlabel("Parameter sample number")
+        plt.savefig(path.join(directory, "accept_precision.pdf"))
+        plt.close()

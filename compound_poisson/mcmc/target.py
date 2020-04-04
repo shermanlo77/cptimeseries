@@ -65,6 +65,11 @@ class Target(object):
         """
         raise NotImplementedError
 
+    def get_prior_mean(self):
+        """Return the mean of the prior
+        """
+        raise NotImplementedError
+
     def set_from_prior(self, rng):
         state = self.simulate_from_prior(rng)
         self.update_state(state)

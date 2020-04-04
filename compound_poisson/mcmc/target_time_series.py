@@ -44,13 +44,13 @@ class TargetParameter(target.Target):
 
     def get_log_target(self):
         ln_l = self.get_log_likelihood()
-        ln_prior = self.get_log_prior(self.prior_cov_chol)
+        ln_prior = self.get_log_prior()
         return ln_l + ln_prior
 
-    def get_log_prior(self, prior_cov_chol):
+    def get_log_prior(self):
         return np.sum(
             stats.norm.logpdf(
-                self.get_state(), self.prior_mean, prior_cov_chol))
+                self.get_state(), self.prior_mean, self.prior_cov_chol))
 
     def save_state(self):
         self.cp_parameter_before = self.time_series.copy_parameter()
@@ -60,6 +60,9 @@ class TargetParameter(target.Target):
 
     def simulate_from_prior(self, rng):
         return rng.normal(self.prior_mean, self.prior_cov_chol)
+
+    def get_prior_mean(self):
+        return self.prior_mean
 
 class TargetZ(target.Target):
     """Wrapper Target class for the latent variables z
@@ -112,23 +115,22 @@ class TargetPrecision(target.Target):
             parameter is an ARMA term
     """
 
-    def __init__(self, parameter_target):
+    def __init__(self, time_series):
         super().__init__()
-        self.parameter_target = parameter_target
+        self.time_series = time_series
         self.prior = target.get_precision_prior()
         self.precision = []
         self.precision_before = None
         self.arma_index = None
 
         #initalise precision using the prior mean
-        for prior in self.prior:
+        for prior in self.prior.values():
             self.precision.append(prior.mean())
         self.precision = np.asarray(self.precision)
 
         #initalise arma_index
-        time_series = self.parameter_target.time_series
         self.arma_index = target.get_arma_index(
-            time_series.get_parameter_vector_name())
+            self.time_series.get_parameter_vector_name())
 
     def get_cov_chol(self):
         """Return the vector of parameter prior std
@@ -153,16 +155,17 @@ class TargetPrecision(target.Target):
 
     def update_state(self, state):
         self.precision = state.copy()
+        self.prograte_precision()
 
     def get_log_likelihood(self):
-        return self.parameter_target.get_log_prior(self.get_cov_chol())
+        return self.time_series.parameter_target.get_log_prior()
 
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
         ln_prior = 0
-        for i, prior in enumerate(self.prior):
+        for i, prior in enumerate(self.prior.values()):
             ln_prior += prior.logpdf(self.precision[i])
         return ln_prior
 
@@ -171,6 +174,7 @@ class TargetPrecision(target.Target):
 
     def revert_state(self):
         self.precision = self.precision_before
+        self.prograte_precision()
 
     def simulate_from_prior(self, rng):
         prior_simulate = []
@@ -178,3 +182,6 @@ class TargetPrecision(target.Target):
             prior.random_state = rng
             prior_simulate.append(prior.rvs())
         return np.asarray(prior_simulate)
+
+    def prograte_precision(self):
+        self.time_series.parameter_target.prior_cov_chol = self.get_cov_chol()
