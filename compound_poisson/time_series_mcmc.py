@@ -1,5 +1,6 @@
 import math
 from os import path
+import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,6 +45,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.z_target = target_time_series.TargetZ(self)
         self.z_mcmc = None
         self.burn_in = 0
+        self.memmap_path = pathlib.Path(__file__).parent.absolute()
 
     def fit(self):
         """Fit using Gibbs sampling
@@ -52,7 +54,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             precision.
         """
         self.initalise_z()
-        mcmc_array = self.instantiate_mcmc()
+        self.instantiate_mcmc()
+        mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
 
     def initalise_z(self):
@@ -74,8 +77,12 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         Instantiate all MCMC objects by passing the corresponding Target objects
             and random number generators
         """
-        self.parameter_mcmc = mcmc.Rwmh(self.parameter_target, self.rng)
-        self.z_mcmc = mcmc.ZRwmh(self.z_target, self.rng)
+        self.parameter_mcmc = mcmc.Rwmh(
+            self.n_sample, self.memmap_path, self.parameter_target, self.rng)
+        self.z_mcmc = mcmc.ZRwmh(
+            self.n_sample, self.memmap_path, self.z_target, self.rng)
+
+    def get_mcmc_array(self):
         mcmc_array = [
             self.z_mcmc,
             self.parameter_mcmc,
@@ -141,6 +148,10 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         Return a sample from the prior
         """
         return self.parameter_target.simulate_from_prior(self.rng)
+
+    def load_memmap(self):
+        for mcmc in self.get_mcmc_array():
+            mcmc.load_memmap()
 
     def print_mcmc(self, directory, true_parameter=None):
         parameter_name = self.get_parameter_vector_name()
@@ -216,13 +227,10 @@ class TimeSeriesSlice(TimeSeriesMcmc):
         Override
         Instantiate slice sampling for the parameter and z
         """
-        self.parameter_mcmc = mcmc.Elliptical(self.parameter_target, self.rng)
-        self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
-        mcmc_array = [
-            self.z_mcmc,
-            self.parameter_mcmc,
-        ]
-        return mcmc_array
+        self.parameter_mcmc = mcmc.Elliptical(
+            self.n_sample, self.memmap_path, self.parameter_target, self.rng)
+        self.z_mcmc = mcmc.ZSlice(
+            self.n_sample, self.memmap_path, self.z_target, self.rng)
 
     def print_chain_property(self, directory):
         plt.figure()
@@ -276,9 +284,13 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
 
         Override - instantiate the MCMC for the precision
         """
-        mcmc_array = super().instantiate_mcmc()
+        super().instantiate_mcmc()
         self.precision_target.prograte_precision()
-        self.precision_mcmc = mcmc.Rwmh(self.precision_target, self.rng)
+        self.precision_mcmc = mcmc.Rwmh(
+            self.n_sample, self.memmap_path, self.precision_target, self.rng)
+
+    def get_mcmc_array(self):
+        mcmc_array = super().get_mcmc_array()
         mcmc_array.append(self.precision_mcmc)
         return mcmc_array
 

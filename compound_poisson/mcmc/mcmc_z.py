@@ -16,12 +16,13 @@ class ZRwmh(mcmc_abstract.Mcmc):
         accept_array: acceptance rate at each proposal
     """
 
-    def __init__(self, target, rng):
-        super().__init__(target, rng)
+    def __init__(self, n_sample, memmap_path, target, rng):
+        super().__init__(np.int32, n_sample, memmap_path, target, rng)
         self.z_parameter = 1 / target.get_n_dim()
         self.n_propose = 0
         self.n_accept = 0
         self.accept_array = []
+        self.sample_array.dtype = np.int32
 
     def sample(self):
         """Use Metropolis Hastings to sample z
@@ -64,7 +65,7 @@ class ZRwmh(mcmc_abstract.Mcmc):
             self.revert_state()
         #keep track of acceptance rate
         self.n_propose += 1
-        self.accept_array.append(self.n_accept/ self.n_propose)
+        self.accept_array.append(self.n_accept/self.n_propose)
 
     def propose_z(self, z):
         """Return a proposed z
@@ -98,11 +99,12 @@ class ZSlice(mcmc_abstract.Mcmc):
     Attributes:
     """
 
-    def __init__(self, target, rng):
-        super().__init__(target, rng)
+    def __init__(self, n_sample, memmap_path, target, rng):
+        super().__init__(np.int32, n_sample, memmap_path, target, rng)
         self.n_propose = 0
         self.slice_width_array = []
         self.non_zero_index = np.nonzero(self.target.time_series.y_array)[0]
+        self.sample_array.dtype = np.int32
 
     def sample(self):
         """Use slice sampling
@@ -201,3 +203,11 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         """
         for time_series in self.downscale.generate_unmask_time_series():
             time_series.z_mcmc.step()
+
+    def del_memmap(self):
+        for time_series in self.downscale.generate_unmask_time_series():
+            time_series.z_mcmc.del_memmap()
+
+    def load_memmap(self):
+        for time_series in self.downscale.generate_unmask_time_series():
+            time_series.z_mcmc.load_memmap()

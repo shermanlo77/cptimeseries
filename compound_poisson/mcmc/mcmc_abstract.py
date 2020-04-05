@@ -1,4 +1,8 @@
+import datetime
 import math
+from os import path
+
+import numpy as np
 
 class Mcmc(object):
     """Abstract class for MCMC
@@ -18,16 +22,44 @@ class Mcmc(object):
         sample_array: array of state vector, representing the chain
     """
 
-    def __init__(self, target=None, rng=None):
+    def __init__(self, dtype=None, n_sample=None, memmap_path=None, target=None,
+        rng=None):
         #none target is used for wrapper mcmc such as ZMcmcArray
+        self.dtype = dtype
+        self.n_sample = n_sample
+        self.memmap_path = memmap_path
         self.target = target
         self.rng = rng
         self.n_dim = None
         self.state = None
-        self.sample_array = []
+        self.sample_array = None
+        self.sample_pointer = 0
+
         if not target is None:
             self.n_dim = self.target.get_n_dim()
             self.state = target.get_state()
+
+            datetime_id = str(datetime.datetime.now())
+            datetime_id = datetime_id.replace("-", "")
+            datetime_id = datetime_id.replace(":", "")
+            datetime_id = datetime_id.replace(" ", "")
+            datetime_id = datetime_id[0:14]
+            file_name = ("_" + type(self).__name__ + type(target).__name__
+                + "_" + datetime_id + "_" + str(id(self)) + ".dat")
+            self.memmap_path = path.join(memmap_path, file_name)
+            self.sample_array = np.memmap(self.memmap_path,
+                                          dtype,
+                                          "w+",
+                                          shape=(self.n_sample+1, self.n_dim))
+
+    def del_memmap(self):
+        del self.sample_array
+
+    def load_memmap(self):
+        self.sample_array = np.memmap(self.memmap_path,
+                                      self.dtype,
+                                      "r",
+                                      shape=(self.n_sample, self.n_dim))
 
     def add_to_sample(self):
         """Add to sample
@@ -36,7 +68,7 @@ class Mcmc(object):
             duplicate to sample_array. Used for rejection step or when sampling
             another component in Gibbs sampling
         """
-        self.sample_array.append(self.state.copy())
+        self.append(self.state.copy())
 
     def update_state(self):
         """Update state
@@ -112,7 +144,10 @@ class Mcmc(object):
         return self.sample_array[index]
 
     def append(self, state):
-        self.sample_array.append(state)
+        if self.dtype.__name__ == "int32":
+            state = state.astype(self.dtype)
+        self.sample_array[self.sample_pointer] = state
+        self.sample_pointer += 1
 
 def do_gibbs_sampling(mcmc_array, n_sample, rng):
     #initial value is a sample
@@ -128,3 +163,5 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng):
                 mcmc.step()
             else:
                 mcmc.add_to_sample()
+    for mcmc in mcmc_array:
+        mcmc.del_memmap()

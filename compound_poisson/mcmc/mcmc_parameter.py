@@ -28,8 +28,8 @@ class Rwmh(mcmc_abstract.Mcmc):
         accept_array: acceptance rate at each proposal
     """
 
-    def __init__(self, target, rng):
-        super().__init__(target, rng)
+    def __init__(self, n_sample, memmap_path, target, rng):
+        super().__init__(np.float64, n_sample, memmap_path, target, rng)
         self.n_till_adapt = 2*self.n_dim
         self.prob_small_proposal = 0.05
         self.proposal_covariance_small = 1e-4 / self.n_dim
@@ -138,8 +138,8 @@ class Elliptical(mcmc_abstract.Mcmc):
         n_reject_array: number of times a rejection was done for each sample
     """
 
-    def __init__(self, target, rng):
-        super().__init__(target, rng)
+    def __init__(self, n_sample, memmap_path, target, rng):
+        super().__init__(np.float64, n_sample, memmap_path, target, rng)
         self.n_reject_array = []
 
     def sample(self):

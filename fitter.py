@@ -30,6 +30,7 @@ class Fitter(object):
                 model_field, rain, (5, 5), (5, 5))
             time_series.time_array = self.dataset.get_time_training()
             time_series.rng = self.rng
+            time_series.memmap_path = self.result_dir
             time_series.fit()
             joblib.dump(time_series, result_file)
         else:
@@ -40,6 +41,7 @@ class Fitter(object):
         except AttributeError:
             true_parameter = None
         directory = path.join(self.figure_dir, self.name)
+        time_series.load_memmap()
         time_series.print_mcmc(directory, true_parameter)
 
 class FitterMcmc(Fitter):

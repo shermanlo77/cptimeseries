@@ -1,4 +1,5 @@
 import math
+import pathlib
 
 import numpy as np
 from numpy import random
@@ -69,6 +70,7 @@ class Downscale(object):
         self.model_field_scale = []
         self.n_model_field = len(data.model_field)
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
+        self.memmap_path = pathlib.Path(__file__).parent.absolute()
 
         #get the square error matrix used for GP
         unmask = np.logical_not(self.mask).flatten()
@@ -112,6 +114,7 @@ class Downscale(object):
                 time_series.x_shift = self.model_field_shift
                 time_series.x_scale = self.model_field_scale
                 time_series.time_array = self.time_array
+                time_series.memmap_path = self.memmap_path
                 time_series_array[lat_i].append(time_series)
                 for i in range(time_series.n_parameter):
                     self.parameter_mask_vector.append(is_mask)
@@ -126,19 +129,25 @@ class Downscale(object):
         """Fit using Gibbs sampling
         """
         self.initalise_z()
-        mcmc_array = self.instantiate_mcmc()
+        self.instantiate_mcmc()
+        mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
 
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
-        self.parameter_mcmc = mcmc.Elliptical(self.parameter_target, self.rng)
-        self.parameter_gp_mcmc = mcmc.Rwmh(self.parameter_gp_target, self.rng)
+        self.parameter_mcmc = mcmc.Elliptical(
+            self.n_sample, self.memmap_path, self.parameter_target, self.rng)
+        self.parameter_gp_mcmc = mcmc.Rwmh(
+            self.n_sample, self.memmap_path, self.parameter_gp_target, self.rng)
         #all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
+            time_series.n_sample = self.n_sample
             time_series.instantiate_mcmc()
         self.z_mcmc = mcmc.ZMcmcArray(self)
         self.parameter_gp_target.save_cov_chol()
+
+    def get_mcmc_array(self):
         mcmc_array = [
             self.z_mcmc,
             self.parameter_mcmc,
@@ -159,23 +168,25 @@ class Downscale(object):
         """Set rng for all time series
         """
         self.rng = rng
-        for time_series_i in self.time_series_array:
-            for time_series in time_series_i:
-                time_series.rng = rng
+        for time_series in self.generate_all_time_series():
+            time_series.rng = rng
+
+    def set_memmap_path(self, memmap_path):
+        self.memmap_path = memmap_path
+        for time_series in self.generate_all_time_series():
+            time_series.memmap_path = memmap_path
 
     def simulate_i(self, i):
         """Simulate a point in time for all time series
         """
-        for time_series_i in self.time_series_array:
-            for time_series in time_series_i:
-                time_series.simulate_i(i)
+        for time_series in self.generate_all_time_series():
+            time_series.simulate_i(i)
 
     def simulate(self):
         """Simulate the entire time series for all time series
         """
-        for time_series_i in self.time_series_array:
-            for time_series in time_series_i:
-                time_series.simulate()
+        for time_series in self.generate_all_time_series():
+            time_series.simulate()
 
     def get_parameter_3d(self):
         """Return the parameters from all time series (3D)
@@ -285,11 +296,20 @@ class Downscale(object):
                 forecast_array[-1].append(forecast)
         return forecast_array
 
+    def generate_all_time_series(self):
+        for time_series_i in self.time_series_array:
+            for time_series in time_series_i:
+                yield time_series
+
     def generate_unmask_time_series(self):
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
                     yield self.time_series_array[lat_i][long_i]
+
+    def load_memmap(self):
+        for mcmc in self.get_mcmc_array():
+            mcmc.load_memmap()
 
     def __len__(self):
         return len(self.time_array)
@@ -316,15 +336,18 @@ class DownscaleDual(Downscale):
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
-        mcmc_array = super().instantiate_mcmc()
+        super().instantiate_mcmc()
         self.model_field_mcmc = mcmc.Elliptical(
-            self.model_field_target, self.rng)
+            self.n_sample, self.memmap_path, self.model_field_target, self.rng)
         self.model_field_gp_mcmc = mcmc.Rwmh(
-            self.model_field_gp_target, self.rng)
-        mcmc_array.append(self.model_field_mcmc)
-        mcmc_array.append(self.model_field_gp_mcmc)
+            self.n_sample, self.memmap_path, self.model_field_gp_target, self.rng)
         self.model_field_gp_target.save_cov_chol()
         self.model_field_target.update_mean()
+
+    def get_mcmc_array():
+        mcmc_array = super().get_mcmc_array()
+        mcmc_array.append(self.model_field_mcmc)
+        mcmc_array.append(self.model_field_gp_mcmc)
         return mcmc_array
 
     def get_model_field(self, time_step):

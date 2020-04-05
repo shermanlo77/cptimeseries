@@ -96,7 +96,7 @@ class TimeSeries(object):
         self.n_parameter = None
         #array containing poisson_rate, gamma_mean and gamma_dispersion
         self.cp_parameter_array = None
-        self.z_array = np.zeros(n)
+        self.z_array = np.zeros(n) #z_array can be float in E step
         self.z_var_array = np.zeros(n)
         self.y_array = None
         self.fitted_time_series = None
@@ -477,7 +477,6 @@ class TimeSeries(object):
         for i in range(len(self)):
             #update the parameter at this time step
             self.update_cp_parameters(i)
-
             #if the rainfall is zero, then z is zero (it has not rained)
             if self[i] == 0:
                 self.z_array[i] = 0

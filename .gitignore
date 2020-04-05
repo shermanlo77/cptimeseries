@@ -4,6 +4,7 @@
 *.png
 *.txt
 *.pyc
+*.dat
 *~
 Data/
 Untitled.ipynb
