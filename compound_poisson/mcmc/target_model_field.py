@@ -87,6 +87,7 @@ class TargetModelFieldArray(target.Target):
 
     def __init__(self, downscale):
         self.downscale = downscale
+        self.rng_array = downscale.spawn_rng(len(downscale))
         self.model_field_target_array = []
         self.area_unmask = downscale.area_unmask
         self.n_model_field = downscale.n_model_field
@@ -139,9 +140,10 @@ class TargetModelFieldArray(target.Target):
             target.set_mean(mean_i)
 
     def simulate_from_prior(self, rng):
+        #provided rng not used as this is to be parallised
         state = []
-        for target in self:
-            state.append(target.simulate_from_prior(rng))
+        for i, target in enumerate(i, self):
+            state.append(target.simulate_from_prior(self.rng_array[i]))
         state = np.concatenate(state)
         return state
 

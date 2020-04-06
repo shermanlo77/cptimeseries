@@ -59,7 +59,8 @@ class Downscale(object):
         self.shape = self.mask.shape
         self.area = self.shape[0] * self.shape[1]
         self.area_unmask = np.sum(np.logical_not(self.mask))
-        self.rng = random.RandomState()
+        self.seed_seq = random.SeedSequence()
+        self.rng = None
         self.parameter_target = None
         self.parameter_gp_target = None
         self.parameter_mcmc = None
@@ -110,7 +111,6 @@ class Downscale(object):
                     time_series = TimeSeriesDownscale(
                         x_i, rain_i.data, n_arma, n_arma)
                 time_series.id = str(lat_i) + "_" + str(long_i)
-                time_series.rng = self.rng
                 time_series.x_shift = self.model_field_shift
                 time_series.x_scale = self.model_field_scale
                 time_series.time_array = self.time_array
@@ -120,6 +120,7 @@ class Downscale(object):
                     self.parameter_mask_vector.append(is_mask)
                 self.n_parameter = time_series.n_parameter
 
+        self.set_rng(self.seed_seq)
         self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
         self.n_total_parameter = self.area_unmask * self.n_parameter
         self.parameter_target = target_downscale.TargetParameter(self)
@@ -164,12 +165,16 @@ class Downscale(object):
             time_series.initalise_z()
         self.update_all_cp_parameters()
 
-    def set_rng(self, rng):
+    def set_rng(self, seed_sequence):
         """Set rng for all time series
+
+        Args:
+            seed_sequence: numpy.random.SeedSequence object
         """
-        self.rng = rng
+        self.seed_seq = seed_sequence
+        self.rng = self.spawn_rng()
         for time_series in self.generate_all_time_series():
-            time_series.rng = rng
+            time_series.rng = self.spawn_rng()
 
     def set_memmap_path(self, memmap_path):
         self.memmap_path = memmap_path
@@ -311,6 +316,18 @@ class Downscale(object):
         for mcmc in self.get_mcmc_array():
             mcmc.load_memmap()
 
+    def spawn_rng(self, n=1):
+        """Return array of substream rng
+        """
+        seed_spawn = self.seed_seq.spawn(n)
+        rng_array = []
+        for s in seed_spawn:
+            rng_s = random.RandomState(random.MT19937(s))
+            rng_array.append(rng_s)
+        if len(rng_array) == 1:
+            rng_array = rng_array[0]
+        return rng_array
+
     def __len__(self):
         return len(self.time_array)
 
@@ -344,7 +361,7 @@ class DownscaleDual(Downscale):
         self.model_field_gp_target.save_cov_chol()
         self.model_field_target.update_mean()
 
-    def get_mcmc_array():
+    def get_mcmc_array(self):
         mcmc_array = super().get_mcmc_array()
         mcmc_array.append(self.model_field_mcmc)
         mcmc_array.append(self.model_field_gp_mcmc)

@@ -10,9 +10,9 @@ import dataset
 
 def main():
 
-    rng = random.RandomState(np.uint32(1919099529))
+    seed = random.SeedSequence(41597761383904719560264433323691455830)
     downscale = compound_poisson.Downscale(dataset.IsleOfManTraining(), (5, 5))
-    downscale.set_rng(rng)
+    downscale.set_rng(seed)
     downscale.fit()
 
     path_here = pathlib.Path(__file__).parent.absolute()

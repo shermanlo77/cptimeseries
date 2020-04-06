@@ -11,6 +11,7 @@ def main():
 
     path_here = pathlib.Path(__file__).parent.absolute()
     downscale = joblib.load(path.join(path_here, "downscale.gz"))
+    downscale.load_memmap()
 
     figure_dir = path.join(path_here, "figure")
     if not path.isdir(figure_dir):
