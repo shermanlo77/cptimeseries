@@ -119,7 +119,7 @@ class Mcmc(object):
         Sample once from the posterior and append it to sample_array
         """
         self.sample()
-        self.append(self.state.copy())
+        self.add_to_sample()
 
     def is_accept_step(self, log_target_before, log_target_after):
         """Metropolis-Hastings accept and reject

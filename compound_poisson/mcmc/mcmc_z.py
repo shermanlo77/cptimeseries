@@ -1,4 +1,5 @@
 import math
+import multiprocessing
 
 import numpy as np
 
@@ -183,26 +184,19 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         super().__init__()
         self.downscale = downscale
 
-    def step(self):
-        """Do a MCMC step
-
-        Sample once from the posterior and append it to sample_array
-        """
-        self.sample()
-
     def sample(self):
         """Duplicate z_array to the z chain
 
         For all time_series, add z_array to the sample_array
         """
         for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.add_to_sample()
+            time_series.z_mcmc.sample()
 
     def add_to_sample(self):
         """All time_series sample z
         """
         for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.step()
+            time_series.z_mcmc.add_to_sample()
 
     def del_memmap(self):
         for time_series in self.downscale.generate_unmask_time_series():
