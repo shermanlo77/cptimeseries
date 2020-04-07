@@ -620,3 +620,6 @@ class TimeSeries(object):
 
     def __setitem__(self, index, value):
         self.y_array[index] = value
+
+def static_get_joint_log_likelihood(time_series):
+    return time_series.get_joint_log_likelihood()

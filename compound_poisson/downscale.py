@@ -7,9 +7,10 @@ from numpy import random
 import compound_poisson
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
+from compound_poisson import time_series
+from compound_poisson import time_series_mcmc
 from compound_poisson.mcmc import target_downscale
 from compound_poisson.mcmc import target_model_field
-from compound_poisson import time_series_mcmc
 
 class Downscale(object):
     """Collection of multiple TimeSeries object
@@ -277,10 +278,8 @@ class Downscale(object):
     def get_log_likelihood(self):
         """Return log likelihood
         """
-        ln_l_array = []
-        for time_series in self.generate_unmask_time_series():
-            ln_l = time_series.get_joint_log_likelihood()
-            ln_l_array.append(ln_l)
+        ln_l_array = self.pool.map(time_series.static_get_joint_log_likelihood,
+                                   self.generate_unmask_time_series())
         return np.sum(ln_l_array)
 
     def forecast(self, data, n_simulation):
