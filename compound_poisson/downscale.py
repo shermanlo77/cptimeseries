@@ -357,7 +357,7 @@ class Downscale(object):
     def __getstate__(self):
         #required as multiprocessing cannot pickle multiprocessing.Pool
         self_dict = self.__dict__.copy()
-        del self_dict['pool']
+        self_dict['pool'] = None
         return self_dict
 
 class DownscaleDual(Downscale):
@@ -385,8 +385,12 @@ class DownscaleDual(Downscale):
         super().instantiate_mcmc()
         self.model_field_mcmc = mcmc.Elliptical(
             self.n_sample, self.memmap_path, self.model_field_target, self.rng)
-        self.model_field_gp_mcmc = mcmc.Rwmh(
-            self.n_sample, self.memmap_path, self.model_field_gp_target, self.rng)
+        self.model_field_gp_mcmc = mcmc.Rwmh(self.n_sample,
+                                             self.memmap_path,
+                                             self.model_field_gp_target,
+                                             self.rng)
+        #ordering is important, calculate the kernel matrices then posterior
+            #gaussian process mean
         self.model_field_gp_target.save_cov_chol()
         self.model_field_target.update_mean()
 
