@@ -323,3 +323,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         plt.xlabel("Parameter sample number")
         plt.savefig(path.join(directory, "accept_precision.pdf"))
         plt.close()
+
+def static_initalise_z(time_series):
+    time_series.initalise_z()
+    return time_series

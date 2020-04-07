@@ -167,8 +167,11 @@ class Downscale(object):
         """
         #all time series initalise z, needed so that the likelihood can be
             #evaluated, eg y=0 if and only if x=0
-        for time_series in self.generate_unmask_time_series():
-            time_series.initalise_z()
+        method = time_series_mcmc.static_initalise_z
+        time_series_array = self.pool.map(
+            method, self.generate_unmask_time_series())
+        self.replace_unmask_time_series(time_series_array)
+        self.read_to_write_z_memmap()
         self.update_all_cp_parameters()
 
     def set_rng(self, seed_sequence):
