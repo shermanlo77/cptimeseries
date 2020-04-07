@@ -50,7 +50,7 @@ class Mcmc(object):
             self.sample_array = np.memmap(self.memmap_path,
                                           dtype,
                                           "w+",
-                                          shape=(self.n_sample+1, self.n_dim))
+                                          shape=(self.n_sample, self.n_dim))
 
     def del_memmap(self):
         del self.sample_array
@@ -151,11 +151,12 @@ class Mcmc(object):
 
 def do_gibbs_sampling(mcmc_array, n_sample, rng):
     #initial value is a sample
+    print("Sample 0")
     for mcmc in mcmc_array:
         mcmc.add_to_sample()
     #Gibbs sampling
-    for i_step in range(n_sample):
-        print("Sample", i_step)
+    for i_step in range(n_sample-1):
+        print("Sample", i_step+1)
         #select random component
         mcmc_index = rng.randint(0, len(mcmc_array))
         for i_mcmc, mcmc in enumerate(mcmc_array):
