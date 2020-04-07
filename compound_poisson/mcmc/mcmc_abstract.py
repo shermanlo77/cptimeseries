@@ -52,6 +52,12 @@ class Mcmc(object):
                                           "w+",
                                           shape=(self.n_sample, self.n_dim))
 
+    def load_to_write(self):
+        self.sample_array = np.memmap(self.memmap_path,
+                                      self.dtype,
+                                      "r+",
+                                      shape=(self.n_sample, self.n_dim))
+
     def del_memmap(self):
         del self.sample_array
 

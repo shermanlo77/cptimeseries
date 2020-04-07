@@ -188,8 +188,12 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
 
         For all time_series, add z_array to the sample_array
         """
-        for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.sample()
+        time_series_array = self.downscale.pool.map(
+            static_sample_z, self.downscale.generate_unmask_time_series())
+        #multiprocessing does a clone, reload the sample array
+        for time_series in time_series_array:
+            time_series.z_mcmc.load_to_write()
+        self.downscale.replace_unmask_time_series(time_series_array)
 
     def add_to_sample(self):
         """All time_series sample z
@@ -204,3 +208,9 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
     def load_memmap(self):
         for time_series in self.downscale.generate_unmask_time_series():
             time_series.z_mcmc.load_memmap()
+
+def static_sample_z(time_series):
+    #multiprocessing does a clone, reload the sample array
+    time_series.z_mcmc.load_to_write()
+    time_series.z_mcmc.sample()
+    return time_series

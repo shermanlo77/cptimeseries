@@ -6,6 +6,7 @@ from numpy import random
 
 import compound_poisson
 from compound_poisson import mcmc
+from compound_poisson import multiprocess
 from compound_poisson.mcmc import target_downscale
 from compound_poisson.mcmc import target_model_field
 from compound_poisson import time_series_mcmc
@@ -71,6 +72,7 @@ class Downscale(object):
         self.model_field_scale = []
         self.n_model_field = len(data.model_field)
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
+        self.pool = None
         self.memmap_path = pathlib.Path(__file__).parent.absolute()
 
         #get the square error matrix used for GP
@@ -129,10 +131,14 @@ class Downscale(object):
     def fit(self):
         """Fit using Gibbs sampling
         """
+        self.pool = multiprocess.Pool()
         self.initalise_z()
         self.instantiate_mcmc()
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
+        self.pool.close()
+        self.pool.join()
+        self.pool = None
 
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
@@ -312,6 +318,14 @@ class Downscale(object):
                 if not self.mask[lat_i, long_i]:
                     yield self.time_series_array[lat_i][long_i]
 
+    def replace_unmask_time_series(self, time_series):
+        i = 0
+        for lat_i in range(self.shape[0]):
+            for long_i in range(self.shape[1]):
+                if not self.mask[lat_i, long_i]:
+                    self.time_series_array[lat_i][long_i] = time_series[i]
+                    i += 1
+
     def load_memmap(self):
         for mcmc in self.get_mcmc_array():
             mcmc.load_memmap()
@@ -330,6 +344,12 @@ class Downscale(object):
 
     def __len__(self):
         return len(self.time_array)
+
+    def __getstate__(self):
+        #required as multiprocessing cannot pickle multiprocessing.Pool
+        self_dict = self.__dict__.copy()
+        del self_dict['pool']
+        return self_dict
 
 class DownscaleDual(Downscale):
 
