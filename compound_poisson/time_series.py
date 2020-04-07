@@ -597,6 +597,9 @@ class TimeSeries(object):
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
 
+    def read_to_write_z_memmap(self):
+        self.z_mcmc.read_to_write_memmap()
+
     def __str__(self):
         #return the reg parameters for each cp parameter
         string = ""
@@ -621,5 +624,6 @@ class TimeSeries(object):
     def __setitem__(self, index, value):
         self.y_array[index] = value
 
-def static_get_joint_log_likelihood(time_series):
-    return time_series.get_joint_log_likelihood()
+def static_update_all_cp_parameters(time_series):
+    time_series.update_all_cp_parameters()
+    return time_series

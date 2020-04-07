@@ -7,7 +7,6 @@ from numpy import random
 import compound_poisson
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
-from compound_poisson import time_series
 from compound_poisson import time_series_mcmc
 from compound_poisson.mcmc import target_downscale
 from compound_poisson.mcmc import target_model_field
@@ -272,14 +271,18 @@ class Downscale(object):
     def update_all_cp_parameters(self):
         """Update all compound Poisson parameters in all time series
         """
-        for time_series in self.generate_unmask_time_series():
-            time_series.update_all_cp_parameters()
+        function = compound_poisson.time_series.static_update_all_cp_parameters
+        time_series_array = self.pool.map(
+            function, self.generate_unmask_time_series())
+        self.replace_unmask_time_series(time_series_array)
+        self.read_to_write_z_memmap()
 
     def get_log_likelihood(self):
         """Return log likelihood
         """
-        ln_l_array = self.pool.map(time_series.static_get_joint_log_likelihood,
-                                   self.generate_unmask_time_series())
+        method = (compound_poisson.time_series.TimeSeries
+            .get_joint_log_likelihood)
+        ln_l_array = self.pool.map(method, self.generate_unmask_time_series())
         return np.sum(ln_l_array)
 
     def forecast(self, data, n_simulation):
@@ -328,6 +331,10 @@ class Downscale(object):
     def load_memmap(self):
         for mcmc in self.get_mcmc_array():
             mcmc.load_memmap()
+
+    def read_to_write_z_memmap(self):
+        if not self.z_mcmc is None:
+            self.z_mcmc.read_to_write_memmap()
 
     def spawn_rng(self, n=1):
         """Return array of substream rng
