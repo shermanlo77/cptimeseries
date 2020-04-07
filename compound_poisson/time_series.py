@@ -597,6 +597,10 @@ class TimeSeries(object):
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
 
+    def read_memmap(self):
+        for mcmc in self.get_mcmc_array():
+            mcmc.read_memmap()
+
     def read_to_write_z_memmap(self):
         self.z_mcmc.read_to_write_memmap()
 

@@ -208,9 +208,9 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         for time_series in self.downscale.generate_unmask_time_series():
             time_series.z_mcmc.del_memmap()
 
-    def load_memmap(self):
+    def read_memmap(self):
         for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.load_memmap()
+            time_series.z_mcmc.read_memmap()
 
 def static_sample_z(time_series):
     #multiprocessing does a clone, reload the sample array

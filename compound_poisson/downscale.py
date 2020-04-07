@@ -328,9 +328,9 @@ class Downscale(object):
                     self.time_series_array[lat_i][long_i] = time_series[i]
                     i += 1
 
-    def load_memmap(self):
+    def read_memmap(self):
         for mcmc in self.get_mcmc_array():
-            mcmc.load_memmap()
+            mcmc.read_memmap()
 
     def read_to_write_z_memmap(self):
         if not self.z_mcmc is None:

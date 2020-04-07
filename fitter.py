@@ -41,7 +41,7 @@ class Fitter(object):
         except AttributeError:
             true_parameter = None
         directory = path.join(self.figure_dir, self.name)
-        time_series.load_memmap()
+        time_series.read_memmap()
         time_series.print_mcmc(directory, true_parameter)
 
 class FitterMcmc(Fitter):

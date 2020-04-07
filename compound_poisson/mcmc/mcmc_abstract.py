@@ -61,7 +61,7 @@ class Mcmc(object):
     def del_memmap(self):
         del self.sample_array
 
-    def load_memmap(self):
+    def read_memmap(self):
         self.sample_array = np.memmap(self.memmap_path,
                                       self.dtype,
                                       "r",
