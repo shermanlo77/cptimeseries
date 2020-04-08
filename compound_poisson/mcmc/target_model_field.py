@@ -53,15 +53,6 @@ class TargetModelField(target.Target):
             - self.area_unmask * math.log(precision)))
         return np.sum(ln_prior_term) - 0.5 * self.n_model_field * ln_det_cov
 
-    def update_mean(self):
-        gp_target = self.downscale.model_field_gp_target
-        for i in range(self.n_model_field):
-            self.prior_mean[i*self.area_unmask:(i+1)*self.area_unmask] = (
-                gp_target.get_mean(i,
-                                   self.time_step,
-                                   self.model_field_shift[i],
-                                   self.model_field_scale[i]))
-
     def set_mean(self, mean):
         self.prior_mean = mean
 
@@ -131,8 +122,12 @@ class TargetModelFieldArray(target.Target):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def update_mean(self):
+        gp_array = []
+        gp_target = self.downscale.model_field_gp_target
         for target in self:
-            target.update_mean()
+            gp_array.append(GpRegression(target, gp_target))
+        mean = self.downscale.pool.map(GpRegression.regress, gp_array)
+        self.set_mean(mean)
 
     def set_mean(self, mean):
         for i, target in enumerate(self):
@@ -267,19 +262,6 @@ class TargetGp(target.Target):
         kernel_matrix = np.exp(kernel_matrix)
         return kernel_matrix
 
-    def get_mean(self, model_field_index, time_step, shift, scale):
-        model_field_name = list(self.model_field_coarse.keys())
-        model_field_name = model_field_name[model_field_index]
-        model_field = self.model_field_coarse[model_field_name][time_step]
-        model_field = model_field.flatten()
-        model_field -= shift
-        model_field /= scale
-        mean = np.matmul(
-            self.k_12.T, linalg.lstsq(self.k_11, model_field, rcond=None)[0])
-        mean *= scale
-        mean += shift
-        return mean
-
     def save_cov_chol(self):
         self.k_11 = self.get_kernel_matrix(self.square_error_coarse)
         self.regularise_kernel(self.k_11)
@@ -296,6 +278,34 @@ class TargetGp(target.Target):
         regulariser = 1/math.sqrt(self.state["reg_precision"])
         for i in range(kernel.shape[0]):
             kernel[i, i] += regulariser
+
+class GpRegression(object):
+
+    def __init__(self, model_field_target, gp_target):
+        self.model_field_coarse = []
+        self.shift_array = model_field_target.model_field_shift
+        self.scale_array = model_field_target.model_field_scale
+        self.k_11 = gp_target.k_11
+        self.k_12 = gp_target.k_12
+        for model_field in (
+            model_field_target.downscale.model_field_coarse.values()):
+            self.model_field_coarse.append(
+                model_field[model_field_target.time_step])
+
+    def regress(self):
+        mean = []
+        k_12_t = self.k_12.T
+        for i, model_field_i in enumerate(self.model_field_coarse):
+            model_field_i = model_field_i.flatten()
+            model_field_i -= self.shift_array[i]
+            model_field_i /= self.scale_array[i]
+            mean_i = np.matmul(
+                k_12_t, linalg.lstsq(self.k_11, model_field_i, rcond=None)[0])
+            mean_i *= self.scale_array[i]
+            mean_i += self.shift_array[i]
+            mean.append(mean_i)
+        return np.concatenate(mean)
+
 
 def get_precision_prior():
     return stats.gamma(a=4/3, scale=3)
