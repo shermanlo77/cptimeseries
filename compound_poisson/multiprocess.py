@@ -1,27 +1,28 @@
 import multiprocessing
 
-from abcpy import backends
+from mpi4py import MPI
+from mpi4py import futures
 
 N_PROCESSESS = None
+CHUNKSIZE = 1
 
 class Pool(object):
 
     def __init__(self):
         self.pool = None
         self.is_mpi = False
-        try:
-            self.pool = backends.BackendMPI()
+
+        comm = MPI.COMM_WORLD
+        if comm.size > 1:
+            self.pool = futures.MPIPoolExecutor()
             self.is_mpi = True
-        except ValueError:
+        else:
             self.pool = multiprocessing.Pool(N_PROCESSESS)
 
     def map(self, function, parameters):
+        results = self.pool.map(function, parameters)
         if self.is_mpi:
-            pds = self.pool.parallelize(parameters)
-            pds_map = self.pool.map(function, pds)
-            results = self.pool.collect(pds_map)
-        else:
-            results = self.pool.map(function, parameters)
+            results = list(results)
         return results
 
     def join(self):
