@@ -12,15 +12,20 @@ from compound_poisson.mcmc import target_downscale
 from compound_poisson.mcmc import target_model_field
 
 class Downscale(object):
-    """Collection of multiple TimeSeries object
+    """Collection of multiple TimeSeries objects
 
     Fit a compound Poisson time series on multiple locations in 2d space.
-        Parameters have a Gaussian process (GP) prior, with gamma precision
-        prior and gamma GP precision prior.
+        Parameters have a Gaussian process (GP) prior with gamma hyper
+        parameters
 
     Attributes:
         n_arma: 2-tuple, containing number of AR and MA terms
-        time_series_array: 2d array containing TimeSeries objects
+        time_series_array: 2d array containing TimeSeries objects, correspond to
+            the fine grid
+        time_array: array containing time stamp for each time step
+        model_field_units: dictionary containing units for each model field,
+            keys are strings describing the model field
+        n_model_field: number of model fields
         mask: 2d boolean, True if on water, therefore masked
         parameter_mask_vector: mask as a vector
         n_parameter: number of parameters for one location
@@ -30,20 +35,23 @@ class Downscale(object):
             mean 0, std 1
         shape: 2-tuple, shape of the space
         area: area of the space
-        area_unmask: area of the unmasked space
+        area_unmask: area of the unmasked space (number of points on fine grid)
+        seed_seq: numpy.random.SeedSequence object
         rng: numpy.random.RandomState object
         parameter_target: TargetParameter object
-        parameter_precision_mcmc: TargetPrecision object
         parameter_gp_target: TargetGp object
         parameter_mcmc: Mcmc object wrapping around parameter_target
-        parameter_precision_mcmc: Mcmc object wrapping around
-            parameter_precision_target
-        gp_mcmc: Mcmc object wrapping around parameter_gp_target
-        n_sample: number of MCMC samples
+        parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
+        z_mcmc: array of all ZMcmc objects (owned by each unmasked time series)
+        n_sample: number of mcmc samples
         model_field_shift: mean of model field, vector, entry for each model
             field
         model_field_scale: std of model field, vector, entry of reach model
             field
+        square_error: matrix (area_unmask x area_unmask) containing square error
+            of topography between each point in space
+        pool: object for parallel programming
+        memmap_path: location to store mcmc samples
     """
 
     def __init__(self, data, n_arma=(0,0)):
@@ -51,6 +59,7 @@ class Downscale(object):
         self.time_series_array = []
         self.time_array = data.time_array
         self.model_field_units = data.model_field_units
+        self.n_model_field = len(data.model_field)
         self.mask = data.mask
         self.parameter_mask_vector = []
         self.n_parameter = None
@@ -70,7 +79,6 @@ class Downscale(object):
         self.n_sample = 10000
         self.model_field_shift = []
         self.model_field_scale = []
-        self.n_model_field = len(data.model_field)
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
         self.pool = None
         self.memmap_path = pathlib.Path(__file__).parent.absolute()
@@ -98,20 +106,20 @@ class Downscale(object):
         #masked points do not have rain, cannot provide it
         time_series_array = self.time_series_array
         for lat_i in range(self.shape[0]):
-
             time_series_array.append([])
-
             for long_i in range(self.shape[1]):
-
                 x_i, rain_i = data.get_data(lat_i, long_i)
                 is_mask = self.mask[lat_i, long_i]
                 if is_mask:
+                    #provide no rain
                     time_series = TimeSeriesDownscale(
                         x_i, poisson_rate_n_arma=n_arma,
                         gamma_mean_n_arma=n_arma)
                 else:
+                    #provide rain
                     time_series = TimeSeriesDownscale(
                         x_i, rain_i.data, n_arma, n_arma)
+                #provide information to time_series
                 time_series.id = str(lat_i) + "_" + str(long_i)
                 time_series.x_shift = self.model_field_shift
                 time_series.x_scale = self.model_field_scale
@@ -122,6 +130,7 @@ class Downscale(object):
                     self.parameter_mask_vector.append(is_mask)
                 self.n_parameter = time_series.n_parameter
 
+        #set other member variables
         self.set_rng(self.seed_seq)
         self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
         self.n_total_parameter = self.area_unmask * self.n_parameter
@@ -155,6 +164,8 @@ class Downscale(object):
         self.parameter_gp_target.save_cov_chol()
 
     def get_mcmc_array(self):
+        """Return array of all mcmc objects
+        """
         mcmc_array = [
             self.z_mcmc,
             self.parameter_mcmc,
@@ -171,6 +182,7 @@ class Downscale(object):
         time_series_array = self.pool.map(
             method, self.generate_unmask_time_series())
         self.replace_unmask_time_series(time_series_array)
+        #reload memmap as parallel deep copy the memmap
         self.read_to_write_z_memmap()
         self.update_all_cp_parameters()
 
@@ -186,6 +198,11 @@ class Downscale(object):
             time_series.rng = self.spawn_rng()
 
     def set_memmap_path(self, memmap_path):
+        """Set the location to save mcmc sample onto disk
+
+        Modifies all mcmc objects to save the mcmc sample onto a specified
+            location
+        """
         self.memmap_path = memmap_path
         for time_series in self.generate_all_time_series():
             time_series.memmap_path = memmap_path
@@ -289,6 +306,12 @@ class Downscale(object):
         return np.sum(ln_l_array)
 
     def forecast(self, data, n_simulation):
+        """Do forecast
+
+        Args:
+            data: test data
+            n_simulation: number of Monte Carlo simulations
+        """
         forecast_array = []
         i = 0
         area_unmask = self.area_unmask
@@ -313,17 +336,25 @@ class Downscale(object):
         return forecast_array
 
     def generate_all_time_series(self):
+        """Generate all time series in self.time_series_array
+        """
         for time_series_i in self.time_series_array:
             for time_series in time_series_i:
                 yield time_series
 
     def generate_unmask_time_series(self):
+        """Generate all unmasked (on land) time series
+        """
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
                 if not self.mask[lat_i, long_i]:
                     yield self.time_series_array[lat_i][long_i]
 
     def replace_unmask_time_series(self, time_series):
+        """Replace all unmaksed time series with provided time series array
+
+        Needed as parallel methods will do a deep copy of time_series objects
+        """
         i = 0
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
@@ -332,15 +363,32 @@ class Downscale(object):
                     i += 1
 
     def read_memmap(self):
+        """Set memmap objects to read from file
+
+        Required when loading saved object from joblib
+        """
         for mcmc in self.get_mcmc_array():
             mcmc.read_memmap()
 
     def read_to_write_z_memmap(self):
+        """Set memmap objects for z mcmc to read and write from file
+
+        Required because parallel does a deep copy of time_series objects which
+            contain ZMcmc objects. When gather is called, memmap objects will
+            need to be instantiated again
+        """
         if not self.z_mcmc is None:
             self.z_mcmc.read_to_write_memmap()
 
     def spawn_rng(self, n=1):
         """Return array of substream rng
+
+        Return array of independent random number generators by spawning from
+            the seed sequence
+
+        Return:
+            array of numpy.random.RandomState objects if n > 1, or just a single
+                object if n == 1
         """
         seed_spawn = self.seed_seq.spawn(n)
         rng_array = []
@@ -361,6 +409,28 @@ class Downscale(object):
         return self_dict
 
 class DownscaleDual(Downscale):
+    """Collection of multiple TimeSeries objects
+
+    Fit a compound Poisson time series on multiple locations in 2d space.
+        Parameters have a Gaussian process (GP) prior with gamma hyper
+        parameters. Model fields on the coarse grid have a GP prior, model
+        fields on the fine grid can be sampled
+
+    See superclass Downscale
+
+    Attributes:
+        model_field_coarse: dictionary model fields on the coarse grid for each
+            time point
+        topography_coarse_normalise: dictionary of normalised topography
+            information on the coarse grid
+        n_coarse: number of points on the coarse grid
+        model_field_target: compound_poisson.mcmc.target_model_field
+            .TargetModelFieldArray object
+        model_field_mcmc: mcmc object wrapping model_field_target
+        model_field_gp_target: compound_poisson.mcmc.target_model_field
+            .TargetGp object
+        model_field_gp_mcmc: mcmc object wrapping model_field_gp_target
+    """
 
     def __init__(self, data, n_arma=(0,0)):
         super().__init__(data, n_arma)
@@ -428,6 +498,8 @@ class DownscaleDual(Downscale):
                 i_counter += 1
 
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
+    """Modify TimeSeriesSlice to only sample z
+    """
 
     def __init__(self,
                  x,
@@ -440,3 +512,22 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
+
+    def instantiate_mcmc(self):
+        """Instantiate all MCMC objects
+
+        Override
+        Only instantiate slice sampling for z
+        """
+        self.z_mcmc = mcmc.ZSlice(
+            self.n_sample, self.memmap_path, self.z_target, self.rng)
+
+    def print_chain_property(self, directory):
+        """Override - only print chain for z
+        """
+        plt.figure()
+        plt.plot(np.asarray(self.z_mcmc.slice_width_array))
+        plt.ylabel("Latent variable slice width")
+        plt.xlabel("Latent variable sample number")
+        plt.savefig(path.join(directory, "slice_width_z.pdf"))
+        plt.close()
