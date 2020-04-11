@@ -325,9 +325,10 @@ class Downscale(object):
             long_i = time_series.id[1]
             x_i = data.get_model_field(lat_i, long_i)
             #extract mcmc chain corresponding to this location
-            parameter_mcmc = np.array(self.parameter_mcmc.sample_array)
+            parameter_mcmc = self.parameter_mcmc.sample_array
             parameter_mcmc = parameter_mcmc[
                 :, range(i, n_total_parameter, area_unmask)]
+            parameter_mcmc = np.asarray(parameter_mcmc.tolist())
             time_series.parameter_mcmc = parameter_mcmc
             forecast = time_series.forecast(x_i, n_simulation)
             forecast_array.append(forecast)
