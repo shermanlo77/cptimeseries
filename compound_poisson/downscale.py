@@ -120,7 +120,7 @@ class Downscale(object):
                     time_series = TimeSeriesDownscale(
                         x_i, rain_i.data, n_arma, n_arma)
                 #provide information to time_series
-                time_series.id = str(lat_i) + "_" + str(long_i)
+                time_series.id = [lat_i, long_i]
                 time_series.x_shift = self.model_field_shift
                 time_series.x_scale = self.model_field_scale
                 time_series.time_array = self.time_array
@@ -311,29 +311,44 @@ class Downscale(object):
         Args:
             data: test data
             n_simulation: number of Monte Carlo simulations
+
+        Return:
+            nested array of Forecast objects, shape corresponding to fine grid
         """
+        #contains forecast objects for each unmasked time series
         forecast_array = []
-        i = 0
         area_unmask = self.area_unmask
         n_total_parameter = self.n_total_parameter
+        #do forecasting for all unmaksed time series
+        for i, time_series in enumerate(self.generate_unmask_time_series()):
+            lat_i = time_series.id[0]
+            long_i = time_series.id[1]
+            x_i = data.get_model_field(lat_i, long_i)
+            #extract mcmc chain corresponding to this location
+            parameter_mcmc = np.array(self.parameter_mcmc.sample_array)
+            parameter_mcmc = parameter_mcmc[
+                :, range(i, n_total_parameter, area_unmask)]
+            time_series.parameter_mcmc = parameter_mcmc
+            forecast = time_series.forecast(x_i, n_simulation)
+            forecast_array.append(forecast)
+
+        #convert array into nested array (2D array), use None for masked time
+            #series
+        forecast_nested_array = []
+        i = 0
         for lat_i in range(self.shape[0]):
-            forecast_array.append([])
+            forecast_nested_array_i = []
             for long_i in range(self.shape[1]):
-                x_i = data.get_model_field(lat_i, long_i)
                 is_mask = self.mask[lat_i, long_i]
                 if self.mask[lat_i, long_i]:
                     forecast = None
                 else:
-                    time_series = self.time_series_array[lat_i][long_i]
-                    parameter_mcmc = np.array(
-                        self.parameter_mcmc.sample_array)
-                    parameter_mcmc = parameter_mcmc[
-                        :, range(i, n_total_parameter, area_unmask)]
-                    time_series.parameter_mcmc = parameter_mcmc
-                    forecast = time_series.forecast(x_i, n_simulation)
+                    forecast = forecast_array[i]
                     i += 1
-                forecast_array[-1].append(forecast)
-        return forecast_array
+                forecast_nested_array_i.append(forecast)
+            forecast_nested_array.append(forecast_nested_array_i)
+
+        return forecast_nested_array
 
     def generate_all_time_series(self):
         """Generate all time series in self.time_series_array
@@ -519,6 +534,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         Override
         Only instantiate slice sampling for z
         """
+        self.parameter_mcmc = None
         self.z_mcmc = mcmc.ZSlice(
             self.n_sample, self.memmap_path, self.z_target, self.rng)
 

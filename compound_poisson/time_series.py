@@ -275,7 +275,7 @@ class TimeSeries(object):
                 if self.id is None:
                     vector_name.append(name)
                 else:
-                    vector_name.append(self.id + "_" + name)
+                    vector_name.append(str(self.id) + "_" + name)
         return vector_name
 
     def set_parameter_vector(self, parameter_vector):

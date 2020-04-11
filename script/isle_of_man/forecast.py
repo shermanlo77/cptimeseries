@@ -6,10 +6,11 @@ import joblib
 import dataset
 
 def main():
-    
+
     path_here = pathlib.Path(__file__).parent.absolute()
     downscale = joblib.load(path.join(path_here, "downscale.gz"))
     test_set = dataset.IsleOfManTest()
+    downscale.read_memmap()
     forecast = downscale.forecast(test_set, 1000)
     joblib.dump(forecast, path.join(path_here, "forecast.gz"))
 
