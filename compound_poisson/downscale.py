@@ -319,8 +319,10 @@ class Downscale(object):
         forecast_array = []
         area_unmask = self.area_unmask
         n_total_parameter = self.n_total_parameter
-        #do forecasting for all unmaksed time series
+
+        forecast_message = []
         for i, time_series in enumerate(self.generate_unmask_time_series()):
+            #extract model fields for each unmasked time_series
             lat_i = time_series.id[0]
             long_i = time_series.id[1]
             x_i = data.get_model_field(lat_i, long_i)
@@ -330,8 +332,16 @@ class Downscale(object):
                 :, range(i, n_total_parameter, area_unmask)]
             parameter_mcmc = np.asarray(parameter_mcmc.tolist())
             time_series.parameter_mcmc = parameter_mcmc
-            forecast = time_series.forecast(x_i, n_simulation)
-            forecast_array.append(forecast)
+
+            message = ForecastMessage(time_series, x_i, n_simulation)
+            forecast_message.append(message)
+
+        self.pool = multiprocess.Pool()
+        forecast_array = self.pool.map(
+            ForecastMessage.forecast, forecast_message)
+        self.pool.close()
+        self.pool.join()
+        self.pool = None
 
         #convert array into nested array (2D array), use None for masked time
             #series
@@ -548,3 +558,15 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         plt.xlabel("Latent variable sample number")
         plt.savefig(path.join(directory, "slice_width_z.pdf"))
         plt.close()
+
+
+class ForecastMessage(object):
+    #message to pass, see Downscale.forecast
+
+    def __init__(self, time_series, model_field, n_simulation):
+        self.time_series = time_series
+        self.model_field = model_field
+        self.n_simulation = n_simulation
+
+    def forecast(self):
+        return self.time_series.forecast(self.model_field, self.n_simulation)
