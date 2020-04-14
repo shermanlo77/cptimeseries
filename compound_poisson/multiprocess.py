@@ -1,5 +1,6 @@
 import multiprocessing
 
+from abcpy import backends
 from mpi4py import MPI
 from mpi4py import futures
 
@@ -17,30 +18,54 @@ class Serial(object):
             results.append(function(parameter))
         return results
 
+    def broadcast(self, value):
+        return Broadcast(value)
+
     def join(self):
         pass
 
+class MPIPoolExecutor(Serial):
+
+    def __init__(self):
+        self.pool = futures.MPIPoolExecutor()
+
+    def map(self, function, parameters):
+        results = self.pool.map(function, parameters)
+        results = list(results)
+        return results
 
 class Pool(Serial):
 
     def __init__(self):
-        self.pool = None
-        self.is_mpi = False
-
-        comm = MPI.COMM_WORLD
-        if comm.size > 1:
-            self.pool = futures.MPIPoolExecutor()
-            self.is_mpi = True
-        else:
-            self.pool = multiprocessing.Pool(N_PROCESSESS)
+        self.pool = multiprocessing.Pool(N_PROCESSESS)
 
     def map(self, function, parameters):
         results = self.pool.map(function, parameters)
-        if self.is_mpi:
-            results = list(results)
         return results
 
     def join(self):
-        if not self.is_mpi:
-            self.pool.close()
-            self.pool.join()
+        self.pool.close()
+        self.pool.join()
+
+class BackendMPI(Serial):
+
+    def __init__(self):
+        self.pool = backends.BackendMPI()
+
+    def map(self, function, parameters):
+        pds = self.pool.parallelize(parameters)
+        pds_map = self.pool.map(function, pds)
+        results = self.pool.collect(pds_map)
+        return results
+
+    def broadcast(self, value):
+        return self.pool.broadcast(value)
+
+class Broadcast(object):
+    """Dummy Broadcast object
+    """
+    def __init__(self, value):
+        self._value = value
+
+    def value(self):
+        return self._value

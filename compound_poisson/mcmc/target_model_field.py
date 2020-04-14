@@ -90,12 +90,31 @@ class TargetModelField(target.Target):
         #used when the gp precision changes which changes the mean
         self.prior_mean = mean
 
+    def get_prior_mean(self):
+        #implemented
+        return self.prior_mean
+
     def simulate_from_prior(self, rng):
         #implemented
         gp_target = self.downscale.model_field_gp_target
-        model_field_vector = np.empty(self.area_unmask * self.n_model_field)
-        scale = 1/math.sqrt(gp_target.state["precision"])
+        precision = gp_target.state["precision"]
         cov_chol = gp_target.cov_chol
+        state_rng = self.simulate_from_prior_given_gp(precision, cov_chol, rng)
+        return state_rng[0]
+
+    def simulate_from_prior_given_gp(self, precision, cov_chol, rng):
+        """Simulate from the prior given gp precision parameters
+
+	    Args:
+            precision: precision to scale cov_chol
+            cov_chol: cholesky of the covariance matrix
+            rng: random number generator
+
+        Return:
+            2 array, 0th element simulation, 1st element rng after being used
+        """
+        model_field_vector = np.empty(self.area_unmask * self.n_model_field)
+        scale = 1/math.sqrt(precision)
         #simulate each model_field, correlation only in space, not between
             #model_fields
         for i in range(self.n_model_field):
@@ -106,11 +125,7 @@ class TargetModelField(target.Target):
                 model_field_i)
         model_field_vector *= scale
         model_field_vector += self.prior_mean
-        return model_field_vector
-
-    def get_prior_mean(self):
-        #implemented
-        return self.prior_mean
+        return [model_field_vector, rng]
 
 class TargetModelFieldArray(target.Target):
     """Contains array of TargetModelField objects, one for each time step
@@ -187,9 +202,13 @@ class TargetModelFieldArray(target.Target):
         """
         gp_array = []
         gp_target = self.downscale.model_field_gp_target
+        pool = self.downscale.pool
+        #distribute k_11 and k_12 to all workers
+        k_11 = pool.broadcast(gp_target.k_11)
+        k_12 = pool.broadcast(gp_target.k_12)
         for target in self:
-            gp_array.append(GpRegression(target, gp_target))
-        mean = self.downscale.pool.map(GpRegression.regress, gp_array)
+            gp_array.append(GpRegressionMessage(target, k_11, k_12))
+        mean = self.downscale.pool.map(GpRegressionMessage.regress, gp_array)
         self.set_mean(mean)
 
     def set_mean(self, mean):
@@ -202,10 +221,28 @@ class TargetModelFieldArray(target.Target):
     def simulate_from_prior(self, rng):
         #implemented
         #provided rng not used as this is to be parallised
-        state = []
-        #use spawned rng which
+        message_array = []
+        pool = self.downscale.pool
+        gp_target = self.downscale.model_field_gp_target
+
+        #perpare message
+        cov_chol = pool.broadcast(gp_target.cov_chol)
+        precision = pool.broadcast(gp_target.state["precision"])
         for i, target in enumerate(i, self):
-            state.append(target.simulate_from_prior(self.rng_array[i]))
+            #use spawned rng
+            rng = self.rng_array[i]
+            message_array.append(
+                GpSimulateMessage(target, cov_chol, precision, rng))
+
+        #returns array of 2 array containing simulated model field and rng after
+            #use, need to extract them and put them accordingly
+        state_rng_array = pool.map(
+            GpSimulateMessage.simulate_from_prior, message_array)
+        state = []
+        self.rng_array = []
+        for state_rng in state_rng_array:
+            state.append(state_rng[0])
+            self.rng_array.append(state_rng[1])
         state = np.concatenate(state)
         return state
 
@@ -399,7 +436,7 @@ class TargetGp(target.Target):
         for i in range(kernel.shape[0]):
             kernel[i, i] += regulariser
 
-class GpRegression(object):
+class GpRegressionMessage(object):
     """For doing gaussian process regression
 
     For doing gaussian process regression and return the mean, designed to be
@@ -410,22 +447,23 @@ class GpRegression(object):
             coarse grid, one model field for each entry
         shift_array: array of normalising factors, one for each model field
         scale_array: array of normalising factors, one for each model field
-        k_11: kernel matrix, dimensions n_coarse x n_coarse
-        k_12: kernel matrix, dimensions n_coarse x area_unmask
+        k_11: broadcast, kernel matrix, dimensions n_coarse x n_coarse
+        k_12: broadcast, kernel matrix, dimensions n_coarse x area_unmask
     """
 
-    def __init__(self, model_field_target, gp_target):
+    def __init__(self, model_field_target, k_11, k_12):
         """
         Args:
             model_field_target: TargetModelField object (not
                 TargetModelFieldArray)
-            gp_target: TargetGp object
+            k_11: kernel matrix, dimensions n_coarse x n_coarse
+            k_12: kernel matrix, dimensions n_coarse x area_unmask
         """
         self.model_field_coarse = []
         self.shift_array = model_field_target.model_field_shift
         self.scale_array = model_field_target.model_field_scale
-        self.k_11 = gp_target.k_11
-        self.k_12 = gp_target.k_12
+        self.k_11 = k_11
+        self.k_12 = k_12
         #extracted model fields for this particular time point
         for model_field in (
             model_field_target.downscale.model_field_coarse.values()):
@@ -439,7 +477,9 @@ class GpRegression(object):
             field, returns vector, model fields are stacked on top of each other
         """
         mean = [] #array of means for each model field
-        k_12_t = self.k_12.T
+        k_11 = self.k_11.value()
+        k_12 = self.k_12.value()
+        k_12_t = k_12.T
         #model fields have covariance matrix over space, but different model
             #fields are not correlated with each other, thus regress for each
             #model fields indepedently
@@ -448,12 +488,62 @@ class GpRegression(object):
             model_field_i -= self.shift_array[i]
             model_field_i /= self.scale_array[i]
             mean_i = np.matmul(
-                k_12_t, linalg.lstsq(self.k_11, model_field_i, rcond=None)[0])
+                k_12_t, linalg.lstsq(k_11, model_field_i, rcond=None)[0])
             mean_i *= self.scale_array[i]
             mean_i += self.shift_array[i]
             mean.append(mean_i)
         return np.concatenate(mean)
 
+class GpSimulateMessage(object):
+    """For simulating model fields from the prior
+
+    For simulating model fields from the prior for a given time point, designed
+        to be temporary and used in distributed memory.
+
+    Attributes:
+        prior_mean: vector, Gaussian process mean, for each model field and
+            point in space, length n_total_parameter
+        model_field_shift: array, normalisation value for each model field
+        model_field_scale: array, normalisation value for each model field
+        area_unmask: number of points on the find grid
+        n_model_field: number of model fields
+        n_total_parameter: number of model fields x area_unmask
+        cov_chol: broadcast, cholesky of kernel matrix (not covariance matrix),
+            dimensions area_unmask x area_unmask
+        precision: broadcast, used to scale cov_chol
+        rng: random number generator
+    """
+
+    def __init__(self, model_field_target, cov_chol, precision, rng):
+        """
+        Args:
+            model_field_target: TargetModelField for a time point
+            cov_chol: broadcast of cov_chol
+            precision: broadcast of gp_target.state["precision"]
+            rng: random number generator
+        """
+        self.prior_mean = model_field_target.prior_mean
+        self.model_field_shift = model_field_target.model_field_shift
+        self.model_field_scale = model_field_target.model_field_scale
+        self.area_unmask = model_field_target.area_unmask
+        self.n_model_field = model_field_target.n_model_field
+        self.cov_chol = cov_chol
+        self.precision = preicison
+        self.rng = rng
+
+    def simulate_from_prior(self):
+        """Return simulation from the prior
+
+        Return:
+            two array, 0th element simulated model field, 1st element rng after
+                use
+        """
+        #implemented
+        precision = self.precision.value()
+        cov_chol = self.cov_chol.value()
+        state_rng = TargetModelField.simulate_from_prior_given_gp(
+            self, precision, cov_chol, self.rng)
+        return [model_field_vector, rng]
 
 def get_precision_prior():
     return stats.gamma(a=4/3, scale=3)
