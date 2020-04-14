@@ -6,7 +6,22 @@ from mpi4py import futures
 N_PROCESSESS = None
 CHUNKSIZE = 1
 
-class Pool(object):
+class Serial(object):
+
+    def __init__(self):
+        pass
+
+    def map(self, function, parameters):
+        results = []
+        for parameter in parameters:
+            results.append(function(parameter))
+        return results
+
+    def join(self):
+        pass
+
+
+class Pool(Serial):
 
     def __init__(self):
         self.pool = None
@@ -27,8 +42,5 @@ class Pool(object):
 
     def join(self):
         if not self.is_mpi:
-            self.pool.join()
-
-    def close(self):
-        if not self.is_mpi:
             self.pool.close()
+            self.pool.join()

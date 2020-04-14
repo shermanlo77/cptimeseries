@@ -509,9 +509,9 @@ class TimeSeries(object):
         forecast_array = forecast.Forecast()
         for i in range(n_simulation):
             print("Predictive sample", i)
-            forecast = self.instantiate_forecast_self()
-            forecast.simulate_given_z()
-            forecast_array.append(forecast)
+            forecast_i = self.instantiate_forecast_self()
+            forecast_i.simulate_given_z()
+            forecast_array.append(forecast_i)
         forecast_array.get_forecast()
         return forecast_array
 
@@ -553,6 +553,8 @@ class TimeSeries(object):
             print("Predictive sample", i)
             forecast_i = self.instantiate_forecast(x)
             forecast_i.simulate()
+            #the fitted time series is not needed anymore
+            forecast_i.fitted_time_series = None
             forecast_array.append(forecast_i)
         forecast_array.get_forecast()
         return forecast_array
@@ -596,6 +598,10 @@ class TimeSeries(object):
         """
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
+
+    def del_memmap(self):
+        for mcmc in self.get_mcmc_array():
+            mcmc.del_memmap()
 
     def read_memmap(self):
         for mcmc in self.get_mcmc_array():

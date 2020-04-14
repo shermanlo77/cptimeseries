@@ -1,6 +1,9 @@
 import math
+import os
+from os import path
 import pathlib
 
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
 
@@ -44,6 +47,7 @@ class Downscale(object):
         parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
         z_mcmc: array of all ZMcmc objects (owned by each unmasked time series)
         n_sample: number of mcmc samples
+        burn_in: number of initial mcmc samples to discard when forecasting
         model_field_shift: mean of model field, vector, entry for each model
             field
         model_field_scale: std of model field, vector, entry of reach model
@@ -77,6 +81,7 @@ class Downscale(object):
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
         self.n_sample = 10000
+        self.burn_in = 0
         self.model_field_shift = []
         self.model_field_scale = []
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
@@ -137,16 +142,20 @@ class Downscale(object):
         self.parameter_target = target_downscale.TargetParameter(self)
         self.parameter_gp_target = target_downscale.TargetGp(self)
 
-    def fit(self):
+    def fit(self, pool=None):
         """Fit using Gibbs sampling
+
+        Args:
+            pool: optional, a pool object to do parallel tasks
         """
-        self.pool = multiprocess.Pool()
+        if pool is None:
+            pool = multiprocess.Serial()
+        self.pool = pool
         self.initalise_z()
         self.instantiate_mcmc()
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
-        self.pool.close()
-        self.pool.join()
+        self.del_memmap()
         self.pool = None
 
     def instantiate_mcmc(self):
@@ -182,30 +191,6 @@ class Downscale(object):
         time_series_array = self.pool.map(
             method, self.generate_unmask_time_series())
         self.replace_unmask_time_series(time_series_array)
-        #reload memmap as parallel deep copy the memmap
-        self.read_to_write_z_memmap()
-        self.update_all_cp_parameters()
-
-    def set_rng(self, seed_sequence):
-        """Set rng for all time series
-
-        Args:
-            seed_sequence: numpy.random.SeedSequence object
-        """
-        self.seed_seq = seed_sequence
-        self.rng = self.spawn_rng()
-        for time_series in self.generate_all_time_series():
-            time_series.rng = self.spawn_rng()
-
-    def set_memmap_path(self, memmap_path):
-        """Set the location to save mcmc sample onto disk
-
-        Modifies all mcmc objects to save the mcmc sample onto a specified
-            location
-        """
-        self.memmap_path = memmap_path
-        for time_series in self.generate_all_time_series():
-            time_series.memmap_path = memmap_path
 
     def simulate_i(self, i):
         """Simulate a point in time for all time series
@@ -292,6 +277,7 @@ class Downscale(object):
         """Update all compound Poisson parameters in all time series
         """
         function = compound_poisson.time_series.static_update_all_cp_parameters
+        self.del_z_memmap()
         time_series_array = self.pool.map(
             function, self.generate_unmask_time_series())
         self.replace_unmask_time_series(time_series_array)
@@ -305,16 +291,21 @@ class Downscale(object):
         ln_l_array = self.pool.map(method, self.generate_unmask_time_series())
         return np.sum(ln_l_array)
 
-    def forecast(self, data, n_simulation):
+    def forecast(self, data, n_simulation, pool=None):
         """Do forecast
 
         Args:
             data: test data
             n_simulation: number of Monte Carlo simulations
+            pool: optional, a pool object to do parallel tasks
 
         Return:
             nested array of Forecast objects, shape corresponding to fine grid
         """
+        if pool is None:
+            pool = multiprocess.Serial()
+        self.pool = pool
+        self.read_memmap()
         #contains forecast objects for each unmasked time series
         forecast_array = []
         area_unmask = self.area_unmask
@@ -339,8 +330,6 @@ class Downscale(object):
         self.pool = multiprocess.Pool()
         forecast_array = self.pool.map(
             ForecastMessage.forecast, forecast_message)
-        self.pool.close()
-        self.pool.join()
         self.pool = None
 
         #convert array into nested array (2D array), use None for masked time
@@ -360,6 +349,44 @@ class Downscale(object):
             forecast_nested_array.append(forecast_nested_array_i)
 
         return forecast_nested_array
+
+    def print_mcmc(self, directory):
+        self.read_memmap()
+
+        directory = path.join(directory, "chain")
+        if not path.isdir(directory):
+            os.mkdir(directory)
+
+        chain = np.asarray(self.parameter_mcmc.sample_array)
+        area_unmask = self.area_unmask
+        parameter_name = (
+            self.time_series_array[0][0].get_parameter_vector_name())
+        for i in range(self.n_parameter):
+            chain_i = chain[:, i*area_unmask : (i+1)*area_unmask]
+            plt.plot(chain_i)
+            plt.xlabel("sample number")
+            plt.ylabel(parameter_name[i])
+            plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
+            plt.close()
+
+        chain = np.asarray(self.parameter_gp_mcmc.sample_array)
+        key = self.parameter_gp_target.state.keys()
+        for i, key in enumerate(self.parameter_gp_target.state):
+            chain_i = chain[:, i]
+            plt.plot(chain_i)
+            plt.xlabel("sample number")
+            plt.ylabel(key)
+            plt.savefig(path.join(directory, key + ".pdf"))
+            plt.close()
+
+        chain = []
+        for time_series in self.generate_unmask_time_series():
+            chain.append(np.mean(time_series.z_mcmc.sample_array, 1))
+        plt.plot(np.transpose(np.asarray(chain)))
+        plt.xlabel("sample number")
+        plt.ylabel("mean z")
+        plt.savefig(path.join(directory, "z.pdf"))
+        plt.close()
 
     def generate_all_time_series(self):
         """Generate all time series in self.time_series_array
@@ -388,6 +415,16 @@ class Downscale(object):
                     self.time_series_array[lat_i][long_i] = time_series[i]
                     i += 1
 
+    def set_memmap_path(self, memmap_path):
+        """Set the location to save mcmc sample onto disk
+
+        Modifies all mcmc objects to save the mcmc sample onto a specified
+            location
+        """
+        self.memmap_path = memmap_path
+        for time_series in self.generate_all_time_series():
+            time_series.memmap_path = memmap_path
+
     def read_memmap(self):
         """Set memmap objects to read from file
 
@@ -405,6 +442,28 @@ class Downscale(object):
         """
         if not self.z_mcmc is None:
             self.z_mcmc.read_to_write_memmap()
+
+    def del_memmap(self):
+        for mcmc in self.get_mcmc_array():
+            mcmc.del_memmap()
+
+    def del_z_memmap(self):
+        """Delete memmap objects for z_mcmc
+
+        Required when passing time_series object to parallel workers
+        """
+        self.z_mcmc.del_memmap()
+
+    def set_rng(self, seed_sequence):
+        """Set rng for all time series
+
+        Args:
+            seed_sequence: numpy.random.SeedSequence object
+        """
+        self.seed_seq = seed_sequence
+        self.rng = self.spawn_rng()
+        for time_series in self.generate_all_time_series():
+            time_series.rng = self.spawn_rng()
 
     def spawn_rng(self, n=1):
         """Return array of substream rng

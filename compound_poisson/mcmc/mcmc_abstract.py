@@ -60,6 +60,7 @@ class Mcmc(object):
 
     def del_memmap(self):
         del self.sample_array
+        self.sample_array = None
 
     def read_memmap(self):
         self.sample_array = np.memmap(self.memmap_path,

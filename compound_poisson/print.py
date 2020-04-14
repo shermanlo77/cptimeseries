@@ -2,21 +2,26 @@ import math
 import os
 from os import path
 
+from cartopy import crs
 import cycler
 import joblib
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import ma
 import pandas.plotting
 from statsmodels.tsa import stattools
 
+import compound_poisson
+import dataset
+
 def time_series(time_series, directory, prefix=""):
-    
+
     pandas.plotting.register_matplotlib_converters()
-    
+
     colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
     cycle = cycler.cycler(color=[colours[0]], linewidth=[1])
-    
+
     x = time_series.x
     y = time_series.y_array
     z = time_series.z_array
@@ -26,13 +31,13 @@ def time_series(time_series, directory, prefix=""):
     poisson_rate_array = time_series.poisson_rate.value_array
     gamma_mean_array = time_series.gamma_mean.value_array
     gamma_dispersion_array = time_series.gamma_dispersion.value_array
-    
+
     acf = stattools.acf(y, nlags=20, fft=True)
     try:
         pacf = stattools.pacf(y, nlags=20)
     except(stattools.LinAlgError):
         pacf = np.full(21, np.nan)
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -41,7 +46,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("rainfall (mm)")
     plt.savefig(path.join(directory, prefix + "rainfall.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -59,7 +64,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("cumulative frequency")
     plt.savefig(path.join(directory, prefix + "cdf.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -70,7 +75,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("autocorrelation")
     plt.savefig(path.join(directory, prefix + "acf.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -81,7 +86,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("partial autocorrelation")
     plt.savefig(path.join(directory, prefix + "pacf.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -90,7 +95,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("poisson rate")
     plt.savefig(path.join(directory, prefix + "poisson_rate.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -99,7 +104,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("gamma mean (mm)")
     plt.savefig(path.join(directory, prefix + "gamma_mean.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -108,7 +113,7 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("gamma dispersion")
     plt.savefig(path.join(directory, prefix + "gamma_dispersion.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle)
@@ -117,23 +122,23 @@ def time_series(time_series, directory, prefix=""):
     plt.ylabel("Z")
     plt.savefig(path.join(directory, prefix + "z.pdf"))
     plt.close()
-    
+
     file = open(path.join(directory, prefix + "parameter.txt"), "w")
     file.write(str(time_series))
     file.close()
 
 def forecast(forecast, observed_rain, directory, prefix=""):
-    
+
     pandas.plotting.register_matplotlib_converters()
     rain_threshold_array = [0, 5, 10, 15]
-    
+
     colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
     cycle_forecast = cycler.cycler(color=[colours[1], colours[0]],
                                    linewidth=[1, 1],
                                    alpha=[1, 0.5])
-    
+
     time_array = forecast.time_array
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle_forecast)
@@ -147,7 +152,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     plt.ylabel("precipitation (mm)")
     plt.savefig(path.join(directory, prefix + "_forecast.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle_forecast)
@@ -161,7 +166,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     plt.ylabel("precipitation (mm)")
     plt.savefig(path.join(directory, prefix + "_forecast_median.pdf"))
     plt.close()
-    
+
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(cycle_forecast)
@@ -171,21 +176,21 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     plt.ylabel("precipitation (mm)")
     plt.savefig(path.join(directory, prefix + "_forecast_extreme.pdf"))
     plt.close()
-    
+
     plt.figure()
     plt.plot(time_array, forecast.forecast - observed_rain)
     plt.xlabel("time")
     plt.ylabel("residual (mm)")
     plt.savefig(path.join(directory, prefix + "_residual.pdf"))
     plt.close()
-    
+
     plt.figure()
     for rain in rain_threshold_array:
         forecast.plot_roc_curve(rain, observed_rain)
     plt.legend()
     plt.savefig(path.join(directory, prefix + "_roc.pdf"))
     plt.close()
-    
+
     for rain in rain_threshold_array:
         plt.figure()
         plt.plot(time_array, forecast.get_prob_rain(rain))
@@ -206,3 +211,46 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     file.write(str(forecast.get_error_rmse(observed_rain)))
     file.write("\n")
     file.close()
+
+def downscale_forecast(forecast_array, test_set, directory):
+    forecast_map = ma.empty_like(test_set.rain)
+
+    series_dir = path.join(directory, "series_forecast")
+    if not path.isdir(series_dir):
+        os.mkdir(series_dir)
+    map_dir = path.join(directory, "map_forecast")
+    if not path.isdir(map_dir):
+        os.mkdir(map_dir)
+
+    for lat_i in range(forecast_map.shape[1]):
+        for long_i in range(forecast_map.shape[2]):
+            if forecast_array[lat_i][long_i]:
+                rain = test_set.get_rain(lat_i, long_i)
+                forecast = forecast_array[lat_i][long_i]
+                forecast.time_array = test_set.time_array
+                compound_poisson.print.forecast(
+                    forecast, rain, series_dir, str(lat_i)+"_"+str(long_i))
+                forecast_map[:, lat_i, long_i] = forecast.forecast_median
+
+    #plot the rain
+    longitude_grid = test_set.topography["longitude"]
+    latitude_grid = test_set.topography["latitude"]
+    angle_resolution = dataset.ANGLE_RESOLUTION
+    for i, time in enumerate(test_set.time_array):
+
+        rain_i = forecast_map[i, :, :]
+        rain_i.mask[rain_i == 0] = True
+
+        plt.figure()
+        ax = plt.axes(projection=crs.PlateCarree())
+        im = ax.pcolor(longitude_grid - angle_resolution / 2,
+                       latitude_grid + angle_resolution / 2,
+                       rain_i,
+                       vmin=0,
+                       vmax=50)
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.title("precipitation (" + test_set.rain_units + ") : " + str(time))
+        plt.savefig(path.join(map_dir, str(i) + ".png"))
+        plt.close()
