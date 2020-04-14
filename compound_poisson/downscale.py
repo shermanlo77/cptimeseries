@@ -321,8 +321,8 @@ class Downscale(object):
             parameter_mcmc = self.parameter_mcmc.sample_array
             parameter_mcmc = parameter_mcmc[
                 :, range(i, n_total_parameter, area_unmask)]
-            parameter_mcmc = np.asarray(parameter_mcmc.tolist())
             time_series.parameter_mcmc = parameter_mcmc
+            time_series.burn_in = self.burn_in
 
             message = ForecastMessage(time_series, x_i, n_simulation)
             forecast_message.append(message)
