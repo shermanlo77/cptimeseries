@@ -4,13 +4,13 @@ import pathlib
 import joblib
 
 from dataset import data
-from dataset.data import AnaDual
-from dataset.data import AnaDual1
-from dataset.data import AnaDual2
-from dataset.data import AnaDual3
-from dataset.data import AnaDual4
-from dataset.data import AnaDualExample1
-from dataset.data import AnaInterpolate1
+from dataset.ana import AnaDual1
+from dataset.ana import AnaDual1Test
+from dataset.ana import AnaDual1Training
+from dataset.ana import AnaDualExample1
+from dataset.ana import AnaDualTest
+from dataset.ana import AnaDualTraining
+from dataset.ana import AnaInterpolate1
 from dataset.data import ANGLE_RESOLUTION
 from dataset.data import CITY_LOCATION
 from dataset.data import GRAVITATIONAL_FIELD_STRENGTH

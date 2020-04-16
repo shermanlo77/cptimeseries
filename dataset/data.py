@@ -465,7 +465,7 @@ class DataDualGrid(Data):
 
     def __init__(self):
         #define member variables before calling super
-        self.model_field_coarse = {}
+        self.model_field_coarse = None
         self.topography_coarse = {}
         self.topography_coarse_normalise = {}
         super().__init__()
@@ -555,6 +555,9 @@ class DataDualGrid(Data):
                 model_field_name = "x_wind"
             elif model_field_name == "v-velocity":
                 model_field_name = "y_wind"
+            elif model_field_name == ("geopotential_"
+                "(at_the_surface_=_orography)"):
+                model_field_name = "geopotential"
             model_field_name_array.append(model_field_name)
             if not model_field_name in self.model_field_units:
                 self.model_field_units[model_field_name] = units
@@ -629,6 +632,7 @@ class DataDualGrid(Data):
             self.model_field_coarse[key] = model_field_coarse
 
     def interpolate_model_field(self):
+        self.model_field = {}
         for key, model_field in self.model_field_coarse.items():
             self.model_field[key] = []
             for i in range(len(self.time_array)):
@@ -641,6 +645,11 @@ class DataDualGrid(Data):
                     model_field_interpolate_i, 0)
                 self.model_field[key].append(model_field_interpolate_i)
             self.model_field[key] = np.asarray(self.model_field[key])
+
+    def trim(self, time):
+        super().trim(time)
+        for key, model_field in self.model_field_coarse.items():
+            self.model_field_coarse[key] = model_field[time[0]:time[1], :, :]
 
 class GeneratorNc(object):
     """To generate the n_read_per_day readings for each day
@@ -701,101 +710,3 @@ class GeneratorGrib(object):
                 assert(len(model_field_day) == self.n_read_per_day)
                 model_field_day = np.asarray(model_field_day)
                 yield model_field_day
-
-class AnaInterpolate1(Data):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_model_field(path.join(dir_to_data, "ana_input_1.nc"))
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
-
-class AnaDualExample1(DataDualGrid):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_model_field_interpolate_to_coarse(path.join(dir_to_data, "ana_input_1.nc"))
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
-
-class AnaDual(DataDualGrid):
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Mar20")
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_0.grib"))
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_1.grib"))
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_2.grib"))
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_3.grib"))
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_4.grib"))
-        self.interpolate_model_field()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
-
-class AnaDual1(DataDualGrid):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Mar20")
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_0.grib"))
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_1.grib"))
-        self.interpolate_model_field()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
-
-class AnaDual2(DataDualGrid):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Mar20")
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_2.grib"))
-        self.interpolate_model_field()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
-
-class AnaDual3(DataDualGrid):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Mar20")
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_3.grib"))
-        self.interpolate_model_field()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
-
-class AnaDual4(DataDualGrid):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        path_here = pathlib.Path(__file__).parent.absolute()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Mar20")
-        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_4.grib"))
-        self.interpolate_model_field()
-        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
-        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc"))
-        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
