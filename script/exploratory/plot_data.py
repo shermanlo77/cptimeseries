@@ -195,20 +195,22 @@ def plot_model_fields(data, figure_dir):
     for i, dir in enumerate(dir_array):
         #for each model field
         for model_field, value in model_field_array[i].items():
+            clim = [value.min(), value.max()]
             for i_time in range(365):
-                model_field_mean = value[i]
                 #plot the mean model field (over time) as a heat map
                 plt.figure()
                 ax = plt.axes(projection=crs.PlateCarree())
                 im = ax.pcolor(longitude_array[i],
                                latitude_array[i],
-                               model_field_mean)
+                               value[i_time],
+                               vmin=clim[0],
+                               vmax=clim[1])
                 ax.coastlines(resolution="50m")
                 plt.colorbar(im)
                 ax.set_aspect("auto", adjustable=None)
                 plt.title(
                     model_field + " (" + units[model_field] + ") : "
-                    + str(data.time_array[i]))
+                    + str(data.time_array[i_time]))
                 plt.savefig(
                     path.join(dir, model_field + "_" + str(i_time) + ".png"))
                 plt.close()
