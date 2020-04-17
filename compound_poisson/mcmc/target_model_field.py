@@ -228,7 +228,7 @@ class TargetModelFieldArray(target.Target):
         #perpare message
         cov_chol = pool.broadcast(gp_target.cov_chol)
         precision = pool.broadcast(gp_target.state["precision"])
-        for i, target in enumerate(i, self):
+        for i, target in enumerate(self):
             #use spawned rng
             rng = self.rng_array[i]
             message_array.append(
@@ -528,7 +528,7 @@ class GpSimulateMessage(object):
         self.area_unmask = model_field_target.area_unmask
         self.n_model_field = model_field_target.n_model_field
         self.cov_chol = cov_chol
-        self.precision = preicison
+        self.precision = precision
         self.rng = rng
 
     def simulate_from_prior(self):
@@ -543,7 +543,7 @@ class GpSimulateMessage(object):
         cov_chol = self.cov_chol.value()
         state_rng = TargetModelField.simulate_from_prior_given_gp(
             self, precision, cov_chol, self.rng)
-        return [model_field_vector, rng]
+        return state_rng
 
 def get_precision_prior():
     return stats.gamma(a=4/3, scale=3)
