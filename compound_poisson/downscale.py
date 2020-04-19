@@ -664,6 +664,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
+        self.model_field_mcmc_array = None
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
