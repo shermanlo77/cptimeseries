@@ -25,5 +25,7 @@ from dataset.data import RESOLUTION
 from dataset.isle_of_man import IsleOfMan
 from dataset.isle_of_man import IsleOfManTest
 from dataset.isle_of_man import IsleOfManTraining
+from dataset.isle_of_man import IsleOfManWeekTest
+from dataset.isle_of_man import IsleOfManWeekTraining
 from dataset.london80 import London80
 from dataset.london80 import LondonSimulated80

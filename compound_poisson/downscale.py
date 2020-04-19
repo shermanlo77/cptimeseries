@@ -351,42 +351,56 @@ class Downscale(object):
         return forecast_nested_array
 
     def print_mcmc(self, directory):
-        self.read_memmap()
-
+        """Print the mcmc chains
+        """
         directory = path.join(directory, "chain")
         if not path.isdir(directory):
             os.mkdir(directory)
+        self.read_memmap()
+        position_index_array = self.get_random_position_index()
 
         chain = np.asarray(self.parameter_mcmc.sample_array)
         area_unmask = self.area_unmask
         parameter_name = (
             self.time_series_array[0][0].get_parameter_vector_name())
         for i in range(self.n_parameter):
-            chain_i = chain[:, i*area_unmask : (i+1)*area_unmask]
-            plt.plot(chain_i)
+            chain_i = []
+            for position_index in position_index_array:
+                chain_i.append(chain[:, i*area_unmask + position_index])
+            plt.plot(np.asarray(chain_i).T)
             plt.xlabel("sample number")
             plt.ylabel(parameter_name[i])
             plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
             plt.close()
 
         chain = np.asarray(self.parameter_gp_mcmc.sample_array)
-        key = self.parameter_gp_target.state.keys()
         for i, key in enumerate(self.parameter_gp_target.state):
             chain_i = chain[:, i]
             plt.plot(chain_i)
             plt.xlabel("sample number")
             plt.ylabel(key)
-            plt.savefig(path.join(directory, key + ".pdf"))
+            plt.savefig(path.join(directory, key + "_downscale.pdf"))
             plt.close()
 
         chain = []
-        for time_series in self.generate_unmask_time_series():
-            chain.append(np.mean(time_series.z_mcmc.sample_array, 1))
+        for i, time_series in enumerate(self.generate_unmask_time_series()):
+            if i in position_index_array:
+                chain.append(np.mean(time_series.z_mcmc.sample_array, 1))
         plt.plot(np.transpose(np.asarray(chain)))
         plt.xlabel("sample number")
         plt.ylabel("mean z")
         plt.savefig(path.join(directory, "z.pdf"))
         plt.close()
+
+    def get_random_position_index(self):
+        """Return array of random n_plot numbers, choose from
+            range(self.area_unmask) without replacement
+
+        Used to select random positions and plot their chains
+        """
+        n_plot = np.amin((6, self.area_unmask))
+        rng = random.RandomState(np.uint32(4020967302))
+        return np.sort(rng.choice(self.area_unmask, n_plot, replace=False))
 
     def generate_all_time_series(self):
         """Generate all time series in self.time_series_array
@@ -575,12 +589,65 @@ class DownscaleDual(Downscale):
             vector of length self.n_model_field * self.area_unmask, [0th model
                 field for all unmasked, 1st model field for all unmasked, ...]
         """
-        i_counter = 0
-        for model_field_i in range(self.n_model_field):
-            for time_series in self.generate_unmask_time_series():
-                time_series.x[time_step, model_field_i] = model_field_vector[
-                    i_counter]
-                i_counter += 1
+        for i_model_field in range(self.n_model_field):
+            for i_space, time_series in enumerate(
+                self.generate_unmask_time_series()):
+                time_series.x[time_step, i_model_field] = model_field_vector[
+                    i_model_field * self.area_unmask + i_space]
+
+    def print_mcmc(self, directory):
+        """Print the mcmc chains
+
+        Require the call of read_memmap() beforehand
+        """
+        super().print_mcmc(directory)
+        directory = path.join(directory, "chain")
+
+        time_index_array = self.get_random_time_index()
+
+        #chain 0th dimension are as following:
+            #contains contanated len(self) vectors of n_parameter_i length
+            #where n_parameter_i = n_model_field * area_unmask
+            #each of those vectors contains n_model_field vectors of area_unmask
+                #length
+        chain = np.asarray(self.model_field_mcmc.sample_array)
+        n_parameter_i = self.model_field_target.n_parameter_i
+
+        for i_model_field, (model_field_name, units) in enumerate(
+            self.model_field_units.items()):
+            chain_i = []
+            for time_index in time_index_array:
+                index = n_parameter_i * time_index
+                index += i_model_field * self.area_unmask
+                #plot mean over all locations in mcmc plot
+                chain_i.append(
+                    np.mean(chain[:, index : index+self.area_unmask], 1))
+            plt.plot(np.asarray(chain_i).T)
+            plt.xlabel("sample number")
+            plt.ylabel(model_field_name + " (" + units + ")")
+            plt.savefig(
+                path.join(directory,
+                          "model_field_" + str(i_model_field) + ".pdf"))
+            plt.close()
+
+        chain = np.asarray(self.model_field_gp_mcmc.sample_array)
+        for i, key in enumerate(self.model_field_gp_target.state):
+            chain_i = chain[:, i]
+            plt.plot(chain_i)
+            plt.xlabel("sample number")
+            plt.ylabel(key)
+            plt.savefig(path.join(directory, key + "_model_field.pdf"))
+            plt.close()
+
+    def get_random_time_index(self):
+        """Return array of random n_plot numbers, choose from
+            range(len(self)) without replacement
+
+        Used to select random times and plot their chains
+        """
+        n_plot = np.amin((6, len(self)))
+        rng = random.RandomState(np.uint32(1625274893))
+        return np.sort(rng.choice(self.area_unmask, n_plot, replace=False))
 
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
     """Modify TimeSeriesSlice to only sample z

@@ -159,7 +159,11 @@ class TimeSeries(object):
             (n + 0.5) / (n - np.count_nonzero(y_array) + 1))
         gamma_mean_guess = np.mean(y_array) / poisson_rate_guess
         gamma_dispersion_guess = (np.var(y_array, ddof=1)
-            /poisson_rate_guess/math.pow(gamma_mean_guess,2)-1)
+            /poisson_rate_guess/math.pow(gamma_mean_guess, 2)-1)
+        if gamma_dispersion_guess <= 0:
+            print("Warning! gamma_dispersion_guess is negative with value",
+                  gamma_dispersion_guess)
+            gamma_dispersion_guess = abs(gamma_dispersion_guess)
         #instantise parameters and set it
         poisson_rate = parameter.PoissonRate(n_model_field, poisson_rate_n_arma)
         gamma_mean = parameter.GammaMean(n_model_field, gamma_mean_n_arma)

@@ -629,7 +629,7 @@ class DataDualGrid(Data):
                     np.flip(LATITUDE_COARSE_ARRAY), LONGITUDE_COARSE_ARRAY)
                 model_field_interpolate = np.flip(model_field_interpolate, 0)
                 model_field_coarse.append(model_field_interpolate)
-            self.model_field_coarse[key] = model_field_coarse
+            self.model_field_coarse[key] = np.asarray(model_field_coarse)
 
     def interpolate_model_field(self):
         self.model_field = {}

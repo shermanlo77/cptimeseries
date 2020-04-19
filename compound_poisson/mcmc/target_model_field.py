@@ -172,7 +172,7 @@ class TargetModelFieldArray(target.Target):
 
     def update_state(self, state):
         #implemented
-        for i, target in enumerate(self):
+        for i in range(len(self)):
             state_i = state[i*self.n_parameter_i : (i+1)*self.n_parameter_i]
             self.downscale.set_model_field(state_i, i)
         self.downscale.update_all_cp_parameters()
@@ -209,6 +209,7 @@ class TargetModelFieldArray(target.Target):
         for target in self:
             gp_array.append(GpRegressionMessage(target, k_11, k_12))
         mean = self.downscale.pool.map(GpRegressionMessage.regress, gp_array)
+        mean = np.concatenate(mean)
         self.set_mean(mean)
 
     def set_mean(self, mean):
