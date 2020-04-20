@@ -195,16 +195,13 @@ def plot_model_fields(data, figure_dir):
     for i, dir in enumerate(dir_array):
         #for each model field
         for model_field, value in model_field_array[i].items():
-            clim = [value.min(), value.max()]
             for i_time in range(365):
                 #plot the mean model field (over time) as a heat map
                 plt.figure()
                 ax = plt.axes(projection=crs.PlateCarree())
                 im = ax.pcolor(longitude_array[i],
                                latitude_array[i],
-                               value[i_time],
-                               vmin=clim[0],
-                               vmax=clim[1])
+                               value[i_time])
                 ax.coastlines(resolution="50m")
                 plt.colorbar(im)
                 ax.set_aspect("auto", adjustable=None)
