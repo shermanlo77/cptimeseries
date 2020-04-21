@@ -91,11 +91,26 @@ def plot_rain(data, figure_dir):
         plt.savefig(path.join(series_dir, "rainfall_" + city + ".pdf"))
         plt.close()
 
+        #plot cdf
+        n = len(rainfall_series)
+        rain_sorted = np.sort(rainfall_series)
+        cdf = np.asarray(range(n))
+        plt.figure()
+        plt.plot(rain_sorted, cdf)
+        if np.any(rain_sorted == 0):
+            non_zero_index = np.nonzero(rain_sorted)[0][0] - 1
+            plt.scatter(0, cdf[non_zero_index])
+        plt.title(city+": precipitation")
+        plt.ylabel("precipitation (" + data.rain_units + ")")
+        plt.ylabel("cumulative frequency")
+        plt.savefig(path.join(series_dir, "rainfall_cdf_" + city + ".pdf"))
+        plt.close()
+
         #plot the acf
         plt.figure()
         plt.bar(np.asarray(range(acf.size)), acf)
         plt.axhline(1/math.sqrt(len(time)), linestyle="--")
-        plt.title(city+": autocorrelation of rain")
+        plt.title(city+": autocorrelation of precipitation")
         plt.xlabel("lag (day)")
         plt.ylabel("autocorrelation")
         plt.savefig(path.join(series_dir, "rainfall_acf_" + city + ".pdf"))
@@ -105,7 +120,7 @@ def plot_rain(data, figure_dir):
         plt.figure()
         plt.bar(np.asarray(range(pacf.size)), pacf)
         plt.axhline(1/math.sqrt(len(time)), linestyle="--")
-        plt.title(city+": partial autocorrelation of rain")
+        plt.title(city+": partial autocorrelation of precipitation")
         plt.xlabel("lag (day)")
         plt.ylabel("partial autocorrelation")
         plt.savefig(path.join(series_dir, "rainfall_pacf_" + city + ".pdf"))
