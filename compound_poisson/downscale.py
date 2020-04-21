@@ -162,9 +162,9 @@ class Downscale(object):
         """Instantiate MCMC objects
         """
         self.parameter_mcmc = mcmc.Elliptical(
-            self.n_sample, self.memmap_path, self.parameter_target, self.rng)
+            self.parameter_target, self.rng, self.n_sample, self.memmap_path)
         self.parameter_gp_mcmc = mcmc.Rwmh(
-            self.n_sample, self.memmap_path, self.parameter_gp_target, self.rng)
+            self.parameter_gp_target, self.rng, self.n_sample, self.memmap_path)
         #all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
@@ -553,11 +553,11 @@ class DownscaleDual(Downscale):
         """
         super().instantiate_mcmc()
         self.model_field_mcmc = mcmc.Elliptical(
-            self.n_sample, self.memmap_path, self.model_field_target, self.rng)
-        self.model_field_gp_mcmc = mcmc.Rwmh(self.n_sample,
-                                             self.memmap_path,
-                                             self.model_field_gp_target,
-                                             self.rng)
+            self.model_field_target, self.rng, self.n_sample, self.memmap_path)
+        self.model_field_gp_mcmc = mcmc.Rwmh(self.model_field_gp_target,
+                                             self.rng,
+                                             self.n_sample,
+                                             self.memmap_path)
         #ordering is important, calculate the kernel matrices then posterior
             #gaussian process mean
         self.model_field_gp_target.save_cov_chol()
@@ -674,7 +674,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         """
         self.parameter_mcmc = None
         self.z_mcmc = mcmc.ZSlice(
-            self.n_sample, self.memmap_path, self.z_target, self.rng)
+            self.z_target, self.rng, self.n_sample, self.memmap_path)
 
     def print_chain_property(self, directory):
         """Override - only print chain for z

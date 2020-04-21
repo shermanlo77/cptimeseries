@@ -78,9 +78,9 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             and random number generators
         """
         self.parameter_mcmc = mcmc.Rwmh(
-            self.n_sample, self.memmap_path, self.parameter_target, self.rng)
+            self.parameter_target, self.rng, self.n_sample, self.memmap_path)
         self.z_mcmc = mcmc.ZRwmh(
-            self.n_sample, self.memmap_path, self.z_target, self.rng)
+            self.z_target, self.rng, self.n_sample, self.memmap_path)
 
     def get_mcmc_array(self):
         mcmc_array = [
@@ -228,9 +228,9 @@ class TimeSeriesSlice(TimeSeriesMcmc):
         Instantiate slice sampling for the parameter and z
         """
         self.parameter_mcmc = mcmc.Elliptical(
-            self.n_sample, self.memmap_path, self.parameter_target, self.rng)
+            self.parameter_target, self.rng, self.n_sample, self.memmap_path)
         self.z_mcmc = mcmc.ZSlice(
-            self.n_sample, self.memmap_path, self.z_target, self.rng)
+            self.z_target, self.rng, self.n_sample, self.memmap_path)
 
     def print_chain_property(self, directory):
         plt.figure()
@@ -287,7 +287,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         super().instantiate_mcmc()
         self.precision_target.prograte_precision()
         self.precision_mcmc = mcmc.Rwmh(
-            self.n_sample, self.memmap_path, self.precision_target, self.rng)
+            self.precision_target, self.rng, self.n_sample, self.memmap_path)
 
     def get_mcmc_array(self):
         mcmc_array = super().get_mcmc_array()

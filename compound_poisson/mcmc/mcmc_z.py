@@ -16,8 +16,8 @@ class ZRwmh(mcmc_abstract.Mcmc):
         accept_array: acceptance rate at each proposal
     """
 
-    def __init__(self, n_sample, memmap_path, target, rng):
-        super().__init__(np.int32, n_sample, memmap_path, target, rng)
+    def __init__(self, target, rng, n_sample, memmap_path):
+        super().__init__(np.int32, target, rng, n_sample, memmap_path)
         self.z_parameter = 1 / target.get_n_dim()
         self.n_propose = 0
         self.n_accept = 0
@@ -99,8 +99,8 @@ class ZSlice(mcmc_abstract.Mcmc):
     Attributes:
     """
 
-    def __init__(self, n_sample, memmap_path, target, rng):
-        super().__init__(np.int32, n_sample, memmap_path, target, rng)
+    def __init__(self, target, rng, n_sample, memmap_path):
+        super().__init__(np.int32, target, rng, n_sample, memmap_path)
         self.n_propose = 0
         self.slice_width_array = []
         self.non_zero_index = np.nonzero(self.target.time_series.y_array)[0]
@@ -112,7 +112,7 @@ class ZSlice(mcmc_abstract.Mcmc):
         Implemented
         See Neal (2003)
         Select a random z_t in the time series, then move it using slice
-            samplingls
+            sampling
         """
         time_series = self.target.time_series
         #pick a random non-zero latent variable to sample
@@ -180,7 +180,7 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
     """
 
     def __init__(self, downscale):
-        super().__init__()
+        super().__init__(np.int32)
         self.downscale = downscale
 
     def sample(self):

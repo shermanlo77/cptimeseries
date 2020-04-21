@@ -22,11 +22,17 @@ class Mcmc(object):
         sample_array: array of state vector, representing the chain
     """
 
-    def __init__(self, dtype=None, n_sample=None, memmap_path=None, target=None,
-        rng=None):
-        #none target is used for wrapper mcmc such as ZMcmcArray
+    def __init__(self,
+                 dtype,
+                 target=None,
+                 rng=None,
+                 n_sample=None,
+                 memmap_path=None):
+        #None target to be used by ZMcmcArray
+        #None n_sample won't store mcmc sample
+        #Potential development: None memmap_path to use np.darray
         self.dtype = dtype
-        self.n_sample = n_sample
+        self.n_sample = None
         self.memmap_path = memmap_path
         self.target = target
         self.rng = rng
@@ -36,21 +42,29 @@ class Mcmc(object):
         self.sample_pointer = 0
 
         if not target is None:
-            self.n_dim = self.target.get_n_dim()
+            n_dim = self.target.get_n_dim()
             self.state = target.get_state()
+            if not n_sample is None:
+                self.instantiate_memmap(
+                    memmap_path, type(target).__name__, n_sample, n_dim)
 
-            datetime_id = str(datetime.datetime.now())
-            datetime_id = datetime_id.replace("-", "")
-            datetime_id = datetime_id.replace(":", "")
-            datetime_id = datetime_id.replace(" ", "")
-            datetime_id = datetime_id[0:14]
-            file_name = ("_" + type(self).__name__ + type(target).__name__
-                + "_" + datetime_id + "_" + str(id(self)) + ".dat")
-            self.memmap_path = path.join(memmap_path, file_name)
-            self.sample_array = np.memmap(self.memmap_path,
-                                          dtype,
-                                          "w+",
-                                          shape=(self.n_sample, self.n_dim))
+    def instantiate_memmap(self, memmap_path, file_name, n_sample, n_dim):
+        #instantiate memmap to member variable, also assign member variables
+            #n_sample and n_dim
+        datetime_id = str(datetime.datetime.now())
+        datetime_id = datetime_id.replace("-", "")
+        datetime_id = datetime_id.replace(":", "")
+        datetime_id = datetime_id.replace(" ", "")
+        datetime_id = datetime_id[0:14]
+        file_name = ("_" + type(self).__name__ + file_name + "_" + datetime_id
+            + "_" + str(id(self)) + ".dat")
+        self.n_sample = n_sample
+        self.n_dim = n_dim
+        self.memmap_path = path.join(memmap_path, file_name)
+        self.sample_array = np.memmap(self.memmap_path,
+                                      self.dtype,
+                                      "w+",
+                                      shape=(n_sample, n_dim))
 
     def read_to_write_memmap(self):
         self.sample_array = np.memmap(self.memmap_path,
