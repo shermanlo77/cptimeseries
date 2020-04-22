@@ -48,23 +48,49 @@ class Mcmc(object):
                 self.instantiate_memmap(
                     memmap_path, type(target).__name__, n_sample, n_dim)
 
-    def instantiate_memmap(self, memmap_path, file_name, n_sample, n_dim):
+    def instantiate_memmap(self, directory, file_name, n_sample, n_dim):
         #instantiate memmap to member variable, also assign member variables
             #n_sample and n_dim
+        file_name = self.make_memmap_file_name(file_name)
+        self.n_sample = n_sample
+        self.n_dim = n_dim
+        self.memmap_path = path.join(directory, file_name)
+        self.sample_array = np.memmap(self.memmap_path,
+                                      self.dtype,
+                                      "w+",
+                                      shape=(n_sample, n_dim))
+
+    def make_memmap_file_name(self, name):
+        """Prefix underscore, class name, append datetime and memory address and
+            .dat
+        """
         datetime_id = str(datetime.datetime.now())
         datetime_id = datetime_id.replace("-", "")
         datetime_id = datetime_id.replace(":", "")
         datetime_id = datetime_id.replace(" ", "")
         datetime_id = datetime_id[0:14]
-        file_name = ("_" + type(self).__name__ + file_name + "_" + datetime_id
+        file_name = ("_" + type(self).__name__ + name + "_" + datetime_id
             + "_" + str(id(self)) + ".dat")
-        self.n_sample = n_sample
-        self.n_dim = n_dim
-        self.memmap_path = path.join(memmap_path, file_name)
-        self.sample_array = np.memmap(self.memmap_path,
-                                      self.dtype,
-                                      "w+",
-                                      shape=(n_sample, n_dim))
+        return file_name
+
+    def extend_memmap(self, n_sample):
+        """Extend sample_array to store more mcmc, makes a new memmap and copies
+            values from the old memmap
+
+        Args:
+            n_sample: new length of sample_array
+        """
+        if n_sample > self.n_sample:
+            n_sample_old = self.n_sample
+            self.read_memmap()
+            sample_array_old = self.sample_array
+            self.instantiate_memmap(path.dirname(self.memmap_path),
+                                    type(self.target).__name__,
+                                    n_sample,
+                                    self.n_dim)
+
+            self.sample_array[0:n_sample_old] = sample_array_old
+            del sample_array_old
 
     def read_to_write_memmap(self):
         self.sample_array = np.memmap(self.memmap_path,
@@ -171,14 +197,16 @@ class Mcmc(object):
         self.sample_array[self.sample_pointer] = state
         self.sample_pointer += 1
 
-def do_gibbs_sampling(mcmc_array, n_sample, rng):
+def do_gibbs_sampling(mcmc_array, n_sample, rng, is_initial_sample=True):
     #initial value is a sample
-    print("Sample 0")
-    for mcmc in mcmc_array:
-        mcmc.add_to_sample()
+    if is_initial_sample:
+        print("Sample initial")
+        for mcmc in mcmc_array:
+            mcmc.add_to_sample()
+        n_sample -= 1
     #Gibbs sampling
-    for i_step in range(n_sample-1):
-        print("Sample", i_step+1)
+    for i_step in range(n_sample):
+        print("Sample", i_step)
         #select random component
         mcmc_index = rng.randint(0, len(mcmc_array))
         for i_mcmc, mcmc in enumerate(mcmc_array):

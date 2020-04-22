@@ -38,6 +38,9 @@ class Fitter(object):
             joblib.dump(downscale, result_file)
         else:
             downscale = joblib.load(result_file)
+            if not n_sample is None:
+                downscale.resume(n_sample, self.pool)
+                joblib.dump(downscale, result_file)
 
         directory = path.join(self.figure_dir, self.name)
         downscale.print_mcmc(directory)

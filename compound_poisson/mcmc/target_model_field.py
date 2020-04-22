@@ -208,7 +208,7 @@ class TargetModelFieldArray(target.Target):
         k_12 = pool.broadcast(gp_target.k_12)
         for target in self:
             gp_array.append(GpRegressionMessage(target, k_11, k_12))
-        mean = self.downscale.pool.map(GpRegressionMessage.regress, gp_array)
+        mean = pool.map(GpRegressionMessage.regress, gp_array)
         mean = np.concatenate(mean)
         self.set_mean(mean)
 

@@ -183,6 +183,9 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         n_dim = len(downscale) * downscale.area_unmask
         self.instantiate_memmap(memmap_path, "", n_sample, n_dim)
 
+    def instantiate_memmap(self, directory, file_name, n_sample, n_dim):
+        super().instantiate_memmap(directory, "", n_sample, n_dim)
+
     def sample(self):
         """Duplicate z_array to the z chain
 

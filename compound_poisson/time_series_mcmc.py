@@ -58,6 +58,21 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
 
+    def resume(self, n_sample):
+        """Run more MCMC samples
+
+        Args:
+            n_sample: new number of mcmc samples
+        """
+        if n_sample > self.n_sample:
+            mcmc_array = self.get_mcmc_array()
+            for mcmc_i in mcmc_array:
+                mcmc_i.extend_memmap(n_sample)
+            #in resume, do not use initial value as sample (False in arg 3)
+            mcmc.do_gibbs_sampling(
+                mcmc_array, n_sample - self.n_sample, self.rng, False)
+            self.n_sample = n_sample
+
     def initalise_z(self):
         """Initalise all z in self.z_array and update all parameters
 

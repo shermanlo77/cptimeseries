@@ -40,7 +40,9 @@ class Fitter(object):
             joblib.dump(time_series, result_file)
         else:
             time_series = joblib.load(result_file)
-
+            if not n_sample is None:
+                time_series.resume(n_sample)
+                joblib.dump(time_series, result_file)
         try:
             true_parameter = dataset.time_series.get_parameter_vector()
         except AttributeError:
