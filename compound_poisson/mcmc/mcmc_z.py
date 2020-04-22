@@ -16,13 +16,12 @@ class ZRwmh(mcmc_abstract.Mcmc):
         accept_array: acceptance rate at each proposal
     """
 
-    def __init__(self, target, rng, n_sample, memmap_path):
+    def __init__(self, target, rng, n_sample=None, memmap_path=None):
         super().__init__(np.int32, target, rng, n_sample, memmap_path)
         self.z_parameter = 1 / target.get_n_dim()
         self.n_propose = 0
         self.n_accept = 0
         self.accept_array = []
-        self.sample_array.dtype = np.int32
 
     def sample(self):
         """Use Metropolis Hastings to sample z
@@ -99,12 +98,11 @@ class ZSlice(mcmc_abstract.Mcmc):
     Attributes:
     """
 
-    def __init__(self, target, rng, n_sample, memmap_path):
+    def __init__(self, target, rng, n_sample=None, memmap_path=None):
         super().__init__(np.int32, target, rng, n_sample, memmap_path)
         self.n_propose = 0
         self.slice_width_array = []
         self.non_zero_index = np.nonzero(self.target.time_series.y_array)[0]
-        self.sample_array.dtype = np.int32
 
     def sample(self):
         """Use slice sampling
@@ -179,9 +177,11 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
     Does MCMC on all z in Downscale
     """
 
-    def __init__(self, downscale):
+    def __init__(self, downscale, n_sample, memmap_path):
         super().__init__(np.int32)
         self.downscale = downscale
+        n_dim = len(downscale) * downscale.area_unmask
+        self.instantiate_memmap(memmap_path, "", n_sample, n_dim)
 
     def sample(self):
         """Duplicate z_array to the z chain
@@ -192,28 +192,17 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
             static_sample_z, self.downscale.generate_unmask_time_series())
         #multiprocessing does a clone, reload the sample array
         self.downscale.replace_unmask_time_series(time_series_array)
-        self.downscale.read_to_write_z_memmap()
 
     def add_to_sample(self):
         """All time_series sample z
         """
+        z_sample = []
         for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.add_to_sample()
-
-    def read_to_write_memmap(self):
-        for time_series in self.downscale.generate_unmask_time_series():
-            time_series.read_to_write_z_memmap()
-
-    def del_memmap(self):
-        for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.del_memmap()
-
-    def read_memmap(self):
-        for time_series in self.downscale.generate_unmask_time_series():
-            time_series.z_mcmc.read_memmap()
+            z_sample.append(time_series.z_array.copy())
+        z_sample = np.asarray(np.concatenate(z_sample), self.dtype)
+        self.append(z_sample)
 
 def static_sample_z(time_series):
     #multiprocessing does a clone, reload the sample array
-    time_series.read_to_write_z_memmap()
     time_series.z_mcmc.sample()
     return time_series

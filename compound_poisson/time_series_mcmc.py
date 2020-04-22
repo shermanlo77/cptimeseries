@@ -155,7 +155,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
 
     def print_mcmc(self, directory, true_parameter=None):
         parameter_name = self.get_parameter_vector_name()
-        chain = np.asarray(self.parameter_mcmc.sample_array)
+        chain = np.asarray(self.parameter_mcmc[:])
         for i in range(self.n_parameter):
             chain_i = chain[:,i]
             plt.figure()
@@ -169,7 +169,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             plt.close()
 
         chain = []
-        z_chain = np.asarray(self.z_mcmc.sample_array)
+        z_chain = np.asarray(self.z_mcmc[:])
         for z in z_chain:
             chain.append(np.mean(z))
         plt.figure()
@@ -306,7 +306,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
 
     def print_chain_property(self, directory):
         super().print_chain_property(directory)
-        precision_chain = np.asarray(self.precision_mcmc.sample_array)
+        precision_chain = np.asarray(self.precision_mcmc[:])
         for i in range(2):
             chain_i = precision_chain[:, i]
             plt.figure()

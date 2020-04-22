@@ -611,9 +611,6 @@ class TimeSeries(object):
         for mcmc in self.get_mcmc_array():
             mcmc.read_memmap()
 
-    def read_to_write_z_memmap(self):
-        self.z_mcmc.read_to_write_memmap()
-
     def __str__(self):
         #return the reg parameters for each cp parameter
         string = ""

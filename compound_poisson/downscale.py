@@ -169,7 +169,7 @@ class Downscale(object):
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
             time_series.instantiate_mcmc()
-        self.z_mcmc = mcmc.ZMcmcArray(self)
+        self.z_mcmc = mcmc.ZMcmcArray(self, self.n_sample, self.memmap_path)
         self.parameter_gp_target.save_cov_chol()
 
     def get_mcmc_array(self):
@@ -277,11 +277,9 @@ class Downscale(object):
         """Update all compound Poisson parameters in all time series
         """
         function = compound_poisson.time_series.static_update_all_cp_parameters
-        self.del_z_memmap()
         time_series_array = self.pool.map(
             function, self.generate_unmask_time_series())
         self.replace_unmask_time_series(time_series_array)
-        self.read_to_write_z_memmap()
 
     def get_log_likelihood(self):
         """Return log likelihood
@@ -306,6 +304,7 @@ class Downscale(object):
             pool = multiprocess.Serial()
         self.pool = pool
         self.read_memmap()
+        self.scatter_z_mcmc_sample()
         #contains forecast objects for each unmasked time series
         forecast_array = []
         area_unmask = self.area_unmask
@@ -318,7 +317,7 @@ class Downscale(object):
             long_i = time_series.id[1]
             x_i = data.get_model_field(lat_i, long_i)
             #extract mcmc chain corresponding to this location
-            parameter_mcmc = self.parameter_mcmc.sample_array
+            parameter_mcmc = self.parameter_mcmc[:]
             parameter_mcmc = parameter_mcmc[
                 :, range(i, n_total_parameter, area_unmask)]
             time_series.parameter_mcmc = parameter_mcmc
@@ -357,9 +356,10 @@ class Downscale(object):
         if not path.isdir(directory):
             os.mkdir(directory)
         self.read_memmap()
+        self.scatter_z_mcmc_sample()
         position_index_array = self.get_random_position_index()
 
-        chain = np.asarray(self.parameter_mcmc.sample_array)
+        chain = np.asarray(self.parameter_mcmc[:])
         area_unmask = self.area_unmask
         parameter_name = (
             self.time_series_array[0][0].get_parameter_vector_name())
@@ -373,7 +373,7 @@ class Downscale(object):
             plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
             plt.close()
 
-        chain = np.asarray(self.parameter_gp_mcmc.sample_array)
+        chain = np.asarray(self.parameter_gp_mcmc[:])
         for i, key in enumerate(self.parameter_gp_target.state):
             chain_i = chain[:, i]
             plt.plot(chain_i)
@@ -385,7 +385,7 @@ class Downscale(object):
         chain = []
         for i, time_series in enumerate(self.generate_unmask_time_series()):
             if i in position_index_array:
-                chain.append(np.mean(time_series.z_mcmc.sample_array, 1))
+                chain.append(np.mean(time_series.z_mcmc[:], 1))
         plt.plot(np.transpose(np.asarray(chain)))
         plt.xlabel("sample number")
         plt.ylabel("mean z")
@@ -429,6 +429,10 @@ class Downscale(object):
                     self.time_series_array[lat_i][long_i] = time_series[i]
                     i += 1
 
+    def scatter_z_mcmc_sample(self):
+        for i, time_series in enumerate(self.generate_unmask_time_series()):
+            time_series.z_mcmc = self.z_mcmc[:, i*len(self):(i+1)*len(self)]
+
     def set_memmap_path(self, memmap_path):
         """Set the location to save mcmc sample onto disk
 
@@ -447,26 +451,9 @@ class Downscale(object):
         for mcmc in self.get_mcmc_array():
             mcmc.read_memmap()
 
-    def read_to_write_z_memmap(self):
-        """Set memmap objects for z mcmc to read and write from file
-
-        Required because parallel does a deep copy of time_series objects which
-            contain ZMcmc objects. When gather is called, memmap objects will
-            need to be instantiated again
-        """
-        if not self.z_mcmc is None:
-            self.z_mcmc.read_to_write_memmap()
-
     def del_memmap(self):
         for mcmc in self.get_mcmc_array():
             mcmc.del_memmap()
-
-    def del_z_memmap(self):
-        """Delete memmap objects for z_mcmc
-
-        Required when passing time_series object to parallel workers
-        """
-        self.z_mcmc.del_memmap()
 
     def set_rng(self, seed_sequence):
         """Set rng for all time series
@@ -610,7 +597,7 @@ class DownscaleDual(Downscale):
             #where n_parameter_i = n_model_field * area_unmask
             #each of those vectors contains n_model_field vectors of area_unmask
                 #length
-        chain = np.asarray(self.model_field_mcmc.sample_array)
+        chain = np.asarray(self.model_field_mcmc[:])
         n_parameter_i = self.model_field_target.n_parameter_i
 
         for i_model_field, (model_field_name, units) in enumerate(
@@ -630,7 +617,7 @@ class DownscaleDual(Downscale):
                           "model_field_" + str(i_model_field) + ".pdf"))
             plt.close()
 
-        chain = np.asarray(self.model_field_gp_mcmc.sample_array)
+        chain = np.asarray(self.model_field_gp_mcmc[:])
         for i, key in enumerate(self.model_field_gp_target.state):
             chain_i = chain[:, i]
             plt.plot(chain_i)
@@ -664,6 +651,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
+        self.z_mcmc = None
         self.model_field_mcmc_array = None
 
     def instantiate_mcmc(self):
@@ -673,8 +661,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         Only instantiate slice sampling for z
         """
         self.parameter_mcmc = None
-        self.z_mcmc = mcmc.ZSlice(
-            self.z_target, self.rng, self.n_sample, self.memmap_path)
+        self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
 
     def print_chain_property(self, directory):
         """Override - only print chain for z

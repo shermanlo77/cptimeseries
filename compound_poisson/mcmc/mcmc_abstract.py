@@ -42,7 +42,7 @@ class Mcmc(object):
         self.sample_pointer = 0
 
         if not target is None:
-            n_dim = self.target.get_n_dim()
+            n_dim = target.get_n_dim()
             self.state = target.get_state()
             if not n_sample is None:
                 self.instantiate_memmap(
@@ -89,7 +89,8 @@ class Mcmc(object):
             duplicate to sample_array. Used for rejection step or when sampling
             another component in Gibbs sampling
         """
-        self.append(self.state.copy())
+        if not self.sample_array is None:
+            self.append(self.state.copy())
 
     def update_state(self):
         """Update state
