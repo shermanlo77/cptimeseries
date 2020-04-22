@@ -21,7 +21,7 @@ class Fitter(object):
         if not path.isdir(self.figure_dir):
             os.mkdir(self.figure_dir)
 
-    def fit(self, dataset):
+    def fit(self, dataset, n_sample=None):
         figure_sub_dir = path.join(self.figure_dir, self.name)
         if not path.isdir(figure_sub_dir):
             os.mkdir(figure_sub_dir)
@@ -34,6 +34,8 @@ class Fitter(object):
             time_series.time_array = dataset.get_time_training()
             time_series.rng = self.rng
             time_series.memmap_path = self.result_dir
+            if not n_sample is None:
+                time_series.n_sample = n_sample
             time_series.fit()
             joblib.dump(time_series, result_file)
         else:
