@@ -8,7 +8,7 @@ import dataset
 import fit_downscale
 
 def main():
-    pool = multiprocess.Pool()
+    pool = multiprocess.BackendMPI()
 
     parser = argparse.ArgumentParser(description="Sample size")
     parser.add_argument("--sample", help="number of mcmc samples", type=int)
