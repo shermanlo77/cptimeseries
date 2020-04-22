@@ -99,8 +99,8 @@ class TargetModelField(target.Target):
         gp_target = self.downscale.model_field_gp_target
         precision = gp_target.state["precision"]
         cov_chol = gp_target.cov_chol
-        state_rng = self.simulate_from_prior_given_gp(precision, cov_chol, rng)
-        return state_rng[0]
+        state = self.simulate_from_prior_given_gp(precision, cov_chol, rng)
+        return state
 
     def simulate_from_prior_given_gp(self, precision, cov_chol, rng):
         """Simulate from the prior given gp precision parameters
@@ -125,7 +125,7 @@ class TargetModelField(target.Target):
                 model_field_i)
         model_field_vector *= scale
         model_field_vector += self.prior_mean
-        return [model_field_vector, rng]
+        return model_field_vector
 
 class TargetModelFieldArray(target.Target):
     """Contains array of TargetModelField objects, one for each time step
@@ -146,13 +146,17 @@ class TargetModelFieldArray(target.Target):
     def __init__(self, downscale):
         self.downscale = downscale
         self.model_field_target_array = []
-        self.rng_array = downscale.spawn_rng(len(downscale))
+        self.rng_array = []
         self.area_unmask = downscale.area_unmask
         self.n_model_field = downscale.n_model_field
         self.n_parameter_i = self.area_unmask * self.n_model_field
 
+        self.set_rng_array()
         for i in range(len(downscale)):
             self.model_field_target_array.append(TargetModelField(downscale, i))
+
+    def set_rng_array(self):
+        self.rng_array = self.downscale.spawn_rng(len(self.downscale))
 
     def get_n_dim(self):
         #implemented
@@ -542,9 +546,9 @@ class GpSimulateMessage(object):
         #implemented
         precision = self.precision.value()
         cov_chol = self.cov_chol.value()
-        state_rng = TargetModelField.simulate_from_prior_given_gp(
+        state = TargetModelField.simulate_from_prior_given_gp(
             self, precision, cov_chol, self.rng)
-        return state_rng
+        return (state, self.rng)
 
 def get_precision_prior():
     return stats.gamma(a=4/3, scale=3)
