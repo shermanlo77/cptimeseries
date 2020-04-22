@@ -4,7 +4,8 @@ import pathlib
 import joblib
 
 from dataset import data
-from dataset.ana import AnaDual1
+from dataset.ana import AnaDual10Test
+from dataset.ana import AnaDual10Training
 from dataset.ana import AnaDual1Test
 from dataset.ana import AnaDual1Training
 from dataset.ana import AnaDualExample1
