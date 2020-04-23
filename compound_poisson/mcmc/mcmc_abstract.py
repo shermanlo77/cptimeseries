@@ -1,5 +1,6 @@
 import datetime
 import math
+import os
 from os import path
 
 import numpy as np
@@ -34,6 +35,7 @@ class Mcmc(object):
         self.dtype = dtype
         self.n_sample = None
         self.memmap_path = memmap_path
+        self.memmap_path_old = None
         self.target = target
         self.rng = rng
         self.n_dim = None
@@ -44,13 +46,14 @@ class Mcmc(object):
         if not target is None:
             n_dim = target.get_n_dim()
             self.state = target.get_state()
-            if not n_sample is None:
-                self.instantiate_memmap(
-                    memmap_path, type(target).__name__, n_sample, n_dim)
 
-    def instantiate_memmap(self, directory, file_name, n_sample, n_dim):
+            if not n_sample is None:
+                self.instantiate_memmap(memmap_path, n_sample, n_dim)
+
+    def instantiate_memmap(self, directory, n_sample, n_dim):
         #instantiate memmap to member variable, also assign member variables
             #n_sample and n_dim
+        file_name = self.get_target_class()
         file_name = self.make_memmap_file_name(file_name)
         self.n_sample = n_sample
         self.n_dim = n_dim
@@ -59,6 +62,10 @@ class Mcmc(object):
                                       self.dtype,
                                       "w+",
                                       shape=(n_sample, n_dim))
+
+    def get_target_class(self):
+        return (type(self.target).__module__.split(".")[-1]
+            + "_" + type(self.target).__name__)
 
     def make_memmap_file_name(self, name):
         """Prefix underscore, class name, append datetime and memory address and
@@ -69,7 +76,7 @@ class Mcmc(object):
         datetime_id = datetime_id.replace(":", "")
         datetime_id = datetime_id.replace(" ", "")
         datetime_id = datetime_id[0:14]
-        file_name = ("_" + type(self).__name__ + name + "_" + datetime_id
+        file_name = ("_" + type(self).__name__ + "_" + name + "_" + datetime_id
             + "_" + str(id(self)) + ".dat")
         return file_name
 
@@ -84,13 +91,16 @@ class Mcmc(object):
             n_sample_old = self.n_sample
             self.read_memmap()
             sample_array_old = self.sample_array
+            self.memmap_path_old = self.memmap_path
             self.instantiate_memmap(path.dirname(self.memmap_path),
-                                    type(self.target).__name__,
                                     n_sample,
                                     self.n_dim)
-
             self.sample_array[0:n_sample_old] = sample_array_old
             del sample_array_old
+
+    def delete_old_memmap(self):
+        if path.exists(self.memmap_path_old):
+            os.remove(self.memmap_path_old)
 
     def read_to_write_memmap(self):
         self.sample_array = np.memmap(self.memmap_path,

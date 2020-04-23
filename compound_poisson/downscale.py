@@ -176,6 +176,7 @@ class Downscale(object):
                 mcmc_array, n_sample - self.n_sample, self.rng, False)
             self.n_sample = n_sample
         self.del_memmap()
+        self.delete_old_memmap()
         self.pool = None
 
     def instantiate_mcmc(self):
@@ -474,6 +475,10 @@ class Downscale(object):
     def del_memmap(self):
         for mcmc in self.get_mcmc_array():
             mcmc.del_memmap()
+
+    def delete_old_memmap(self):
+        for mcmc in self.get_mcmc_array():
+            mcmc.delete_old_memmap()
 
     def set_time_series_rng(self, seed_sequence):
         """Set rng for all time series

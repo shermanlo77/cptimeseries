@@ -72,6 +72,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng, False)
             self.n_sample = n_sample
+        self.delete_old_memmap()
 
     def initalise_z(self):
         """Initalise all z in self.z_array and update all parameters
@@ -165,8 +166,12 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         return self.parameter_target.simulate_from_prior(self.rng)
 
     def load_memmap(self):
-        for mcmc in self.get_mcmc_array():
-            mcmc.load_memmap()
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.load_memmap()
+
+    def delete_old_memmap(self):
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.delete_old_memmap()
 
     def print_mcmc(self, directory, true_parameter=None):
         parameter_name = self.get_parameter_vector_name()
