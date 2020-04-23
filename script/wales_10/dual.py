@@ -15,7 +15,7 @@ def main():
     n_sample = parser.parse_args().sample
 
     seed = random.SeedSequence(79828531385540741833868879786528914229)
-    name = "downscale"
+    name = "dual"
     path_here = pathlib.Path(__file__).parent.absolute()
     fitter = fit_downscale.FitterDownscaleDual(name, path_here, pool, seed)
     fitter.fit(dataset.Wales10Training(), n_sample)
