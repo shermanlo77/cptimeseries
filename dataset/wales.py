@@ -3,7 +3,7 @@ import dataset
 LAT = (55, 75)
 LONG = (56, 82)
 
-class WalesTraining(dataset.AnaDual10Training):
+class Wales10Training(dataset.AnaDual10Training):
 
     def __init__(self):
         super().__init__()
@@ -12,7 +12,7 @@ class WalesTraining(dataset.AnaDual10Training):
         super().load_data()
         self.crop(LAT, LONG)
 
-class WalesTest(dataset.AnaDual10Test):
+class Wales10Test(dataset.AnaDual10Test):
 
     def __init__(self):
         super().__init__()
@@ -20,4 +20,21 @@ class WalesTest(dataset.AnaDual10Test):
     def load_data(self):
         super().load_data()
         self.crop(LAT, LONG)
-        self.trim([0, 365])
+
+class Wales1Training(dataset.AnaDual1Training):
+
+    def __init__(self):
+        super().__init__()
+
+    def load_data(self):
+        super().load_data()
+        self.crop(LAT, LONG)
+
+class Wales1Test(dataset.AnaDual1Test):
+
+    def __init__(self):
+        super().__init__()
+
+    def load_data(self):
+        super().load_data()
+        self.crop(LAT, LONG)
