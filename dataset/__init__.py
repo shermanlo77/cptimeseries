@@ -1,8 +1,3 @@
-from os import path
-import pathlib
-
-import joblib
-
 from dataset import data
 from dataset.ana import AnaDual10Test
 from dataset.ana import AnaDual10Training
@@ -30,3 +25,5 @@ from dataset.isle_of_man import IsleOfManWeekTest
 from dataset.isle_of_man import IsleOfManWeekTraining
 from dataset.london80 import London80
 from dataset.london80 import LondonSimulated80
+from dataset.wales import WalesTest
+from dataset.wales import WalesTraining
