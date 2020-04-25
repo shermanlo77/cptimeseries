@@ -28,6 +28,7 @@ class Forecaster(forecast_time_series.Forecaster):
         self.make_memmap_path()
         self.load_memmap("w+")
         self.simulate_forecasts(range(n_simulation))
+        self.del_memmap()
 
     def make_memmap_path(self):
         datetime_id = str(datetime.datetime.now())
@@ -57,6 +58,7 @@ class Forecaster(forecast_time_series.Forecaster):
                 :, range(i, n_total_parameter, area_unmask)]
             time_series.parameter_mcmc = parameter_mcmc
             time_series.burn_in = self.downscale.burn_in
+            time_series.forecast_memmap_path = self.memmap_path
 
             message = ForecastMessage(time_series, x_i, self.n_simulation)
             forecast_message.append(message)
@@ -86,7 +88,6 @@ class TimeSeriesForecaster(forecast_time_series.Forecaster):
         self.n_simulation = n_simulation
         self.load_memmap()
         self.simulate_forecasts(range(n_simulation))
-        self.del_memmap()
 
     def resume_forecast(self, n_simulation):
         if n_simulation > self.n_simulation:
@@ -98,7 +99,7 @@ class TimeSeriesForecaster(forecast_time_series.Forecaster):
             self.del_memmap()
 
     def load_memmap(self, mode=None):
-        self.forecast_array = np.memmap(self.memmap_path,
+        self.forecast_array = np.memmap(self.time_series.forecast_memmap_path,
                                         np.float64,
                                         "r+")
         self.forecast_array = np.reshape(

@@ -217,6 +217,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     forecast.del_memmap()
 
 def downscale_forecast(forecast_array, test_set, directory):
+    forecast_array.load_memmap("r")
     forecast_map = ma.empty_like(test_set.rain)
 
     series_dir = path.join(directory, "series_forecast")
@@ -226,15 +227,15 @@ def downscale_forecast(forecast_array, test_set, directory):
     if not path.isdir(map_dir):
         os.mkdir(map_dir)
 
+    mask = test_set.rain.mask[0]
+    counter = 0
     for lat_i in range(forecast_map.shape[1]):
         for long_i in range(forecast_map.shape[2]):
-            if forecast_array[lat_i][long_i]:
+            if not mask[lat_i, long_i]:
                 rain = test_set.get_rain(lat_i, long_i)
-                forecast = forecast_array[lat_i][long_i]
-                forecast.time_array = test_set.time_array
-                compound_poisson.print.forecast(
-                    forecast, rain, series_dir, str(lat_i)+"_"+str(long_i))
-                forecast_map[:, lat_i, long_i] = forecast.forecast_median
+                forecast = forecast_array.forecast_array[:, counter, :]
+                forecast_map[:, lat_i, long_i] = np.median(forecast, 0)
+                counter += 1
 
     #plot the rain
     longitude_grid = test_set.topography["longitude"]
@@ -251,7 +252,7 @@ def downscale_forecast(forecast_array, test_set, directory):
                        latitude_grid + angle_resolution / 2,
                        rain_i,
                        vmin=0,
-                       vmax=50)
+                       vmax=15)
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)

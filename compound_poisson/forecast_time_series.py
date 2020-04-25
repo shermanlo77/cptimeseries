@@ -100,6 +100,7 @@ class Forecaster(object):
 
     def del_memmap(self):
         del self.forecast_array
+        self.forecast_array = None
 
     def get_forecast(self):
         """Calculate statistics over all the provided forecasts
