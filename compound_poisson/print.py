@@ -129,6 +129,8 @@ def time_series(time_series, directory, prefix=""):
 
 def forecast(forecast, observed_rain, directory, prefix=""):
 
+    forecast.load_memmap("r")
+
     pandas.plotting.register_matplotlib_converters()
     rain_threshold_array = [0, 5, 10, 15]
 
@@ -194,7 +196,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     for rain in rain_threshold_array:
         plt.figure()
         plt.plot(time_array, forecast.get_prob_rain(rain))
-        for day in range(forecast.n):
+        for day in range(forecast.n_time):
             if observed_rain[day] > rain:
                 plt.axvline(x=time_array[day], color="r", linestyle=":")
         plt.xlabel("time")
@@ -211,6 +213,8 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     file.write(str(forecast.get_error_rmse(observed_rain)))
     file.write("\n")
     file.close()
+
+    forecast.del_memmap()
 
 def downscale_forecast(forecast_array, test_set, directory):
     forecast_map = ma.empty_like(test_set.rain)

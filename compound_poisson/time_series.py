@@ -1,4 +1,5 @@
 import math
+import pathlib
 
 import numpy as np
 from numpy import random
@@ -6,7 +7,7 @@ import pandas
 from scipy import special
 
 from compound_poisson import arma
-from compound_poisson import forecast
+from compound_poisson import forecast_time_series
 from compound_poisson import parameter
 from compound_poisson import terms
 
@@ -102,6 +103,9 @@ class TimeSeries(object):
         self.fitted_time_series = None
         self.rng = random.RandomState()
         self.id = None
+        self.forecaster = None
+        self.self_forecaster = None
+        self.forecaster_memmap_dir = pathlib.Path(__file__).parent.absolute()
 
         #name the model fields, or extract from pandas data frame
         if type(x) is pandas.core.frame.DataFrame:
@@ -510,14 +514,15 @@ class TimeSeries(object):
         Returns:
             forecast: Forecast object
         """
-        forecast_array = forecast.Forecast()
-        for i in range(n_simulation):
-            print("Predictive sample", i)
-            forecast_i = self.instantiate_forecast_self()
-            forecast_i.simulate_given_z()
-            forecast_array.append(forecast_i)
-        forecast_array.get_forecast()
-        return forecast_array
+        self.read_memmap()
+        if self.self_forecaster is None:
+            self.self_forecaster = forecast_time_series.SelfForecaster(
+                self, self.forecaster_memmap_dir)
+            self.self_forecaster.start_forecast(n_simulation)
+        else:
+            self.self_forecaster.resume_forecast(n_simulation)
+        self.del_memmap()
+        return self.self_forecaster
 
     def instantiate_forecast_self(self):
         """Instantiate TimeSeries for forecasting itself
@@ -552,16 +557,15 @@ class TimeSeries(object):
         Returns:
             forecast: Forecast object
         """
-        forecast_array = forecast.Forecast()
-        for i in range(n_simulation):
-            print("Predictive sample", i)
-            forecast_i = self.instantiate_forecast(x)
-            forecast_i.simulate()
-            #the fitted time series is not needed anymore
-            forecast_i.fitted_time_series = None
-            forecast_array.append(forecast_i)
-        forecast_array.get_forecast()
-        return forecast_array
+        self.read_memmap()
+        if self.forecaster is None:
+            self.forecaster = forecast_time_series.Forecaster(
+                self, self.forecaster_memmap_dir)
+            self.forecaster.start_forecast(n_simulation, x)
+        else:
+            self.forecaster.resume_forecast(n_simulation)
+        self.del_memmap()
+        return self.forecaster
 
     def instantiate_forecast(self, x):
         """Instantiate TimeSeries for simulating the future given the current

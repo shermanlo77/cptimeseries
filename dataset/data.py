@@ -449,6 +449,9 @@ class Data(object):
         self.rain = self.rain[time[0]:time[1], :, :]
         self.time_array = self.time_array[time[0]:time[1]]
 
+    def __len__(self):
+        return len(self.time_array)
+
 class DataDualGrid(Data):
     """Handles model fields and topography on both the fine and coarse grid
 

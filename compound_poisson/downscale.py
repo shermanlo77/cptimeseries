@@ -8,6 +8,7 @@ import numpy as np
 from numpy import random
 
 import compound_poisson
+from compound_poisson import forecast_downscale
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
 from compound_poisson import time_series_mcmc
@@ -87,6 +88,7 @@ class Downscale(object):
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
         self.pool = None
         self.memmap_path = pathlib.Path(__file__).parent.absolute()
+        self.forecaster = None
 
         #get the square error matrix used for GP
         unmask = np.logical_not(self.mask).flatten()
@@ -327,48 +329,11 @@ class Downscale(object):
         self.read_memmap()
         self.scatter_z_mcmc_sample()
         #contains forecast objects for each unmasked time series
-        forecast_array = []
-        area_unmask = self.area_unmask
-        n_total_parameter = self.n_total_parameter
-
-        forecast_message = []
-        for i, time_series in enumerate(self.generate_unmask_time_series()):
-            #extract model fields for each unmasked time_series
-            lat_i = time_series.id[0]
-            long_i = time_series.id[1]
-            x_i = data.get_model_field(lat_i, long_i)
-            #extract mcmc chain corresponding to this location
-            parameter_mcmc = self.parameter_mcmc[:]
-            parameter_mcmc = parameter_mcmc[
-                :, range(i, n_total_parameter, area_unmask)]
-            time_series.parameter_mcmc = parameter_mcmc
-            time_series.burn_in = self.burn_in
-
-            message = ForecastMessage(time_series, x_i, n_simulation)
-            forecast_message.append(message)
-
-        self.pool = multiprocess.Pool()
-        forecast_array = self.pool.map(
-            ForecastMessage.forecast, forecast_message)
-        self.pool = None
-
-        #convert array into nested array (2D array), use None for masked time
-            #series
-        forecast_nested_array = []
-        i = 0
-        for lat_i in range(self.shape[0]):
-            forecast_nested_array_i = []
-            for long_i in range(self.shape[1]):
-                is_mask = self.mask[lat_i, long_i]
-                if self.mask[lat_i, long_i]:
-                    forecast = None
-                else:
-                    forecast = forecast_array[i]
-                    i += 1
-                forecast_nested_array_i.append(forecast)
-            forecast_nested_array.append(forecast_nested_array_i)
-
-        return forecast_nested_array
+        self.forecaster = forecast_downscale.Forecaster(self, self.memmap_path)
+        self.forecaster.start_forecast(n_simulation, data)
+        self.del_z_mcmc_sample()
+        self.del_memmap()
+        return self.forecaster
 
     def print_mcmc(self, directory):
         """Print the mcmc chains
@@ -453,6 +418,11 @@ class Downscale(object):
     def scatter_z_mcmc_sample(self):
         for i, time_series in enumerate(self.generate_unmask_time_series()):
             time_series.z_mcmc = self.z_mcmc[:, i*len(self):(i+1)*len(self)]
+
+    def del_z_mcmc_sample(self):
+        for time_series in self.generate_unmask_time_series():
+            del time_series.z_mcmc
+            time_series.z_mcmc = None
 
     def set_memmap_path(self, memmap_path):
         """Set the location to save mcmc sample onto disk
@@ -691,6 +661,8 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          cp_parameter_array)
         self.z_mcmc = None
         self.model_field_mcmc_array = None
+        self.forecast_memmap_path = None
+        self.i_space = None
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
@@ -701,15 +673,16 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         self.parameter_mcmc = None
         self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
 
-    def print_chain_property(self, directory):
-        """Override - only print chain for z
-        """
-        plt.figure()
-        plt.plot(np.asarray(self.z_mcmc.slice_width_array))
-        plt.ylabel("Latent variable slice width")
-        plt.xlabel("Latent variable sample number")
-        plt.savefig(path.join(directory, "slice_width_z.pdf"))
-        plt.close()
+    def forecast(self, x, n_simulation):
+        if not "forecaster" in dir(self):
+            self.forecaster = None
+        if self.forecaster is None:
+            self.forecaster = forecast_downscale.TimeSeriesForecaster(
+                self, self.memmap_path, self.i_space)
+            self.forecaster.start_forecast(n_simulation, x)
+        else:
+            self.forecaster.resume_forecast(n_simulation)
+        return self.forecaster
 
 
 class ForecastMessage(object):
