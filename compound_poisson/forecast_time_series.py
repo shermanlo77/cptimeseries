@@ -12,22 +12,28 @@ from compound_poisson import roc
 class Forecaster(object):
     """Contain Monte Carlo forecasts
 
-    Contain Monte Carlo forecasts in forecast_array as an array of TimeSeries
-        objects. Add forecasts using the method append(). Call the method
-        get_forecast() to calculate statistcs of all forecats. The statistics
-        are stored as member variables.
+    Contain Monte Carlo forecasts in forecast_array as an array a numpy.memmap
+        object. Add forecasts using the method start_forecast(). To add more
+        forecasts after that, call the method resume_forecast(). Summary
+        statistics are stored in member variables,
     Used by the methods TimeSeries.forecast() and TimeSeries.forecast_self().
 
     Attributes:
-        forecast_array: memmap of TimeSeries objects
-        forecast: expectation of all forecasts
-        forecast_error: std of all forecasts
-        forecast_median: median of all forecasts
-        forecast_sigma: dictoary of z sigma errors of all forecasts
+        time_series: pointer to parent TimeSeries object
         time_array: array, containing time stamps for each point in the forecast
-        n: length of time series
-        n_simulation: length of forecast_array
-        memmap_path
+        model_field: stored model fields of the test set
+        forecast_array: memmap of forecasts
+            dim 0: for each simulation
+            dim 1: for each time point
+        forecast: expectation of all forecasts, array
+        forecast_median: median of all forecasts
+        forecast_sigma: dictionary of sigma errors (quantiles) of all forecasts,
+            keys are [-3, -2, -1, 0, 1, 2, 3] which correspond to the sigma
+            level
+        n_time: length of forecast or number of time points
+        n_simulation: number of simulations to be done
+        memmap_dir: directory to forecast_array memmap file
+        memmap_path: file path to forecast_array memmap file
     """
 
     def __init__(self, time_series, memmap_dir):
@@ -36,16 +42,18 @@ class Forecaster(object):
         self.model_field = None
         self.forecast_array = None
         self.forecast = None
-        self.forecast_error = None
         self.forecast_median = None
         self.forecast_sigma = {}
-        self.time_array = None
         self.n_time = None
         self.n_simulation = 0
         self.memmap_dir = memmap_dir
         self.memmap_path = None
 
     def make_memmap_path(self):
+        """Make a new memmap file name
+
+        Uses datetime to make it unique and identifiable
+        """
         datetime_id = str(datetime.datetime.now())
         datetime_id = datetime_id.replace("-", "")
         datetime_id = datetime_id.replace(":", "")
@@ -56,6 +64,13 @@ class Forecaster(object):
         self.memmap_path = path.join(self.memmap_dir, file_name)
 
     def start_forecast(self, n_simulation, model_field=None):
+        """Start forecast simulations, to be called initially
+
+        Args:
+            n_simulation: number of simulations
+            model_field: model fields for test set (None is test set is training
+                set)
+        """
         self.model_field = model_field
         if model_field is None:
             self.n_time = len(self.time_series)
@@ -67,6 +82,13 @@ class Forecaster(object):
         self.simulate_forecasts(range(n_simulation))
 
     def simulate_forecasts(self, index_range):
+        """Simulate forecasts
+
+        Simulate the forecasts and save results to self.forecast_array
+
+        Args:
+            index_range: array of points to save results onto forecast_array
+        """
         for i in index_range:
             print("Predictive sample", i)
             forecast_i = self.get_simulated_forecast()
@@ -76,13 +98,22 @@ class Forecaster(object):
         self.del_memmap()
 
     def get_simulated_forecast(self):
+        """Return a TimeSeries object with simulated values
+        """
         forecast_i = self.time_series.instantiate_forecast(self.model_field)
         forecast_i.simulate()
         return forecast_i
 
     def resume_forecast(self, n_simulation):
+        """Simulate more forecasts
+
+        Args:
+            n_simulation: total amount of simulations, ie should be higher than
+                previous
+        """
         if n_simulation > self.n_simulation:
             n_simulation_old = self.n_simulation
+            #transfer forecasts from old file to new file
             memmap_path_old = self.memmap_path
             self.load_memmap("r")
             forecast_array_old = self.forecast_array
@@ -91,17 +122,25 @@ class Forecaster(object):
             self.load_memmap("w+")
             self.forecast_array[0:n_simulation_old] = forecast_array_old[:]
             del forecast_array_old
+            #simulate more forecasts
             self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
             if path.exists(memmap_path_old):
                 os.remove(memmap_path_old)
 
     def load_memmap(self, mode):
+        """Load the memmap file fore forecast_array
+
+        Args:
+            mode: how to read the memmap file, eg "w+", "r+", "r"
+        """
         self.forecast_array = np.memmap(self.memmap_path,
                                         np.float64,
                                         mode,
                                         shape=(self.n_simulation, self.n_time))
 
     def del_memmap(self):
+        """Delete the file handling
+        """
         del self.forecast_array
         self.forecast_array = None
 
@@ -109,7 +148,6 @@ class Forecaster(object):
         """Calculate statistics over all the provided forecasts
         """
         self.forecast = np.mean(self.forecast_array, 0)
-        self.forecast_error = np.std(self.forecast_array, 0, ddof=1)
         sigma_array = range(-3,4)
         forecast_quantile = np.quantile(self.forecast_array,
                                         stats.norm.cdf(sigma_array),
@@ -131,7 +169,11 @@ class Forecaster(object):
         return p_rain
 
     def plot_roc_curve(self, rain_warning, rain_true):
-        """Plot ROC curve
+        """Plot ROC curve, with area under curve as label
+
+        Args:
+            rain_warning: the amount of precipitation to be detected
+            rain_true: observed precipitation, array, for each time point
         """
         p_rain_warning = self.get_prob_rain(rain_warning)
         (true_positive_array, false_positive_array, auc) = roc.get_roc_curve(
@@ -191,14 +233,21 @@ class Forecaster(object):
             return math.pow(np.sum(error) / n, 2)
 
 class SelfForecaster(Forecaster):
+    """For forecasting the training set
+
+    Different as the z were estimated in MCMC
+    """
 
     def __init__(self, time_series, memmap_dir):
         super().__init__(time_series, memmap_dir)
 
     def start_forecast(self, n_simulation):
+        #pass no model fields
         super().start_forecast(n_simulation)
 
     def get_simulated_forecast(self):
+        """Return a TimeSeries object with simulated values, with z known
+        """
         forecast_i = self.time_series.instantiate_forecast_self()
         forecast_i.simulate_given_z()
         return forecast_i

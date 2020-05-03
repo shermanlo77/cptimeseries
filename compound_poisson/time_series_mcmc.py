@@ -99,6 +99,11 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             self.z_target, self.rng, self.n_sample, self.memmap_path)
 
     def get_mcmc_array(self):
+        """Return array of Mcmc objects
+
+        Each element in this array can be called to do a Gibbs step for
+            different components
+        """
         mcmc_array = [
             self.z_mcmc,
             self.parameter_mcmc,
@@ -166,6 +171,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         return self.parameter_target.simulate_from_prior(self.rng)
 
     def load_memmap(self):
+        """Load all memmap file handling from all MCMCs
+        """
         for mcmc_i in self.get_mcmc_array():
             mcmc_i.load_memmap()
 

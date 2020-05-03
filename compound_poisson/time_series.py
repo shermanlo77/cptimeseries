@@ -607,14 +607,6 @@ class TimeSeries(object):
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
 
-    def del_memmap(self):
-        for mcmc in self.get_mcmc_array():
-            mcmc.del_memmap()
-
-    def read_memmap(self):
-        for mcmc in self.get_mcmc_array():
-            mcmc.read_memmap()
-
     def __str__(self):
         #return the reg parameters for each cp parameter
         string = ""
