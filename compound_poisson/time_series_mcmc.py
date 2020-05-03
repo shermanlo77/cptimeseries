@@ -170,11 +170,15 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         """
         return self.parameter_target.simulate_from_prior(self.rng)
 
-    def load_memmap(self):
-        """Load all memmap file handling from all MCMCs
+    def read_memmap(self):
+        """Read all memmap file handling from all MCMCs
         """
         for mcmc_i in self.get_mcmc_array():
-            mcmc_i.load_memmap()
+            mcmc_i.read_memmap()
+
+    def del_memmap(self):
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.del_memmap()
 
     def delete_old_memmap(self):
         for mcmc_i in self.get_mcmc_array():
