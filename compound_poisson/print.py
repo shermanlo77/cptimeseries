@@ -170,16 +170,6 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     plt.close()
 
     plt.figure()
-    ax = plt.gca()
-    ax.set_prop_cycle(cycle_forecast)
-    plt.plot(time_array, forecast.forecast_sigma[2])
-    plt.plot(time_array, forecast.forecast_median)
-    plt.xlabel("time")
-    plt.ylabel("precipitation (mm)")
-    plt.savefig(path.join(directory, prefix + "_forecast_extreme.pdf"))
-    plt.close()
-
-    plt.figure()
     plt.plot(time_array, forecast.forecast - observed_rain)
     plt.xlabel("time")
     plt.ylabel("residual (mm)")
