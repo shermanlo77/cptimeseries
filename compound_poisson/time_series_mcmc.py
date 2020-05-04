@@ -26,6 +26,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         z_mcmc: Mcmc object which does MCMC using z_target
         burn_in: integer, which samples to discard when doing posterior sampling
             which is used for forecasting
+        memmap_path: directory to store the MCMC samples
     """
 
     def __init__(self,
@@ -58,7 +59,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
 
-    def resume(self, n_sample):
+    def resume_fitting(self, n_sample):
         """Run more MCMC samples
 
         Args:
@@ -110,13 +111,13 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         ]
         return mcmc_array
 
-    def set_parameter_from_sample(self):
+    def set_parameter_from_sample(self, rng):
         """Set parameter from MCMC sample
 
         Set the regression parameters and latent variables z from the MCMC
             samples in parameter_sample and z_sample.
         """
-        index = self.rng.randint(self.burn_in, len(self.parameter_mcmc))
+        index = rng.randint(self.burn_in, len(self.parameter_mcmc))
         self.set_parameter_vector(self.parameter_mcmc[index])
         self.z_array = self.z_mcmc[index]
         self.update_all_cp_parameters()
@@ -124,14 +125,14 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     def instantiate_forecast_self(self):
         """Override - Set the parameter from the MCMC sample
         """
-        self.set_parameter_from_sample()
+        self.set_parameter_from_sample(self.self_forecaster_rng)
         forecast = super().instantiate_forecast_self()
         return forecast
 
     def instantiate_forecast(self, x):
         """Override - Set the parameter from the MCMC sample
         """
-        self.set_parameter_from_sample()
+        self.set_parameter_from_sample(self.forecaster_rng)
         forecast = super().instantiate_forecast(x)
         return forecast
 

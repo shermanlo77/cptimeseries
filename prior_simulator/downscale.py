@@ -23,7 +23,7 @@ class PriorSimulator(object):
 
     def instantiate_downscale(self):
         self.downscale = compound_poisson.Downscale(
-            dataset.AnaInterpolate1(), (5, 5))
+            dataset.AnaDual10Training(), (5, 5))
 
     def simulate(self, precision=None):
         downscale = self.downscale

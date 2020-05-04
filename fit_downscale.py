@@ -39,7 +39,7 @@ class Fitter(object):
         else:
             downscale = joblib.load(result_file)
             if not n_sample is None:
-                downscale.resume(n_sample, self.pool)
+                downscale.resume_fitting(n_sample, self.pool)
                 joblib.dump(downscale, result_file)
 
         directory = path.join(self.figure_dir, self.name)

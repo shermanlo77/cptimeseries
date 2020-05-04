@@ -7,7 +7,7 @@ TEST_RANGE = [3653, 4018]
 WEEK_TRAINING_RANGE = [0, 7]
 WEEK_TEST_RANGE = [7, 14]
 
-class IsleOfMan(dataset.AnaDualExample1):
+class IsleOfManTraining(dataset.ana.AnaDual10Training):
 
     def __init__(self):
         super().__init__()
@@ -16,16 +16,7 @@ class IsleOfMan(dataset.AnaDualExample1):
         super().load_data()
         self.crop(LAT, LONG)
 
-class IsleOfManTraining(IsleOfMan):
-
-    def __init__(self):
-        super().__init__()
-
-    def load_data(self):
-        super().load_data()
-        self.trim(TRAINING_RANGE)
-
-class IsleOfManTest(IsleOfMan):
+class IsleOfManTest(dataset.ana.AnaDual10Test):
 
     def __init__(self):
         super().__init__()
@@ -34,7 +25,7 @@ class IsleOfManTest(IsleOfMan):
         super().load_data()
         self.trim(TEST_RANGE)
 
-class IsleOfManWeekTraining(IsleOfMan):
+class IsleOfManWeekTraining(IsleOfManTraining):
 
     def __init__(self):
         super().__init__()
@@ -43,7 +34,7 @@ class IsleOfManWeekTraining(IsleOfMan):
         super().load_data()
         self.trim(WEEK_TRAINING_RANGE)
 
-class IsleOfManWeekTest(IsleOfMan):
+class IsleOfManWeekTest(IsleOfManTraining):
 
     def __init__(self):
         super().__init__()

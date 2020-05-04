@@ -20,7 +20,7 @@ class PriorSimulator(object):
         self.n_simulate = 100
         self.n_lag = 20
         self.max_rain = 100
-        self.data = dataset.AnaInterpolate1()
+        self.data = dataset.AnaDual10Training()
 
     def get_prior_time_series(self, x, prior_std):
         time_series = compound_poisson.TimeSeriesMcmc(

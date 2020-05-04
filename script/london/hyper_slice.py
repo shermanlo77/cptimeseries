@@ -12,11 +12,10 @@ def main():
     parser.add_argument("--sample", help="number of mcmc samples", type=int)
     n_sample = parser.parse_args().sample
 
-    rng = random.RandomState(np.uint32(2443707582))
-    name = "hyper"
+    seed = random.SeedSequence(126906591942422578422472743313642430795)
     path_here = pathlib.Path(__file__).parent.absolute()
-    fitter = fit_time_series.FitterHyperSlice(name, path_here, rng)
-    fitter.fit(dataset.London80(), n_sample)
+    fitter = fit_time_series.FitterHyperSlice(path_here)
+    fitter.fit(dataset.London80(), seed, n_sample)
 
 if __name__ == "__main__":
     main()

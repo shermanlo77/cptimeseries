@@ -48,7 +48,15 @@ class TimeSeries(object):
         y_array: compound poisson variables at each time step
         fitted_time_series: time series before this one, used for forecasting
         rng: numpy.random.RandomState object
-        id: string to identify this time series
+        id: default None, 2 elemenet array containing latitude and longitiude
+            index, used by Downscale
+        forecaster: forecast_time_series.Forecaster object, contains forecasts
+            on a test set
+        self_forecaster: forecast_time_series.SelfForecaster object, contains
+            forecasts on the training set
+        forecaster_memmap_dir: directory to store forecast objects
+        forecaster_rng: rng for method instantiate_forecast_self()
+        self_forecaster_rng: rng for method instantiate_forecast()
     """
 
     def __init__(self,
@@ -101,11 +109,15 @@ class TimeSeries(object):
         self.z_var_array = np.zeros(n)
         self.y_array = None
         self.fitted_time_series = None
-        self.rng = random.RandomState()
+        self.rng = None
         self.id = None
         self.forecaster = None
         self.self_forecaster = None
         self.forecaster_memmap_dir = pathlib.Path(__file__).parent.absolute()
+        self.forecaster_rng = None
+        self.self_forecaster_rng = None
+
+        self.set_rng(random.SeedSequence())
 
         #name the model fields, or extract from pandas data frame
         if type(x) is pandas.core.frame.DataFrame:
@@ -506,13 +518,11 @@ class TimeSeries(object):
         """Forecast itself
 
         Forecast itself given its parameters and estimates of z. Use expectation
-            of the predictive distribution using Monte Carlo.
+            of the predictive distribution using Monte Carlo. Results are stored
+            in self_forecaster
 
         Args:
             n_simulation: number of Monte Carlo simulations
-
-        Returns:
-            forecast: Forecast object
         """
         self.read_memmap()
         if self.self_forecaster is None:
@@ -522,7 +532,6 @@ class TimeSeries(object):
         else:
             self.self_forecaster.resume_forecast(n_simulation)
         self.del_memmap()
-        return self.self_forecaster
 
     def instantiate_forecast_self(self):
         """Instantiate TimeSeries for forecasting itself
@@ -540,7 +549,7 @@ class TimeSeries(object):
         forecast.x_scale = self.x_scale
         forecast.model_field_name = self.model_field_name
         forecast.time_array = self.time_array
-        forecast.rng = self.rng
+        forecast.rng = self.self_forecaster_rng
         return forecast
 
     def forecast(self, x, n_simulation):
@@ -548,14 +557,11 @@ class TimeSeries(object):
 
         Forecast itself given its parameters, estimates of z and future model
             fields. Use expectation of the predictive distribution using Monte
-            Carlo.
+            Carlo. Results are stored in forecaster
 
         Args:
             x: model fields, np.array, each element for each time step
             n_simulation: number of Monte Carlo simulations
-
-        Returns:
-            forecast: Forecast object
         """
         self.read_memmap()
         if self.forecaster is None:
@@ -565,7 +571,6 @@ class TimeSeries(object):
         else:
             self.forecaster.resume_forecast(n_simulation)
         self.del_memmap()
-        return self.forecaster
 
     def instantiate_forecast(self, x):
         """Instantiate TimeSeries for simulating the future given the current
@@ -586,7 +591,7 @@ class TimeSeries(object):
         forecast.fitted_time_series = self
         forecast.model_field_name = self.model_field_name
         forecast.time_array = []
-        forecast.rng = self.rng
+        forecast.rng = self.forecaster_rng
         #the forecast time_array is the future
         last_time = self.time_array[len(self)-1]
         time_diff = last_time - self.time_array[len(self)-2]
@@ -594,6 +599,17 @@ class TimeSeries(object):
             forecast.time_array.append(last_time + (i+1)*time_diff)
 
         return forecast
+
+    def set_rng(self, seed_sequence):
+        """Set rng
+        """
+        rng_array = []
+        for s in seed_sequence.spawn(3):
+            rng_s = random.RandomState(random.MT19937(s))
+            rng_array.append(rng_s)
+        self.rng = rng_array[0]
+        self.forecaster_rng = rng_array[1]
+        self.self_forecaster_rng = rng_array[2]
 
     def cast_arma(self, arma_class):
         """Cast the arma object

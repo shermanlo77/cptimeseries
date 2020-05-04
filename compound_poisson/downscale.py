@@ -160,7 +160,7 @@ class Downscale(object):
         self.del_memmap()
         self.pool = None
 
-    def resume(self, n_sample, pool=None):
+    def resume_fitting(self, n_sample, pool=None):
         """Run more MCMC samples
 
         Args:
@@ -459,7 +459,7 @@ class Downscale(object):
         self.seed_seq = seed_sequence
         self.rng = self.spawn_rng()
         for time_series in self.generate_all_time_series():
-            time_series.rng = self.spawn_rng()
+            time_series.set_rng(seed_sequence)
 
     def set_rng(self, seed_sequence):
         self.set_time_series_rng(seed_sequence)
