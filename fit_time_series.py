@@ -8,7 +8,7 @@ import numpy as np
 import compound_poisson
 
 class Fitter(object):
-    """Wrapper class for fitting TimeSeries onto data
+    """Wrapper class for fitting TimeSeries onto data and check-pointing
 
     Attributes:
         name: name of TimeSeries object to be fitted
@@ -48,10 +48,9 @@ class Fitter(object):
             dataset: object with method get_data_training() which returns model
                 fields and precipitation
             seed: numpy.random.SeedSequence object
-            n_sample: number of samples, default value used is None is passed
+            n_sample: number of samples, default value used if None is passed
         """
         result_file = path.join(self.result_dir, self.name + ".gz")
-
         #check if this is the initial fit() call by checking the results files
         if not path.isfile(result_file):
             #fit the model
@@ -80,34 +79,43 @@ class Fitter(object):
             true_parameter = None
 
         #print results
-        time_series.read_memmap()
         time_series.print_mcmc(self.figure_dir, true_parameter)
 
     def forecast(self, dataset, n_simulation=None, burn_in=None):
         """Make forecasts on training and test set
 
         After fitting, make forecasts on training and test set. When called
-            again, can add more simulations.
-        NOTE: THIS IS NOT REPRODUCIBLE IF CALLED AGAIN (this is because it does n_simulation)
+            again, can add more simulations. The method fit() should not be
+            called after calling forecast(). Recommend backing up the results
+            before calling forecast() when debugging or developing.
 
         Args:
             dataset: object which can call get_model_field_test() and
                 get_rain_test()
             n_simulation: number of simulations, default is 1000
-            burn_in: burn in for MCMC, default is 1000
+            burn_in: burn in for MCMC, default value is 0
         """
         result_file = path.join(self.result_dir, self.name + ".gz")
         time_series = joblib.load(result_file)
-        if n_simulation is None:
+        time_series.forecaster_memmap_dir = self.result_dir
+        #set default n_simulation if this is the initial forecast() call
+        if (time_series.forecaster is None) and (n_simulation is None):
             n_simulation = 1000
         if not burn_in is None:
             time_series.burn_in = burn_in
-        time_series.forecaster_memmap_dir = self.result_dir
 
-        time_series.forecast_self(n_simulation)
-        time_series.forecast(dataset.get_model_field_test(), n_simulation)
-        joblib.dump(time_series, result_file)
+        #call time_series.forecast() and time_series.self_forecast() if this is
+            #the initial forecast() call
+            #or this is further forecast() calls and a n_simulation is provided
+        is_do_forecast = ((time_series.forecaster is None)
+            or ((not time_series.forecaster is None)
+            and (not n_simulation is None)))
+        if is_do_forecast:
+            time_series.forecast_self(n_simulation)
+            time_series.forecast(dataset.get_model_field_test(), n_simulation)
+            joblib.dump(time_series, result_file)
 
+        #plot forecast results
         rain = dataset.get_rain_training()
         compound_poisson.print.forecast(
             time_series.self_forecaster, rain, self.figure_dir, "training")

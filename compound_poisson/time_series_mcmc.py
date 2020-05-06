@@ -187,6 +187,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
 
     def print_mcmc(self, directory, true_parameter=None):
         parameter_name = self.get_parameter_vector_name()
+        self.read_memmap()
         chain = np.asarray(self.parameter_mcmc[:])
         for i in range(self.n_parameter):
             chain_i = chain[:,i]
@@ -212,6 +213,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         plt.close()
 
         self.print_chain_property(directory)
+        self.del_memmap()
 
     def print_chain_property(self, directory):
         plt.figure()

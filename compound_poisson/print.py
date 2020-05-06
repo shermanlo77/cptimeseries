@@ -219,12 +219,15 @@ def downscale_forecast(forecast_array, test_set, directory):
 
     mask = test_set.rain.mask[0]
     counter = 0
+    observed_rain_mask_array = []
+
     for lat_i in range(forecast_map.shape[1]):
         for long_i in range(forecast_map.shape[2]):
             if not mask[lat_i, long_i]:
-                rain = test_set.get_rain(lat_i, long_i)
-                forecast = forecast_array.forecast_array[:, counter, :]
-                forecast_map[:, lat_i, long_i] = np.median(forecast, 0)
+                observed_rain_mask_array.append(
+                    test_set.get_rain(lat_i, long_i))
+                forecast_i = forecast_array.forecast_array[counter]
+                forecast_map[:, lat_i, long_i] = np.median(forecast_i, 0)
                 counter += 1
 
     #plot the rain
@@ -233,19 +236,31 @@ def downscale_forecast(forecast_array, test_set, directory):
     angle_resolution = dataset.ANGLE_RESOLUTION
     for i, time in enumerate(test_set.time_array):
 
-        rain_i = forecast_map[i, :, :]
-        rain_i.mask[rain_i == 0] = True
+        if i < 365:
 
-        plt.figure()
-        ax = plt.axes(projection=crs.PlateCarree())
-        im = ax.pcolor(longitude_grid - angle_resolution / 2,
-                       latitude_grid + angle_resolution / 2,
-                       rain_i,
-                       vmin=0,
-                       vmax=15)
-        ax.coastlines(resolution="50m")
-        plt.colorbar(im)
-        ax.set_aspect("auto", adjustable=None)
-        plt.title("precipitation (" + test_set.rain_units + ") : " + str(time))
-        plt.savefig(path.join(map_dir, str(i) + ".png"))
-        plt.close()
+            rain_i = forecast_map[i]
+            rain_i.mask[rain_i == 0] = True
+
+            plt.figure()
+            ax = plt.axes(projection=crs.PlateCarree())
+            im = ax.pcolor(longitude_grid - angle_resolution / 2,
+                           latitude_grid + angle_resolution / 2,
+                           rain_i,
+                           vmin=0,
+                           vmax=15)
+            ax.coastlines(resolution="50m")
+            plt.colorbar(im)
+            ax.set_aspect("auto", adjustable=None)
+            plt.title(
+                "precipitation (" + test_set.rain_units + ") : " + str(time))
+            plt.savefig(path.join(map_dir, str(i) + ".png"))
+            plt.close()
+
+
+    #plot the forecast for each location
+    downscale = forecast_array.downscale
+    for i, time_series_i in enumerate(downscale.generate_unmask_time_series()):
+        forecast(time_series_i.forecaster,
+                 observed_rain_mask_array[i],
+                 series_dir,
+                 prefix=str(time_series_i.id))

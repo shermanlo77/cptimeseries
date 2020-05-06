@@ -56,7 +56,7 @@ class Downscale(object):
         square_error: matrix (area_unmask x area_unmask) containing square error
             of topography between each point in space
         pool: object for parallel programming
-        memmap_path: location to store mcmc samples
+        memmap_path: location to store mcmc samples and forecasts
     """
 
     def __init__(self, data, n_arma=(0,0)):
@@ -378,6 +378,8 @@ class Downscale(object):
         plt.savefig(path.join(directory, "z.pdf"))
         plt.close()
 
+        self.del_memmap()
+
     def get_random_position_index(self):
         """Return array of random n_plot numbers, choose from
             range(self.area_unmask) without replacement
@@ -423,6 +425,11 @@ class Downscale(object):
         for time_series in self.generate_unmask_time_series():
             del time_series.z_mcmc
             time_series.z_mcmc = None
+
+    def set_burn_in(self, burn_in):
+        self.burn_in = burn_in
+        for time_series in self.generate_unmask_time_series():
+            time_series.burn_in = burn_in
 
     def set_memmap_path(self, memmap_path):
         """Set the location to save mcmc sample onto disk
@@ -661,8 +668,6 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          cp_parameter_array)
         self.z_mcmc = None
         self.model_field_mcmc_array = None
-        self.forecast_memmap_path = None
-        self.i_space = None
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
@@ -673,17 +678,15 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         self.parameter_mcmc = None
         self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
 
-    def forecast(self, x, n_simulation):
-        if not "forecaster" in dir(self):
-            self.forecaster = None
+    def forecast(self, x, n_simulation, memmap_path, i_space):
         if self.forecaster is None:
             self.forecaster = forecast_downscale.TimeSeriesForecaster(
-                self, self.memmap_path, self.i_space)
+                self, memmap_path, i_space)
             self.forecaster.start_forecast(n_simulation, x)
         else:
+            self.forecaster.memmap_path = memmap_path
             self.forecaster.resume_forecast(n_simulation)
         return self.forecaster
-
 
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast

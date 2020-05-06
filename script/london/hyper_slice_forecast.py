@@ -15,7 +15,6 @@ def main():
     if burn_in is None:
         burn_in = 8000
 
-    name = "hyper"
     path_here = pathlib.Path(__file__).parent.absolute()
     fitter = fit_time_series.FitterHyperSlice(path_here)
     fitter.forecast(dataset.London80(), n_simulation, burn_in)
