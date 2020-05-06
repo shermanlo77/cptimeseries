@@ -40,7 +40,7 @@ class Forecaster(forecast_time_series.Forecaster):
             self.n_simulation = n_simulation
             self.make_memmap_path()
             self.load_memmap("w+")
-            for i in range(self.forecast_array):
+            for i in range(len(self.forecast_array)):
                 self.forecast_array[i, 0:n_simulation_old] = (
                     forecast_array_old[i])
             del forecast_array_old

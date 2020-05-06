@@ -74,7 +74,7 @@ class Downscale(object):
         self.shape = self.mask.shape
         self.area = self.shape[0] * self.shape[1]
         self.area_unmask = np.sum(np.logical_not(self.mask))
-        self.seed_seq = random.SeedSequence()
+        self.seed_seq = None
         self.rng = None
         self.parameter_target = None
         self.parameter_gp_target = None
@@ -138,7 +138,7 @@ class Downscale(object):
                 self.n_parameter = time_series.n_parameter
 
         #set other member variables
-        self.set_time_series_rng(self.seed_seq)
+        self.set_rng(random.SeedSequence())
         self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
         self.n_total_parameter = self.area_unmask * self.n_parameter
         self.parameter_target = target_downscale.TargetParameter(self)
@@ -328,12 +328,16 @@ class Downscale(object):
         self.pool = pool
         self.read_memmap()
         self.scatter_z_mcmc_sample()
-        #contains forecast objects for each unmasked time series
-        self.forecaster = forecast_downscale.Forecaster(self, self.memmap_dir)
-        self.forecaster.start_forecast(n_simulation, data)
+
+        if self.forecaster is None:
+            self.forecaster = forecast_downscale.Forecaster(
+                self, self.memmap_dir)
+            self.forecaster.start_forecast(n_simulation, data)
+        else:
+            self.forecaster.resume_forecast(n_simulation)
+
         self.del_z_mcmc_sample()
         self.del_memmap()
-        return self.forecaster
 
     def print_mcmc(self, directory):
         """Print the mcmc chains
@@ -463,12 +467,12 @@ class Downscale(object):
         Args:
             seed_sequence: numpy.random.SeedSequence object
         """
-        self.seed_seq = seed_sequence
-        self.rng = self.spawn_rng()
         for time_series in self.generate_all_time_series():
             time_series.set_rng(seed_sequence)
 
     def set_rng(self, seed_sequence):
+        self.seed_seq = seed_sequence
+        self.rng = self.spawn_rng()
         self.set_time_series_rng(seed_sequence)
 
     def spawn_rng(self, n=1):
