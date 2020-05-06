@@ -138,7 +138,8 @@ class Downscale(object):
                 self.n_parameter = time_series.n_parameter
 
         #set other member variables
-        self.set_rng(random.SeedSequence())
+        self.set_seed_seq(random.SeedSequence())
+        self.set_time_series_rng()
         self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
         self.n_total_parameter = self.area_unmask * self.n_parameter
         self.parameter_target = target_downscale.TargetParameter(self)
@@ -461,19 +462,23 @@ class Downscale(object):
         for mcmc in self.get_mcmc_array():
             mcmc.delete_old_memmap()
 
-    def set_time_series_rng(self, seed_sequence):
-        """Set rng for all time series
-
-        Args:
-            seed_sequence: numpy.random.SeedSequence object
-        """
-        for time_series in self.generate_all_time_series():
-            time_series.set_rng(seed_sequence)
-
-    def set_rng(self, seed_sequence):
+    def set_seed_seq(self, seed_sequence):
         self.seed_seq = seed_sequence
         self.rng = self.spawn_rng()
-        self.set_time_series_rng(seed_sequence)
+
+    def set_time_series_rng(self):
+        """Set rng for all time series
+        """
+        for time_series in self.generate_all_time_series():
+            time_series.set_rng(self.seed_seq)
+
+    def set_rng(self, seed_sequence):
+        """Set rng for all objects which uses rng
+
+        To be override by subclasses
+        """
+        self.set_seed_seq(seed_sequence)
+        self.set_time_series_rng()
 
     def spawn_rng(self, n=1):
         """Return array of substream rng
@@ -543,6 +548,8 @@ class DownscaleDual(Downscale):
 
         self.model_field_target = target_model_field.TargetModelFieldArray(self)
         self.model_field_gp_target = target_model_field.TargetGp(self)
+
+        self.set_model_field_target_rng()
 
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
@@ -645,6 +652,9 @@ class DownscaleDual(Downscale):
         rng = random.RandomState(np.uint32(1625274893))
         return np.sort(rng.choice(self.area_unmask, n_plot, replace=False))
 
+    def set_model_field_target_rng(self):
+        self.model_field_target.set_rng_array()
+
     def set_rng(self, seed_sequence):
         """Set rng for all time series and for each time step in
             self.model_field_target
@@ -653,7 +663,7 @@ class DownscaleDual(Downscale):
             seed_sequence: numpy.random.SeedSequence object
         """
         super().set_rng(seed_sequence)
-        self.model_field_target.set_rng_array()
+        self.set_model_field_target_rng()
 
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
     """Modify TimeSeriesSlice to only sample z

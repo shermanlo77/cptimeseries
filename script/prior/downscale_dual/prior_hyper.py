@@ -9,7 +9,7 @@ import prior_simulator
 
 def main():
 
-    rng = random.RandomState(np.uint32(953360999))
+    seed = random.SeedSequence(229832313616889766024454351930337995132)
 
     path_here = pathlib.Path(__file__).parent.absolute()
     figure_dir = path.join(path_here, "figure")
@@ -20,7 +20,7 @@ def main():
         os.mkdir(figure_dir)
 
     prior_simulate = prior_simulator.downscale_dual.PriorSimulator(
-        figure_dir, rng)
+        figure_dir, seed)
     prior_simulate()
 
 if __name__ == "__main__":

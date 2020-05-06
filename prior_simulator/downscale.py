@@ -6,20 +6,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import linalg
 from numpy import ma
+from numpy import random
 
 import compound_poisson
 import dataset
 
 class PriorSimulator(object):
 
-    def __init__(self, figure_directory, rng):
+    def __init__(self, figure_directory, seed):
         self.figure_directory = figure_directory
         self.n_simulate = 10
         self.downscale = None
         self.angle_resolution = dataset.ANGLE_RESOLUTION
-        self.rng = rng
+        self.rng = random.RandomState(random.MT19937(seed.spawn(1)[0]))
         self.instantiate_downscale()
-        self.downscale.set_rng(rng)
+        self.downscale.set_rng(seed)
 
     def instantiate_downscale(self):
         self.downscale = compound_poisson.Downscale(
@@ -32,9 +33,9 @@ class PriorSimulator(object):
             gp_parameter = gp_target.simulate_from_prior(self.rng)
             for i, key in enumerate(gp_target.state):
                 if key == "gp_precision":
-                    gp_parameter.state[key] = precision
+                    gp_target.state[key] = precision
                 else:
-                    gp_parameter.state[key] = gp_parameter[i]
+                    gp_target.state[key] = gp_parameter[i]
             gp_target.save_cov_chol()
         else:
             gp_target.set_from_prior(self.rng)
@@ -76,7 +77,6 @@ class PriorSimulator(object):
             os.mkdir(figure_directory)
 
         downscale = self.downscale
-        downscale.update_parameter_gp()
         try:
             for i_simulate in range(self.n_simulate):
                 self.simulate(precision)
