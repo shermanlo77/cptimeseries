@@ -16,8 +16,8 @@ class ZRwmh(mcmc_abstract.Mcmc):
         accept_array: acceptance rate at each proposal
     """
 
-    def __init__(self, target, rng, n_sample=None, memmap_path=None):
-        super().__init__(np.int32, target, rng, n_sample, memmap_path)
+    def __init__(self, target, rng, n_sample=None, memmap_dir=None):
+        super().__init__(np.int32, target, rng, n_sample, memmap_dir)
         self.z_parameter = 1 / target.get_n_dim()
         self.n_propose = 0
         self.n_accept = 0
@@ -98,8 +98,8 @@ class ZSlice(mcmc_abstract.Mcmc):
     Attributes:
     """
 
-    def __init__(self, target, rng, n_sample=None, memmap_path=None):
-        super().__init__(np.int32, target, rng, n_sample, memmap_path)
+    def __init__(self, target, rng, n_sample=None, memmap_dir=None):
+        super().__init__(np.int32, target, rng, n_sample, memmap_dir)
         self.n_propose = 0
         self.slice_width_array = []
         self.non_zero_index = np.nonzero(self.target.time_series.y_array)[0]
@@ -177,11 +177,11 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
     Does MCMC on all z in Downscale
     """
 
-    def __init__(self, downscale, n_sample, memmap_path):
+    def __init__(self, downscale, n_sample, memmap_dir):
         super().__init__(np.int32)
         self.downscale = downscale
         n_dim = len(downscale) * downscale.area_unmask
-        self.instantiate_memmap(memmap_path, n_sample, n_dim)
+        self.instantiate_memmap(memmap_dir, n_sample, n_dim)
 
     def instantiate_memmap(self, directory, n_sample, n_dim):
         super().instantiate_memmap(directory, n_sample, n_dim)

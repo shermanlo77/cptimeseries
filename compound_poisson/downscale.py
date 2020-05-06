@@ -56,7 +56,7 @@ class Downscale(object):
         square_error: matrix (area_unmask x area_unmask) containing square error
             of topography between each point in space
         pool: object for parallel programming
-        memmap_path: location to store mcmc samples and forecasts
+        memmap_dir: location to store mcmc samples and forecasts
     """
 
     def __init__(self, data, n_arma=(0,0)):
@@ -87,7 +87,7 @@ class Downscale(object):
         self.model_field_scale = []
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
         self.pool = None
-        self.memmap_path = pathlib.Path(__file__).parent.absolute()
+        self.memmap_dir = ""
         self.forecaster = None
 
         #get the square error matrix used for GP
@@ -131,7 +131,7 @@ class Downscale(object):
                 time_series.x_shift = self.model_field_shift
                 time_series.x_scale = self.model_field_scale
                 time_series.time_array = self.time_array
-                time_series.memmap_path = self.memmap_path
+                time_series.memmap_dir = self.memmap_dir
                 time_series_array[lat_i].append(time_series)
                 for i in range(time_series.n_parameter):
                     self.parameter_mask_vector.append(is_mask)
@@ -185,14 +185,14 @@ class Downscale(object):
         """Instantiate MCMC objects
         """
         self.parameter_mcmc = mcmc.Elliptical(
-            self.parameter_target, self.rng, self.n_sample, self.memmap_path)
+            self.parameter_target, self.rng, self.n_sample, self.memmap_dir)
         self.parameter_gp_mcmc = mcmc.Rwmh(
-            self.parameter_gp_target, self.rng, self.n_sample, self.memmap_path)
+            self.parameter_gp_target, self.rng, self.n_sample, self.memmap_dir)
         #all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
             time_series.instantiate_mcmc()
-        self.z_mcmc = mcmc.ZMcmcArray(self, self.n_sample, self.memmap_path)
+        self.z_mcmc = mcmc.ZMcmcArray(self, self.n_sample, self.memmap_dir)
         self.parameter_gp_target.save_cov_chol()
 
     def get_mcmc_array(self):
@@ -329,7 +329,7 @@ class Downscale(object):
         self.read_memmap()
         self.scatter_z_mcmc_sample()
         #contains forecast objects for each unmasked time series
-        self.forecaster = forecast_downscale.Forecaster(self, self.memmap_path)
+        self.forecaster = forecast_downscale.Forecaster(self, self.memmap_dir)
         self.forecaster.start_forecast(n_simulation, data)
         self.del_z_mcmc_sample()
         self.del_memmap()
@@ -431,15 +431,15 @@ class Downscale(object):
         for time_series in self.generate_unmask_time_series():
             time_series.burn_in = burn_in
 
-    def set_memmap_path(self, memmap_path):
+    def set_memmap_dir(self, memmap_dir):
         """Set the location to save mcmc sample onto disk
 
         Modifies all mcmc objects to save the mcmc sample onto a specified
             location
         """
-        self.memmap_path = memmap_path
+        self.memmap_dir = memmap_dir
         for time_series in self.generate_all_time_series():
-            time_series.memmap_path = memmap_path
+            time_series.memmap_dir = memmap_dir
 
     def read_memmap(self):
         """Set memmap objects to read from file
@@ -545,11 +545,11 @@ class DownscaleDual(Downscale):
         """
         super().instantiate_mcmc()
         self.model_field_mcmc = mcmc.Elliptical(
-            self.model_field_target, self.rng, self.n_sample, self.memmap_path)
+            self.model_field_target, self.rng, self.n_sample, self.memmap_dir)
         self.model_field_gp_mcmc = mcmc.Rwmh(self.model_field_gp_target,
                                              self.rng,
                                              self.n_sample,
-                                             self.memmap_path)
+                                             self.memmap_dir)
         #ordering is important, calculate the kernel matrices then posterior
             #gaussian process mean
         self.model_field_gp_target.save_cov_chol()

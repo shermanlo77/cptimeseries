@@ -17,7 +17,7 @@ class Fitter(object):
         figure_dir: directory to store figures
     """
 
-    def __init__(self, directory, time_series_class):
+    def __init__(self, time_series_class, directory):
         """
         Args:
             directory: location to store results and figures
@@ -59,7 +59,7 @@ class Fitter(object):
                 model_field, rain, (5, 5), (5, 5))
             time_series.time_array = dataset.get_time_training()
             time_series.set_rng(seed)
-            time_series.memmap_path = self.result_dir
+            time_series.memmap_dir = self.result_dir
             if not n_sample is None:
                 time_series.n_sample = n_sample
             time_series.fit()
@@ -126,15 +126,15 @@ class Fitter(object):
 
 class FitterMcmc(Fitter):
 
-    def __init__(self, directory):
-        super().__init__(directory, compound_poisson.TimeSeriesMcmc)
+    def __init__(self, directory=""):
+        super().__init__(compound_poisson.TimeSeriesMcmc, directory)
 
 class FitterSlice(Fitter):
 
-    def __init__(self, directory):
-        super().__init__(directory, compound_poisson.TimeSeriesSlice)
+    def __init__(self, directory=""):
+        super().__init__(compound_poisson.TimeSeriesSlice, directory)
 
 class FitterHyperSlice(Fitter):
 
-    def __init__(self, directory):
-        super().__init__(directory, compound_poisson.TimeSeriesHyperSlice)
+    def __init__(self, directory=""):
+        super().__init__(compound_poisson.TimeSeriesHyperSlice, directory)

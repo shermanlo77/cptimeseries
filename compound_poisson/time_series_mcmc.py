@@ -26,7 +26,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         z_mcmc: Mcmc object which does MCMC using z_target
         burn_in: integer, which samples to discard when doing posterior sampling
             which is used for forecasting
-        memmap_path: directory to store the MCMC samples
+        memmap_dir: directory to store the MCMC samples
     """
 
     def __init__(self,
@@ -46,7 +46,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.z_target = target_time_series.TargetZ(self)
         self.z_mcmc = None
         self.burn_in = 0
-        self.memmap_path = pathlib.Path(__file__).parent.absolute()
+        self.memmap_dir = ""
 
     def fit(self):
         """Fit using Gibbs sampling
@@ -95,9 +95,9 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             and random number generators
         """
         self.parameter_mcmc = mcmc.Rwmh(
-            self.parameter_target, self.rng, self.n_sample, self.memmap_path)
+            self.parameter_target, self.rng, self.n_sample, self.memmap_dir)
         self.z_mcmc = mcmc.ZRwmh(
-            self.z_target, self.rng, self.n_sample, self.memmap_path)
+            self.z_target, self.rng, self.n_sample, self.memmap_dir)
 
     def get_mcmc_array(self):
         """Return array of Mcmc objects
@@ -262,9 +262,9 @@ class TimeSeriesSlice(TimeSeriesMcmc):
         Instantiate slice sampling for the parameter and z
         """
         self.parameter_mcmc = mcmc.Elliptical(
-            self.parameter_target, self.rng, self.n_sample, self.memmap_path)
+            self.parameter_target, self.rng, self.n_sample, self.memmap_dir)
         self.z_mcmc = mcmc.ZSlice(
-            self.z_target, self.rng, self.n_sample, self.memmap_path)
+            self.z_target, self.rng, self.n_sample, self.memmap_dir)
 
     def print_chain_property(self, directory):
         plt.figure()
@@ -321,7 +321,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         super().instantiate_mcmc()
         self.precision_target.prograte_precision()
         self.precision_mcmc = mcmc.Rwmh(
-            self.precision_target, self.rng, self.n_sample, self.memmap_path)
+            self.precision_target, self.rng, self.n_sample, self.memmap_dir)
 
     def get_mcmc_array(self):
         mcmc_array = super().get_mcmc_array()

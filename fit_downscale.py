@@ -17,7 +17,7 @@ class Fitter(object):
         figure_dir: directory to store figures
     """
 
-    def __init__(self, directory, downscale_class):
+    def __init__(self, downscale_class, directory=""):
         self.name = downscale_class.__name__
         self.downscale_class = downscale_class
         self.result_dir = path.join(directory, "result")
@@ -50,7 +50,7 @@ class Fitter(object):
         if not path.isfile(result_file):
             downscale = self.downscale_class(dataset, (5, 5))
             downscale.set_rng(seed)
-            downscale.set_memmap_path(self.result_dir)
+            downscale.set_memmap_dir(self.result_dir)
             if not n_sample is None:
                 downscale.n_sample = n_sample
             downscale.fit(pool)
@@ -100,10 +100,10 @@ class Fitter(object):
 
 class FitterDownscale(Fitter):
 
-    def __init__(self, directory):
-        super().__init__(directory, compound_poisson.Downscale)
+    def __init__(self, directory=""):
+        super().__init__(compound_poisson.Downscale, directory)
 
 class FitterDownscaleDual(Fitter):
 
-    def __init__(self, directory):
-        super().__init__(directory, compound_poisson.DownscaleDual)
+    def __init__(self, directory=""):
+        super().__init__(compound_poisson.DownscaleDual, directory)

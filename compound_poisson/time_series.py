@@ -113,7 +113,7 @@ class TimeSeries(object):
         self.id = None
         self.forecaster = None
         self.self_forecaster = None
-        self.forecaster_memmap_dir = pathlib.Path(__file__).parent.absolute()
+        self.forecaster_memmap_dir = ""
         self.forecaster_rng = None
         self.self_forecaster_rng = None
 

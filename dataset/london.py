@@ -10,11 +10,11 @@ import compound_poisson
 from compound_poisson import parameter
 import dataset
 
-class London80(object):
+class London(object):
 
     def __init__(self):
         self.training_range = range(0, 3653)
-        self.test_range = range(3653, 4018)
+        self.test_range = range(3653, 7305)
         self.model_field = None
         self.rain = None
         self.time_array = None
@@ -71,7 +71,7 @@ class London80(object):
     def get_time_test(self):
         return self.time_array[self.test_range.start : self.test_range.stop]
 
-class LondonSimulated80(London80):
+class LondonSimulated(London):
 
     def __init__(self):
         self.time_series = None

@@ -20,8 +20,8 @@ from dataset.isle_of_man import IsleOfManTest
 from dataset.isle_of_man import IsleOfManTraining
 from dataset.isle_of_man import IsleOfManWeekTest
 from dataset.isle_of_man import IsleOfManWeekTraining
-from dataset.london80 import London80
-from dataset.london80 import LondonSimulated80
+from dataset.london import London
+from dataset.london import LondonSimulated
 from dataset.wales import Wales1Test
 from dataset.wales import Wales1Training
 from dataset.wales import Wales10Test

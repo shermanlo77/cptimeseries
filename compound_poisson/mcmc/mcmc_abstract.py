@@ -28,13 +28,13 @@ class Mcmc(object):
                  target=None,
                  rng=None,
                  n_sample=None,
-                 memmap_path=None):
+                 memmap_dir=None):
         #None target to be used by ZMcmcArray
         #None n_sample won't store mcmc sample
         #Potential development: None memmap_path to use np.darray
         self.dtype = dtype
         self.n_sample = None
-        self.memmap_path = memmap_path
+        self.memmap_path = memmap_dir
         self.memmap_path_old = None
         self.target = target
         self.rng = rng
@@ -48,7 +48,7 @@ class Mcmc(object):
             self.state = target.get_state()
 
             if not n_sample is None:
-                self.instantiate_memmap(memmap_path, n_sample, n_dim)
+                self.instantiate_memmap(memmap_dir, n_sample, n_dim)
 
     def instantiate_memmap(self, directory, n_sample, n_dim):
         #instantiate memmap to member variable, also assign member variables
