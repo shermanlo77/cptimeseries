@@ -178,8 +178,8 @@ class Downscale(object):
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng, False)
             self.n_sample = n_sample
+            self.delete_old_memmap()
         self.del_memmap()
-        self.delete_old_memmap()
         self.pool = None
 
     def instantiate_mcmc(self):

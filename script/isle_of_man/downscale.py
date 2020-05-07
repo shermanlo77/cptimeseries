@@ -18,7 +18,7 @@ def main():
     seed = random.SeedSequence(41597761383904719560264433323691455830)
     path_here = pathlib.Path(__file__).parent.absolute()
     fitter = fit.downscale.FitterDownscale(path_here)
-    fitter.fit(dataset.IsleOfManTraining(), seed, pool, n_sample)
+    fitter.fit(dataset.IsleOfManTraining(), seed, n_sample, pool)
 
     pool.join()
 

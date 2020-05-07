@@ -73,7 +73,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng, False)
             self.n_sample = n_sample
-        self.delete_old_memmap()
+            self.delete_old_memmap()
 
     def initalise_z(self):
         """Initalise all z in self.z_array and update all parameters
@@ -110,6 +110,9 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             self.parameter_mcmc,
         ]
         return mcmc_array
+
+    def set_burn_in(self, burn_in):
+        self.burn_in = burn_in
 
     def set_parameter_from_sample(self, rng):
         """Set parameter from MCMC sample

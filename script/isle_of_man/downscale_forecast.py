@@ -18,7 +18,7 @@ def main():
 
     path_here = pathlib.Path(__file__).parent.absolute()
     fitter = fit.downscale.FitterDownscale(path_here)
-    fitter.forecast(dataset.IsleOfManTest(), pool, n_simulation, burn_in)
+    fitter.forecast(dataset.IsleOfManTest(), n_simulation, burn_in, pool)
     pool.join()
 
 if __name__ == "__main__":
