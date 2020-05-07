@@ -1,9 +1,9 @@
 import argparse
 import pathlib
 
+from compound_poisson import fit
 from compound_poisson import multiprocess
 import dataset
-import fit_downscale
 
 def main():
     pool = multiprocess.Pool()
@@ -17,7 +17,7 @@ def main():
         burn_in = 200
 
     path_here = pathlib.Path(__file__).parent.absolute()
-    fitter = fit_downscale.FitterDownscale(path_here)
+    fitter = fit.downscale.FitterDownscale(path_here)
     fitter.forecast(dataset.IsleOfManTest(), pool, n_simulation, burn_in)
     pool.join()
 

@@ -7,7 +7,7 @@ import pandas
 from scipy import special
 
 from compound_poisson import arma
-from compound_poisson import forecast_time_series
+from compound_poisson import forecast
 from compound_poisson import parameter
 from compound_poisson import terms
 
@@ -50,9 +50,9 @@ class TimeSeries(object):
         rng: numpy.random.RandomState object
         id: default None, 2 elemenet array containing latitude and longitiude
             index, used by Downscale
-        forecaster: forecast_time_series.Forecaster object, contains forecasts
+        forecaster: forecast.time_series.Forecaster object, contains forecasts
             on a test set
-        self_forecaster: forecast_time_series.SelfForecaster object, contains
+        self_forecaster: forecast.time_series.SelfForecaster object, contains
             forecasts on the training set
         forecaster_memmap_dir: directory to store forecast objects
         forecaster_rng: rng for method instantiate_forecast_self()
@@ -526,7 +526,7 @@ class TimeSeries(object):
         """
         self.read_memmap()
         if self.self_forecaster is None:
-            self.self_forecaster = forecast_time_series.SelfForecaster(
+            self.self_forecaster = forecast.time_series.SelfForecaster(
                 self, self.forecaster_memmap_dir)
             self.self_forecaster.start_forecast(n_simulation)
         else:
@@ -565,7 +565,7 @@ class TimeSeries(object):
         """
         self.read_memmap()
         if self.forecaster is None:
-            self.forecaster = forecast_time_series.Forecaster(
+            self.forecaster = forecast.time_series.Forecaster(
                 self, self.forecaster_memmap_dir)
             self.forecaster.start_forecast(n_simulation, x)
         else:

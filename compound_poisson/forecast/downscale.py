@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-from compound_poisson import forecast_time_series
+from compound_poisson.forecast import time_series
 
-class Forecaster(forecast_time_series.Forecaster):
+class Forecaster(time_series.Forecaster):
 
     def __init__(self, downscale, memmap_dir):
         self.downscale = downscale
@@ -93,7 +93,7 @@ class Forecaster(forecast_time_series.Forecaster):
                                                self.n_simulation,
                                                self.n_time))
 
-class TimeSeriesForecaster(forecast_time_series.Forecaster):
+class TimeSeriesForecaster(time_series.Forecaster):
 
     def __init__(self, time_series, memmap_path, i_space):
         super().__init__(time_series, path.dirname(memmap_path))

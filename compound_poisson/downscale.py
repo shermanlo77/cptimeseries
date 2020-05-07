@@ -8,7 +8,7 @@ import numpy as np
 from numpy import random
 
 import compound_poisson
-from compound_poisson import forecast_downscale
+from compound_poisson import forecast
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
 from compound_poisson import time_series_mcmc
@@ -331,7 +331,7 @@ class Downscale(object):
         self.scatter_z_mcmc_sample()
 
         if self.forecaster is None:
-            self.forecaster = forecast_downscale.Forecaster(
+            self.forecaster = forecast.downscale.Forecaster(
                 self, self.memmap_dir)
             self.forecaster.start_forecast(n_simulation, data)
         else:
@@ -694,13 +694,12 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
 
     def forecast(self, x, n_simulation, memmap_path, i_space):
         if self.forecaster is None:
-            self.forecaster = forecast_downscale.TimeSeriesForecaster(
+            self.forecaster = forecast.downscale.TimeSeriesForecaster(
                 self, memmap_path, i_space)
             self.forecaster.start_forecast(n_simulation, x)
         else:
             self.forecaster.memmap_path = memmap_path
             self.forecaster.resume_forecast(n_simulation)
-        return self.forecaster
 
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast

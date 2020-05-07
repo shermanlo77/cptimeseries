@@ -2,8 +2,8 @@ import argparse
 
 from numpy import random
 
+from compound_poisson import fit
 import dataset
-import fit_time_series
 
 def main():
     parser = argparse.ArgumentParser(description="Sample size")
@@ -11,7 +11,7 @@ def main():
     n_sample = parser.parse_args().sample
 
     seed = random.SeedSequence(294372210542946537575453307391036609937)
-    fitter = fit_time_series.FitterHyperSlice()
+    fitter = fit.time_series.FitterHyperSlice()
     fitter.fit(dataset.LondonSimulated(), seed, n_sample)
 
 if __name__ == "__main__":

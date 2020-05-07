@@ -2,8 +2,8 @@ import argparse
 
 import joblib
 
+from compound_poisson import fit
 import dataset
-import fit_time_series
 
 def main():
     parser = argparse.ArgumentParser(description="Forecasting options")
@@ -14,7 +14,7 @@ def main():
     if burn_in is None:
         burn_in = 8000
 
-    fitter = fit_time_series.FitterHyperSlice()
+    fitter = fit.time_series.FitterHyperSlice()
     fitter.forecast(dataset.London(), n_simulation, burn_in)
 
 if __name__ == "__main__":
