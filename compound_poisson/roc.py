@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import numpy as np
 
 def get_roc_curve(rain_warning, p_rain_warning, rain_true):
@@ -54,3 +55,14 @@ def get_roc_curve(rain_warning, p_rain_warning, rain_true):
     area_under_curve = np.sum(area_under_curve)
 
     return (true_positive_array, false_positive_array, area_under_curve)
+
+def plot_roc_curve(true_positive_array,
+                   false_positive_array,
+                   auc,
+                   rain_warning):
+    plt.step(false_positive_array,
+             true_positive_array,
+             where="post",
+             label=str(rain_warning)+" mm, AUC = "+str(round(auc, 3)))
+    plt.xlabel("false positive rate")
+    plt.ylabel("true positive rate")

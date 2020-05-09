@@ -175,15 +175,12 @@ class Forecaster(object):
             rain_warning: the amount of precipitation to be detected
             rain_true: observed precipitation, array, for each time point
         """
-        p_rain_warning = self.get_prob_rain(rain_warning)
-        (true_positive_array, false_positive_array, auc) = roc.get_roc_curve(
-            rain_warning, p_rain_warning, rain_true)
-        plt.step(false_positive_array,
-                 true_positive_array,
-                 where="post",
-                 label=str(rain_warning)+" mm, AUC = "+str(round(auc, 3)))
-        plt.xlabel("false positive rate")
-        plt.ylabel("true positive rate")
+        if np.any(rain_true > rain_warning):
+            p_rain_warning = self.get_prob_rain(rain_warning)
+            (true_positive_array, false_positive_array, auc) = (
+                roc.get_roc_curve(rain_warning, p_rain_warning, rain_true))
+            roc.plot_roc_curve(
+                true_positive_array, false_positive_array, auc, rain_warning)
 
     def get_error_rmse(self, true_y):
         """Return root mean square error
@@ -231,6 +228,22 @@ class Forecaster(object):
             return math.inf
         else:
             return math.pow(np.sum(error) / n, 2)
+
+    def __getitem__(self, index):
+        #only to be used for plotting purposes
+        #does not copy model fields
+        slice_copy = Forecaster(self.time_series, self.memmap_dir)
+        slice_copy.time_array = self.time_array[index]
+        slice_copy.forecast_array = self.forecast_array[:, index]
+        slice_copy.forecast = self.forecast[index]
+        slice_copy.forecast_median = self.forecast_median[index]
+        slice_copy.forecast_sigma = {}
+        for key, forecast_sigma_i in self.forecast_sigma.items():
+            slice_copy.forecast_sigma[key] = forecast_sigma_i[index]
+        slice_copy.n_time = len(slice_copy.time_array)
+        slice_copy.n_simulation = self.n_simulation
+        slice_copy.memmap_path = self.memmap_path
+        return slice_copy
 
 class SelfForecaster(Forecaster):
     """For forecasting the training set

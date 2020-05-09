@@ -13,6 +13,7 @@ import pandas.plotting
 from statsmodels.tsa import stattools
 
 import compound_poisson
+from compound_poisson import roc
 import dataset
 
 def time_series(time_series, directory, prefix=""):
@@ -127,12 +128,25 @@ def time_series(time_series, directory, prefix=""):
     file.write(str(time_series))
     file.close()
 
+def get_year_index_dir(time_array):
+    year_index_dir = {} #key: years #value: index of times with that year
+    for i, time in enumerate(time_array):
+        year = time.year
+        if not year in year_index_dir:
+            year_index_dir[year] = []
+        year_index_dir[year].append(i)
+    #convert index into slice objects
+    for year, index in year_index_dir.items():
+        year_index_dir[year] = slice(index[0], index[-1]+1)
+    return year_index_dir
+
 def forecast(forecast, observed_rain, directory, prefix=""):
 
     forecast.load_memmap("r")
 
     pandas.plotting.register_matplotlib_converters()
     rain_threshold_array = [0, 5, 10, 15]
+    rain_threshold_extreme_array = [0, 10, 20, 30]
 
     colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
     cycle_forecast = cycler.cycler(color=[colours[1], colours[0]],
@@ -140,60 +154,84 @@ def forecast(forecast, observed_rain, directory, prefix=""):
                                    alpha=[1, 0.5])
 
     time_array = forecast.time_array
+    year_index_dir = get_year_index_dir(time_array)
+
+    for year, index in year_index_dir.items():
+
+        forecast_sliced = forecast[index]
+        observed_rain_i = observed_rain[index]
+
+        forecast_i = forecast_sliced.forecast
+        forecast_median_i = forecast_sliced.forecast_median
+        forecast_lower_error = forecast_sliced.forecast_sigma[-1]
+        forecast_upper_error = forecast_sliced.forecast_sigma[1]
+        time_array_i = forecast_sliced.time_array
+
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle_forecast)
+        plt.fill_between(time_array_i,
+                         forecast_lower_error,
+                         forecast_upper_error,
+                         alpha=0.25)
+        plt.plot(time_array_i, forecast_i)
+        plt.plot(time_array_i, observed_rain_i)
+        plt.xlabel("time")
+        plt.ylabel("precipitation (mm)")
+        plt.savefig(
+            path.join(directory, prefix + "_forecast_" + str(year) + ".pdf"))
+        plt.close()
+
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle_forecast)
+        plt.fill_between(time_array_i,
+                         forecast_lower_error,
+                         forecast_upper_error,
+                         alpha=0.25)
+        plt.plot(time_array_i, forecast_median_i)
+        plt.plot(time_array_i, observed_rain_i)
+        plt.xlabel("time")
+        plt.ylabel("precipitation (mm)")
+        plt.savefig(
+            path.join(directory,
+                      prefix+"_forecast_median_"+str(year)+".pdf"))
+        plt.close()
+
+        plt.figure()
+        plt.plot(time_array_i, forecast_i - observed_rain_i)
+        plt.xlabel("time")
+        plt.ylabel("residual (mm)")
+        plt.savefig(
+            path.join(directory, prefix + "_residual_" + str(year) + ".pdf"))
+        plt.close()
+
+        plt.figure()
+        for rain in rain_threshold_array:
+            forecast_sliced.plot_roc_curve(rain, observed_rain_i)
+        plt.legend()
+        plt.savefig(path.join(directory, prefix + "_roc_" + str(year) + ".pdf"))
+        plt.close()
+
+        for rain in rain_threshold_array:
+            plt.figure()
+            plt.plot(time_array_i, forecast_sliced.get_prob_rain(rain))
+            for i, date_i in enumerate(time_array_i):
+                if observed_rain_i[i] > rain:
+                    plt.axvline(x=date_i, color="r", linestyle=":")
+            plt.xlabel("time")
+            plt.ylabel("forecasted probability of > "+str(rain)+" mm")
+            plt.savefig(
+                path.join(directory,
+                          prefix+"_prob_"+str(rain)+"_"+str(year)+".pdf"))
+            plt.close()
 
     plt.figure()
-    ax = plt.gca()
-    ax.set_prop_cycle(cycle_forecast)
-    plt.fill_between(time_array,
-                      forecast.forecast_sigma[-1],
-                      forecast.forecast_sigma[1],
-                      alpha=0.25)
-    plt.plot(time_array, forecast.forecast)
-    plt.plot(time_array, observed_rain)
-    plt.xlabel("time")
-    plt.ylabel("precipitation (mm)")
-    plt.savefig(path.join(directory, prefix + "_forecast.pdf"))
-    plt.close()
-
-    plt.figure()
-    ax = plt.gca()
-    ax.set_prop_cycle(cycle_forecast)
-    plt.fill_between(time_array,
-                      forecast.forecast_sigma[-1],
-                      forecast.forecast_sigma[1],
-                      alpha=0.25)
-    plt.plot(time_array, forecast.forecast_median)
-    plt.plot(time_array, observed_rain)
-    plt.xlabel("time")
-    plt.ylabel("precipitation (mm)")
-    plt.savefig(path.join(directory, prefix + "_forecast_median.pdf"))
-    plt.close()
-
-    plt.figure()
-    plt.plot(time_array, forecast.forecast - observed_rain)
-    plt.xlabel("time")
-    plt.ylabel("residual (mm)")
-    plt.savefig(path.join(directory, prefix + "_residual.pdf"))
-    plt.close()
-
-    plt.figure()
-    for rain in rain_threshold_array:
+    for rain in rain_threshold_extreme_array:
         forecast.plot_roc_curve(rain, observed_rain)
     plt.legend()
-    plt.savefig(path.join(directory, prefix + "_roc.pdf"))
+    plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
-
-    for rain in rain_threshold_array:
-        plt.figure()
-        plt.plot(time_array, forecast.get_prob_rain(rain))
-        for day in range(forecast.n_time):
-            if observed_rain[day] > rain:
-                plt.axvline(x=time_array[day], color="r", linestyle=":")
-        plt.xlabel("time")
-        plt.ylabel("forecasted probability of > "+str(rain)+" mm of rain")
-        plt.savefig(
-            path.join(directory, prefix + "_prob_" + str(rain) + ".pdf"))
-        plt.close()
 
     file = open(path.join(directory, prefix + "_errors.txt"), "w")
     file.write("Deviance: ")
@@ -229,6 +267,7 @@ def downscale_forecast(forecast_array, test_set, directory):
                 forecast_i = forecast_array.forecast_array[counter]
                 forecast_map[:, lat_i, long_i] = np.median(forecast_i, 0)
                 counter += 1
+    observed_rain_mask_array = np.asarray(observed_rain_mask_array)
 
     #plot the rain
     longitude_grid = test_set.topography["longitude"]
@@ -256,11 +295,52 @@ def downscale_forecast(forecast_array, test_set, directory):
             plt.savefig(path.join(map_dir, str(i) + ".png"))
             plt.close()
 
-
     #plot the forecast for each location
     downscale = forecast_array.downscale
     for i, time_series_i in enumerate(downscale.generate_unmask_time_series()):
+        series_sub_dir = path.join(series_dir, str(time_series_i.id))
+        if not path.exists(series_sub_dir):
+            os.mkdir(series_sub_dir)
         forecast(time_series_i.forecaster,
                  observed_rain_mask_array[i],
-                 series_dir,
-                 prefix=str(time_series_i.id))
+                 series_sub_dir,
+                 "test")
+
+    rain_threshold_array = [0, 5, 10, 15]
+    year_index_dir = get_year_index_dir(forecast_array.time_array)
+    for year, index in year_index_dir.items():
+        observed_rain_i = observed_rain_mask_array[:, index].flatten()
+        plt.figure()
+        for rain_warning in rain_threshold_array:
+            prob_rain_array = []
+            for forecast_i in forecast_array.generate_time_series_forecaster():
+                prob_rain_array.append(
+                    forecast_i[index].get_prob_rain(rain_warning))
+                forecast_i.del_memmap()
+            prob_rain_array = np.asarray(prob_rain_array).flatten()
+            true_positive_array, false_positive_array, auc = (
+                roc.get_roc_curve(
+                    rain_warning, prob_rain_array, observed_rain_i))
+            roc.plot_roc_curve(
+                true_positive_array, false_positive_array, auc, rain_warning)
+        plt.legend()
+        plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
+        plt.close()
+
+    rain_threshold_extreme_array = [0, 10, 20, 30]
+    observed_rain_mask_array = observed_rain_mask_array.flatten()
+    for rain_warning in rain_threshold_extreme_array:
+        prob_rain_array = []
+        if np.any(rain_warning > observed_rain_mask_array):
+            for forecast_i in forecast_array.generate_time_series_forecaster():
+                prob_rain_array.append(forecast_i.get_prob_rain(rain_warning))
+                forecast_i.del_memmap()
+            prob_rain_array = np.asarray(prob_rain_array).flatten()
+            true_positive_array, false_positive_array, auc = (
+                roc.get_roc_curve(
+                    rain_warning, prob_rain_array,observed_rain_mask_array))
+            roc.plot_roc_curve(
+                true_positive_array, false_positive_array, auc, rain_warning)
+    plt.legend()
+    plt.savefig(path.join(directory, "test_roc_full.pdf"))
+    plt.close()

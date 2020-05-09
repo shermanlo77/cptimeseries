@@ -25,6 +25,7 @@ class Forecaster(time_series.Forecaster):
         self.data = data
         self.n_time = len(data)
         self.n_simulation = n_simulation
+        self.time_array = data.time_array
         self.make_memmap_path()
         self.load_memmap("w+")
         self.simulate_forecasts(range(n_simulation))
@@ -92,6 +93,12 @@ class Forecaster(time_series.Forecaster):
                                         shape=(self.downscale.area_unmask,
                                                self.n_simulation,
                                                self.n_time))
+
+    def generate_time_series_forecaster(self):
+        for time_series in self.downscale.generate_unmask_time_series():
+            forecaster = time_series.forecaster
+            forecaster.load_memmap("r")
+            yield time_series.forecaster
 
 class TimeSeriesForecaster(time_series.Forecaster):
 
