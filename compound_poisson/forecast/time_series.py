@@ -156,19 +156,19 @@ class Forecaster(object):
             self.forecast_sigma[sigma_array[i]] = forecast_quantile[i]
         self.forecast_median = self.forecast_sigma[0]
 
-    def get_prob_rain(self, rainfall):
+    def get_prob_rain(self, rain):
         """Get the probability if it will rain at least of a certian amount
 
         Args:
-            rainfall: scalar, amount of rain to evaluate the probability
+            rain: scalar, amount of rain to evaluate the probability
 
         Return:
             vector, a probability for each day
         """
-        p_rain = np.mean(self.forecast_array > rainfall, 0)
+        p_rain = np.mean(self.forecast_array > rain, 0)
         return p_rain
 
-    def plot_roc_curve(self, rain_warning, rain_true):
+    def get_roc_curve(self, rain_warning, rain_true):
         """Plot ROC curve, with area under curve as label
 
         Args:
@@ -177,10 +177,10 @@ class Forecaster(object):
         """
         if np.any(rain_true > rain_warning):
             p_rain_warning = self.get_prob_rain(rain_warning)
-            (true_positive_array, false_positive_array, auc) = (
-                roc.get_roc_curve(rain_warning, p_rain_warning, rain_true))
-            roc.plot_roc_curve(
-                true_positive_array, false_positive_array, auc, rain_warning)
+            roc_curve = roc.Roc(rain_warning, p_rain_warning, rain_true)
+        else:
+            roc_curve = None
+        return roc_curve
 
     def get_error_rmse(self, true_y):
         """Return root mean square error

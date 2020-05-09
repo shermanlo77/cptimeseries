@@ -16,6 +16,9 @@ import compound_poisson
 from compound_poisson import roc
 import dataset
 
+RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]
+RAIN_THRESHOLD_EXTREME_ARRAY = [0, 10, 20, 30]
+
 def time_series(time_series, directory, prefix=""):
 
     pandas.plotting.register_matplotlib_converters()
@@ -145,8 +148,6 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     forecast.load_memmap("r")
 
     pandas.plotting.register_matplotlib_converters()
-    rain_threshold_array = [0, 5, 10, 15]
-    rain_threshold_extreme_array = [0, 10, 20, 30]
 
     colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
     cycle_forecast = cycler.cycler(color=[colours[1], colours[0]],
@@ -207,13 +208,15 @@ def forecast(forecast, observed_rain, directory, prefix=""):
         plt.close()
 
         plt.figure()
-        for rain in rain_threshold_array:
-            forecast_sliced.plot_roc_curve(rain, observed_rain_i)
+        for rain in RAIN_THRESHOLD_ARRAY:
+            roc_curve = forecast_sliced.get_roc_curve(rain, observed_rain_i)
+            if not roc_curve is None:
+                roc_curve.plot()
         plt.legend()
         plt.savefig(path.join(directory, prefix + "_roc_" + str(year) + ".pdf"))
         plt.close()
 
-        for rain in rain_threshold_array:
+        for rain in RAIN_THRESHOLD_ARRAY:
             plt.figure()
             plt.plot(time_array_i, forecast_sliced.get_prob_rain(rain))
             for i, date_i in enumerate(time_array_i):
@@ -227,8 +230,10 @@ def forecast(forecast, observed_rain, directory, prefix=""):
             plt.close()
 
     plt.figure()
-    for rain in rain_threshold_extreme_array:
-        forecast.plot_roc_curve(rain, observed_rain)
+    for rain in RAIN_THRESHOLD_EXTREME_ARRAY:
+        roc_curve = forecast.get_roc_curve(rain, observed_rain)
+        if not roc_curve is None:
+            roc_curve.plot()
     plt.legend()
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
@@ -247,6 +252,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
 def downscale_forecast(forecast_array, test_set, directory):
     forecast_array.load_memmap("r")
     forecast_map = ma.empty_like(test_set.rain)
+    downscale = forecast_array.downscale
 
     series_dir = path.join(directory, "series_forecast")
     if not path.isdir(series_dir):
@@ -255,19 +261,11 @@ def downscale_forecast(forecast_array, test_set, directory):
     if not path.isdir(map_dir):
         os.mkdir(map_dir)
 
-    mask = test_set.rain.mask[0]
-    counter = 0
-    observed_rain_mask_array = []
-
-    for lat_i in range(forecast_map.shape[1]):
-        for long_i in range(forecast_map.shape[2]):
-            if not mask[lat_i, long_i]:
-                observed_rain_mask_array.append(
-                    test_set.get_rain(lat_i, long_i))
-                forecast_i = forecast_array.forecast_array[counter]
-                forecast_map[:, lat_i, long_i] = np.median(forecast_i, 0)
-                counter += 1
-    observed_rain_mask_array = np.asarray(observed_rain_mask_array)
+    for time_series in downscale.generate_unmask_time_series():
+        lat_i = time_series.id[0]
+        long_i = time_series.id[1]
+        forecaster = time_series.forecaster
+        forecast_map[:, lat_i, long_i] = forecaster.forecast_median
 
     #plot the rain
     longitude_grid = test_set.topography["longitude"]
@@ -296,51 +294,31 @@ def downscale_forecast(forecast_array, test_set, directory):
             plt.close()
 
     #plot the forecast for each location
-    downscale = forecast_array.downscale
-    for i, time_series_i in enumerate(downscale.generate_unmask_time_series()):
+    for time_series_i, observed_rain_i in (
+        zip(downscale.generate_unmask_time_series(),
+            test_set.generate_unmask_rain())):
         series_sub_dir = path.join(series_dir, str(time_series_i.id))
         if not path.exists(series_sub_dir):
             os.mkdir(series_sub_dir)
-        forecast(time_series_i.forecaster,
-                 observed_rain_mask_array[i],
-                 series_sub_dir,
-                 "test")
+        forecast(
+            time_series_i.forecaster, observed_rain_i, series_sub_dir, "test")
 
-    rain_threshold_array = [0, 5, 10, 15]
     year_index_dir = get_year_index_dir(forecast_array.time_array)
     for year, index in year_index_dir.items():
-        observed_rain_i = observed_rain_mask_array[:, index].flatten()
         plt.figure()
-        for rain_warning in rain_threshold_array:
-            prob_rain_array = []
-            for forecast_i in forecast_array.generate_time_series_forecaster():
-                prob_rain_array.append(
-                    forecast_i[index].get_prob_rain(rain_warning))
-                forecast_i.del_memmap()
-            prob_rain_array = np.asarray(prob_rain_array).flatten()
-            true_positive_array, false_positive_array, auc = (
-                roc.get_roc_curve(
-                    rain_warning, prob_rain_array, observed_rain_i))
-            roc.plot_roc_curve(
-                true_positive_array, false_positive_array, auc, rain_warning)
+        roc_curve_array = forecast_array.get_roc_curve_array(
+            RAIN_THRESHOLD_ARRAY, test_set, index)
+        for roc_curve in roc_curve_array:
+            roc_curve.plot()
         plt.legend()
         plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
         plt.close()
 
-    rain_threshold_extreme_array = [0, 10, 20, 30]
-    observed_rain_mask_array = observed_rain_mask_array.flatten()
-    for rain_warning in rain_threshold_extreme_array:
-        prob_rain_array = []
-        if np.any(rain_warning > observed_rain_mask_array):
-            for forecast_i in forecast_array.generate_time_series_forecaster():
-                prob_rain_array.append(forecast_i.get_prob_rain(rain_warning))
-                forecast_i.del_memmap()
-            prob_rain_array = np.asarray(prob_rain_array).flatten()
-            true_positive_array, false_positive_array, auc = (
-                roc.get_roc_curve(
-                    rain_warning, prob_rain_array,observed_rain_mask_array))
-            roc.plot_roc_curve(
-                true_positive_array, false_positive_array, auc, rain_warning)
+    plt.figure()
+    roc_curve_array = forecast_array.get_roc_curve_array(
+        RAIN_THRESHOLD_EXTREME_ARRAY, test_set)
+    for roc_curve in roc_curve_array:
+        roc_curve.plot()
     plt.legend()
     plt.savefig(path.join(directory, "test_roc_full.pdf"))
     plt.close()

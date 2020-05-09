@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
+from compound_poisson import roc
 from compound_poisson.forecast import time_series
 
 class Forecaster(time_series.Forecaster):
@@ -94,11 +95,47 @@ class Forecaster(time_series.Forecaster):
                                                self.n_simulation,
                                                self.n_time))
 
+    def del_memmap(self):
+        del self.forecast_array
+        self.forecast_array = None
+
     def generate_time_series_forecaster(self):
         for time_series in self.downscale.generate_unmask_time_series():
             forecaster = time_series.forecaster
             forecaster.load_memmap("r")
             yield time_series.forecaster
+
+    def get_prob_rain(self, rain, index=None):
+        """Get the probability if it will rain at least of a certian amount
+
+        Args:
+            rain: scalar, amount of rain to evaluate the probability
+            index: time index (optional)
+
+        Return:
+            matrix, dim 0 for each location, dim 1 for each time step
+        """
+        if index is None:
+            index = slice(self.n_time)
+        p_rain = np.mean(self.forecast_array[:, :, index] > rain, 1)
+        return p_rain
+
+    def get_roc_curve_array(
+        self, rain_warning_array, test_set, time_index=None):
+        if time_index is None:
+            time_index = slice(len(test_set))
+        mask = test_set.mask
+        observed_rain = test_set.rain[time_index, np.logical_not(mask)]
+        observed_rain = np.swapaxes(observed_rain, 0, 1)
+        observed_rain = observed_rain.flatten()
+
+        roc_array = []
+        for rain_warning in rain_warning_array:
+            if np.any(rain_warning < observed_rain):
+                p_rain = self.get_prob_rain(rain_warning, time_index).flatten()
+                roc_curve = roc.Roc(rain_warning, p_rain, observed_rain)
+                roc_array.append(roc_curve)
+        return roc_array
 
 class TimeSeriesForecaster(time_series.Forecaster):
 

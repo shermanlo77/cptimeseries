@@ -449,6 +449,12 @@ class Data(object):
         self.rain = self.rain[time[0]:time[1], :, :]
         self.time_array = self.time_array[time[0]:time[1]]
 
+    def generate_unmask_rain(self):
+        for lat_i in range(self.mask.shape[0]):
+            for long_i in range(self.mask.shape[1]):
+                if not self.mask[lat_i, long_i]:
+                    yield self.rain[:, lat_i, long_i]
+
     def __len__(self):
         return len(self.time_array)
 
