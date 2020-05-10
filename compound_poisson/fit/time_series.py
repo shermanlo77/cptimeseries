@@ -44,9 +44,10 @@ class Fitter(fitter.Fitter):
         time_series.forecast_self(n_simulation)
         time_series.forecast(dataset.get_model_field_test(), n_simulation)
 
-    def print_forecast(self, time_series, dataset):
+    def print_forecast(self, time_series, dataset, pool=None):
         #dataset should be able to call get_rain_training() and get_rain_test()
         #plot forecast results
+        #args pool not used
         rain = dataset.get_rain_training()
         compound_poisson.print.forecast(
             time_series.self_forecaster, rain, self.figure_dir, "training")

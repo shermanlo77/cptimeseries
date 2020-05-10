@@ -249,7 +249,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
 
     forecast.del_memmap()
 
-def downscale_forecast(forecast_array, test_set, directory):
+def downscale_forecast(forecast_array, test_set, directory, pool):
     forecast_array.load_memmap("r")
     forecast_map = ma.empty_like(test_set.rain)
     downscale = forecast_array.downscale
@@ -268,40 +268,32 @@ def downscale_forecast(forecast_array, test_set, directory):
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
 
     #plot the rain
-    longitude_grid = test_set.topography["longitude"]
-    latitude_grid = test_set.topography["latitude"]
     angle_resolution = dataset.ANGLE_RESOLUTION
+    longitude_grid = test_set.topography["longitude"] - angle_resolution / 2
+    latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
+
+    rain_units = test_set.rain_units
+    message_array = []
     for i, time in enumerate(test_set.time_array):
-
-        if i < 365:
-
-            rain_i = forecast_map[i]
-            rain_i.mask[rain_i == 0] = True
-
-            plt.figure()
-            ax = plt.axes(projection=crs.PlateCarree())
-            im = ax.pcolor(longitude_grid - angle_resolution / 2,
-                           latitude_grid + angle_resolution / 2,
-                           rain_i,
-                           vmin=0,
-                           vmax=15)
-            ax.coastlines(resolution="50m")
-            plt.colorbar(im)
-            ax.set_aspect("auto", adjustable=None)
-            plt.title(
-                "precipitation (" + test_set.rain_units + ") : " + str(time))
-            plt.savefig(path.join(map_dir, str(i) + ".png"))
-            plt.close()
+        title = "precipitation (" + rain_units + ") : " + str(time)
+        file_path = path.join(map_dir, str(i) + ".png")
+        message = PrintForecastMapMessage(forecast_map[i],
+                                          latitude_grid,
+                                          longitude_grid,
+                                          title,
+                                          file_path)
+        message_array.append(message)
+    pool.map(PrintForecastMapMessage.print, message_array)
 
     #plot the forecast for each location
+    message_array = []
     for time_series_i, observed_rain_i in (
         zip(downscale.generate_unmask_time_series(),
             test_set.generate_unmask_rain())):
-        series_sub_dir = path.join(series_dir, str(time_series_i.id))
-        if not path.exists(series_sub_dir):
-            os.mkdir(series_sub_dir)
-        forecast(
-            time_series_i.forecaster, observed_rain_i, series_sub_dir, "test")
+        message = PrintForecastSeriesMessage(
+            series_dir, time_series_i, observed_rain_i)
+        message_array.append(message)
+    pool.map(PrintForecastSeriesMessage.print, message_array)
 
     year_index_dir = get_year_index_dir(forecast_array.time_array)
     for year, index in year_index_dir.items():
@@ -322,3 +314,47 @@ def downscale_forecast(forecast_array, test_set, directory):
     plt.legend()
     plt.savefig(path.join(directory, "test_roc_full.pdf"))
     plt.close()
+
+class PrintForecastMapMessage(object):
+
+    def __init__(self,
+                 forecast_i,
+                 latitude_grid,
+                 longitude_grid,
+                 title,
+                 file_path):
+        self.forecast_i = forecast_i
+        self.latitude_grid = latitude_grid
+        self.longitude_grid = longitude_grid
+        self.title = title
+        self.file_path = file_path
+
+    def print(self):
+        self.forecast_i.mask[self.forecast_i == 0] = True
+
+        plt.figure()
+        ax = plt.axes(projection=crs.PlateCarree())
+        im = ax.pcolor(self.longitude_grid,
+                       self.latitude_grid,
+                       self.forecast_i,
+                       vmin=0,
+                       vmax=15)
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.title(self.title)
+        plt.savefig(self.file_path)
+        plt.close()
+
+class PrintForecastSeriesMessage(object):
+
+    def __init__(self, series_dir, time_series_i, observed_rain_i):
+        self.series_sub_dir =  path.join(series_dir, str(time_series_i.id))
+        self.forecaster = time_series_i.forecaster
+        self.observed_rain_i = observed_rain_i
+        if not path.exists(self.series_sub_dir):
+            os.mkdir(self.series_sub_dir)
+
+    def print(self):
+        forecast(
+            self.forecaster, self.observed_rain_i, self.series_sub_dir, "test")

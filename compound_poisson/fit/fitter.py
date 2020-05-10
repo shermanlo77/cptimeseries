@@ -123,20 +123,21 @@ class Fitter(object):
             self.do_forecast(model, dataset, n_simulation, pool)
             joblib.dump(model, result_file)
 
-        self.print_forecast(model, dataset)
+        self.print_forecast(model, dataset, pool)
 
     def initalise_model_for_forecast(self, model):
         """Initalise the model object right after loading
         """
         pass
 
-    def do_forecast(self, model, dataset, n_simulation, pool):
+    def do_forecast(self, model, dataset, n_simulation, pool=None):
         """Make forecasts for the model
         """
         #pool required by downscale
         raise NotImplementedError
 
-    def print_forecast(self, model, dataset):
+    def print_forecast(self, model, dataset, pool=None):
         """Print forecast figures for this model
         """
+        #pool required by downscale
         raise NotImplementedError

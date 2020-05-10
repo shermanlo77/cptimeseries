@@ -27,10 +27,10 @@ class Fitter(fitter.Fitter):
         #dataset is Data object (see dataset module)
         downscale.forecast(dataset, n_simulation, pool)
 
-    def print_forecast(self, downscale, dataset):
+    def print_forecast(self, downscale, dataset, pool):
         #dataset is Data object (see dataset module)
         compound_poisson.print.downscale_forecast(
-            downscale.forecaster, dataset, self.figure_dir)
+            downscale.forecaster, dataset, self.figure_dir, pool)
 
 class FitterDownscale(Fitter):
 
