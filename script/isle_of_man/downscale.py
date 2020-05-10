@@ -1,12 +1,10 @@
 import argparse
-import pathlib
 
 from numpy import random
 
 from compound_poisson import fit
 from compound_poisson import multiprocess
 import dataset
-
 
 def main():
     pool = multiprocess.Pool()
@@ -16,8 +14,7 @@ def main():
     n_sample = parser.parse_args().sample
 
     seed = random.SeedSequence(41597761383904719560264433323691455830)
-    path_here = pathlib.Path(__file__).parent.absolute()
-    fitter = fit.downscale.FitterDownscale(path_here)
+    fitter = fit.downscale.FitterDownscale()
     fitter.fit(dataset.IsleOfManTraining(), seed, n_sample, pool)
 
     pool.join()

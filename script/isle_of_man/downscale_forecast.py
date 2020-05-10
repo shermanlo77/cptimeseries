@@ -1,5 +1,4 @@
 import argparse
-import pathlib
 
 from compound_poisson import fit
 from compound_poisson import multiprocess
@@ -16,8 +15,7 @@ def main():
     if burn_in is None:
         burn_in = 200
 
-    path_here = pathlib.Path(__file__).parent.absolute()
-    fitter = fit.downscale.FitterDownscale(path_here)
+    fitter = fit.downscale.FitterDownscale()
     fitter.forecast(dataset.IsleOfManTest(), n_simulation, burn_in, pool)
     pool.join()
 
