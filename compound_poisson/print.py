@@ -212,7 +212,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
             roc_curve = forecast_sliced.get_roc_curve(rain, observed_rain_i)
             if not roc_curve is None:
                 roc_curve.plot()
-        plt.legend()
+        plt.legend(loc="lower right")
         plt.savefig(path.join(directory, prefix + "_roc_" + str(year) + ".pdf"))
         plt.close()
 
@@ -234,7 +234,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
         roc_curve = forecast.get_roc_curve(rain, observed_rain)
         if not roc_curve is None:
             roc_curve.plot()
-    plt.legend()
+    plt.legend(loc="lower right")
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
@@ -302,7 +302,7 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
             RAIN_THRESHOLD_ARRAY, test_set, index)
         for roc_curve in roc_curve_array:
             roc_curve.plot()
-        plt.legend()
+        plt.legend(loc="lower right")
         plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
         plt.close()
 
@@ -311,7 +311,7 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
         RAIN_THRESHOLD_EXTREME_ARRAY, test_set)
     for roc_curve in roc_curve_array:
         roc_curve.plot()
-    plt.legend()
+    plt.legend(loc="lower right")
     plt.savefig(path.join(directory, "test_roc_full.pdf"))
     plt.close()
 
