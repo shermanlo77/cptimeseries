@@ -90,7 +90,12 @@ class Fitter(object):
         #dataset is required by time_series for plotting true values
         raise NotImplementedError
 
-    def forecast(self, dataset, n_simulation=None, burn_in=None, pool=None):
+    def forecast(self,
+                 dataset,
+                 n_simulation=None,
+                 burn_in=None,
+                 pool=None,
+                 is_print=True):
         """Make forecasts on training and test set
 
         After fitting, make forecasts on test (and training) set. When called
@@ -103,6 +108,7 @@ class Fitter(object):
             n_simulation: number of simulations, default is 1000
             burn_in: burn in for MCMC, default value is 0
             pool: required by downscale
+            is_print: boolean, print forecasts if True
         """
         result_file = self.get_result_path()
         model = joblib.load(result_file)
@@ -123,7 +129,8 @@ class Fitter(object):
             self.do_forecast(model, dataset, n_simulation, pool)
             joblib.dump(model, result_file)
 
-        self.print_forecast(model, dataset, pool)
+        if is_print:
+            self.print_forecast(model, dataset, pool)
 
     def initalise_model_for_forecast(self, model):
         """Initalise the model object right after loading
