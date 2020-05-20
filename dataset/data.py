@@ -32,8 +32,8 @@ RESOLUTION = math.radians(ANGLE_RESOLUTION)*RADIUS_OF_EARTH
 GRAVITATIONAL_FIELD_STRENGTH = 9.81
 DERIVED_MODEL_FIELD = {
     "wind_speed": "m s-1",
-    "specific_humidity_rate": "s-1",
-    "total_column_water_rate": "kg m-2 s-1",
+    "specific_humidity_rate": "m deg-1 s-1",
+    "total_column_water_rate": "kg m-1 deg-1 s-1",
 }
 MAX_DATE = datetime.date(2019, 7, 31) #end point of data
 
