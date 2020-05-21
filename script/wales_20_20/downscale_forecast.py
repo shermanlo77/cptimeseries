@@ -5,7 +5,7 @@ from compound_poisson import multiprocess
 import dataset
 
 def main():
-    pool = multiprocess.Pool()
+    pool = multiprocess.MPIPoolExecutor()
 
     parser = argparse.ArgumentParser(description="Forecasting options")
     parser.add_argument("--sample", help="number of simulations", type=int)
