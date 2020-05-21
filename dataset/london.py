@@ -5,8 +5,9 @@ import pandas as pd
 import compound_poisson
 from compound_poisson import parameter
 import dataset
+from dataset import location
 
-class LondonTraining(dataset.location.Location):
+class LondonTraining(location.Location):
 
     def __init__(self):
         super().__init__()
@@ -14,7 +15,7 @@ class LondonTraining(dataset.location.Location):
     def load_data(self):
         self.load_data_from_city(dataset.ana.AnaDual10Training(), "London")
 
-class LondonTest(dataset.location.Location):
+class LondonTest(location.Location):
 
     def __init__(self):
         super().__init__()
@@ -38,7 +39,7 @@ class LondonSimulatedTraining(LondonTraining):
         self.time_series = time_series
         self.rain = self.time_series.y_array[training_slice]
 
-def get_simulated_time_series(self):
+def get_simulated_time_series():
     """Return a simulated time_series object and 2 slice objec
 
     Returna 3 tuple.
@@ -52,13 +53,14 @@ def get_simulated_time_series(self):
         #times are simulated
     data_training = LondonTraining()
     data_test = LondonTest()
-    model_field = pd.concat[data_training.model_field, data_test.model_field]
+    model_field = pd.concat(
+        [data_training.get_model_field(), data_test.get_model_field()])
 
     training_slice = slice(0, len(data_training))
     test_slice = slice(len(data_training), len(data_training)+len(data_test))
 
     rng = random.RandomState(np.uint32(3667413888))
-    n_model_field = len(self.model_field.columns)
+    n_model_field = len(model_field.columns)
     n_arma = (5, 5)
     poisson_rate = parameter.PoissonRate(n_model_field, n_arma)
     gamma_mean = parameter.GammaMean(n_model_field, n_arma)
@@ -130,7 +132,7 @@ def get_simulated_time_series(self):
     gamma_dispersion['const'] = np.asarray([-0.26056112])
 
     time_series = compound_poisson.TimeSeries(
-        self.model_field, cp_parameter_array=cp_parameter_array)
+        model_field, cp_parameter_array=cp_parameter_array)
     time_series.rng = rng
     time_series.simulate()
     time_series.time_array = np.concatenate(

@@ -1,6 +1,7 @@
 import dataset
+from dataset import location
 
-class CardiffTraining(dataset.location.Location):
+class CardiffTraining(location.Location):
 
     def __init__(self):
         super().__init__()
@@ -8,7 +9,7 @@ class CardiffTraining(dataset.location.Location):
     def load_data(self):
         self.load_data_from_city(dataset.ana.AnaDualTraining(), "Cardiff")
 
-class CardiffTest(dataset.location.Location):
+class CardiffTest(location.Location):
 
     def __init__(self):
         super().__init__()
@@ -16,7 +17,7 @@ class CardiffTest(dataset.location.Location):
     def load_data(self):
         self.load_data_from_city(dataset.ana.AnaDualTest(), "Cardiff")
 
-class CardiffTrainingHalf(dataset.location.Location):
+class CardiffTrainingHalf(location.Location):
 
     def __init__(self):
         super().__init__()
