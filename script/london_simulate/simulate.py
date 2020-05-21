@@ -13,7 +13,7 @@ def main():
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
 
-    london = dataset.LondonSimulated()
+    london = dataset.LondonSimulatedTraining()
     time_series = london.time_series
     compound_poisson.print.time_series(time_series, figure_dir)
 

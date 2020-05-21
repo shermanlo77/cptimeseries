@@ -14,7 +14,7 @@ def main():
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
 
-    london = dataset.London()
+    london = dataset.LondonTraining()
     model_field = london.model_field
     rain = london.rain
     time_series = compound_poisson.TimeSeries(model_field, rain)

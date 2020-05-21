@@ -12,7 +12,7 @@ def main():
 
     seed = random.SeedSequence(170300509484813619611218577657545000221)
     fitter = fit.time_series.FitterSlice()
-    fitter.fit(dataset.LondonSimulated(), seed, n_sample)
+    fitter.fit(dataset.LondonSimulatedTraining(), seed, n_sample)
 
 if __name__ == "__main__":
     main()

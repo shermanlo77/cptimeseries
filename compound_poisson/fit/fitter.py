@@ -104,7 +104,8 @@ class Fitter(object):
             before calling forecast() when debugging or developing.
 
         Args:
-            dataset: object containing test data (exact class varies)
+            dataset: object containing test data (exact class varies)(may also
+                contain training data)
             n_simulation: number of simulations, default is 1000
             burn_in: burn in for MCMC, default value is 0
             pool: required by downscale
