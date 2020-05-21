@@ -17,7 +17,7 @@ class Fitter(fitter.Fitter):
         #dataset contains training set
         model_field, rain = dataset.get_data()
         time_series = self.model_class(model_field, rain, (5, 5), (5, 5))
-        time_series.time_array = dataset.get_time_training()
+        time_series.time_array = dataset.get_time()
         time_series.set_rng(seed)
         time_series.memmap_dir = self.result_dir
         if not n_sample is None:

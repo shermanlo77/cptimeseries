@@ -135,6 +135,8 @@ class Forecaster(time_series.Forecaster):
                 p_rain = self.get_prob_rain(rain_warning, time_index).flatten()
                 roc_curve = roc.Roc(rain_warning, p_rain, observed_rain)
                 roc_array.append(roc_curve)
+            else:
+                roc_array.append(None)
         return roc_array
 
 class TimeSeriesForecaster(time_series.Forecaster):

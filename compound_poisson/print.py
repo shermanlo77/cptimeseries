@@ -157,6 +157,10 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     time_array = forecast.time_array
     year_index_dir = get_year_index_dir(time_array)
 
+    auc_array = {}
+    for rain in RAIN_THRESHOLD_ARRAY:
+        auc_array[rain] = []
+
     for year, index in year_index_dir.items():
 
         forecast_sliced = forecast[index]
@@ -212,6 +216,10 @@ def forecast(forecast, observed_rain, directory, prefix=""):
             roc_curve = forecast_sliced.get_roc_curve(rain, observed_rain_i)
             if not roc_curve is None:
                 roc_curve.plot()
+                auc = roc_curve.area_under_curve
+            else:
+                auc = np.nan
+            auc_array[rain].append(auc)
         plt.legend(loc="lower right")
         plt.savefig(path.join(directory, prefix + "_roc_" + str(year) + ".pdf"))
         plt.close()
@@ -228,6 +236,19 @@ def forecast(forecast, observed_rain, directory, prefix=""):
                 path.join(directory,
                           prefix+"_prob_"+str(rain)+"_"+str(year)+".pdf"))
             plt.close()
+
+    plt.figure()
+    for rain in RAIN_THRESHOLD_ARRAY:
+        label = str(rain) + " mm"
+        auc = np.asarray(auc_array[rain])
+        is_number = np.logical_not(np.isnan(auc))
+        year = np.asarray(list(year_index_dir))
+        plt.plot(year[is_number], auc[is_number], '-o', label=label)
+    plt.legend()
+    plt.xlabel("year")
+    plt.ylabel("area under curve")
+    plt.savefig(path.join(directory, prefix + "_auc.pdf"))
+    plt.close()
 
     plt.figure()
     for rain in RAIN_THRESHOLD_EXTREME_ARRAY:
@@ -296,15 +317,37 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
     pool.map(PrintForecastSeriesMessage.print, message_array)
 
     year_index_dir = get_year_index_dir(forecast_array.time_array)
+    auc_array = {}
+    for rain in RAIN_THRESHOLD_ARRAY:
+        auc_array[rain] = []
+
     for year, index in year_index_dir.items():
         plt.figure()
         roc_curve_array = forecast_array.get_roc_curve_array(
             RAIN_THRESHOLD_ARRAY, test_set, index)
-        for roc_curve in roc_curve_array:
-            roc_curve.plot()
+        for i_rain, roc_curve in enumerate(roc_curve_array):
+            if not roc_curve is None:
+                roc_curve.plot()
+                auc = roc_curve.area_under_curve
+            else:
+                auc = np.nan
+            auc_array[RAIN_THRESHOLD_ARRAY[i_rain]].append(auc)
         plt.legend(loc="lower right")
         plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
         plt.close()
+
+    plt.figure()
+    for rain in RAIN_THRESHOLD_ARRAY:
+        label = str(rain) + " mm"
+        auc = np.asarray(auc_array[rain])
+        is_number = np.logical_not(np.isnan(auc))
+        year = np.asarray(list(year_index_dir))
+        plt.plot(year[is_number], auc[is_number], '-o', label=label)
+    plt.legend()
+    plt.xlabel("year")
+    plt.ylabel("area under curve")
+    plt.savefig(path.join(directory, "auc.pdf"))
+    plt.close()
 
     plt.figure()
     roc_curve_array = forecast_array.get_roc_curve_array(

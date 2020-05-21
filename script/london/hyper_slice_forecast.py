@@ -16,7 +16,7 @@ def main():
 
     fitter = fit.time_series.FitterHyperSlice()
     fitter.forecast(
-        dataset.LondonTraining(), dataset.LondonTest(), n_simulation, burn_in)
+        (dataset.LondonTraining(), dataset.LondonTest()), n_simulation, burn_in)
 
 if __name__ == "__main__":
     main()

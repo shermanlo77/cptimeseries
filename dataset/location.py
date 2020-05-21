@@ -58,10 +58,10 @@ class Location(object):
     def get_model_field(self):
         return self.model_field
 
-    def get_rain_training(self):
+    def get_rain(self):
         return self.rain
 
-    def get_time_training(self):
+    def get_time(self):
         return self.time_array
 
     def __len__(self):
