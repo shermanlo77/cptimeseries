@@ -539,15 +539,12 @@ class DownscaleDual(Downscale):
         self.n_coarse = None
         self.model_field_target = None
         self.model_field_mcmc = None
-        self.model_field_gp_target = None
-        self.model_field_gp_mcmc = None
 
         for model_field in self.model_field_coarse.values():
             self.n_coarse = model_field[0].size
             break
 
         self.model_field_target = target_model_field.TargetModelFieldArray(self)
-        self.model_field_gp_target = target_model_field.TargetGp(self)
 
         self.set_model_field_target_rng()
 
@@ -557,13 +554,9 @@ class DownscaleDual(Downscale):
         super().instantiate_mcmc()
         self.model_field_mcmc = mcmc.Elliptical(
             self.model_field_target, self.rng, self.n_sample, self.memmap_dir)
-        self.model_field_gp_mcmc = mcmc.Rwmh(self.model_field_gp_target,
-                                             self.rng,
-                                             self.n_sample,
-                                             self.memmap_dir)
         #ordering is important, calculate the kernel matrices then posterior
             #gaussian process mean
-        self.model_field_gp_target.save_cov_chol()
+        self.model_field_target.optimise_gp_parameter()
         self.model_field_target.update_mean()
 
     def get_mcmc_array(self):
