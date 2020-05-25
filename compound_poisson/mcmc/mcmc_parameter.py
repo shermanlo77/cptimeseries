@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from numpy import linalg
+from scipy import linalg
 
 from compound_poisson.mcmc import mcmc_abstract
 
