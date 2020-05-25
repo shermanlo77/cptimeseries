@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from numpy import linalg
+from scipy import linalg
 from scipy import stats
 
 from compound_poisson.mcmc import target
@@ -82,7 +82,7 @@ class TargetParameter(target.Target):
                 precision = gp_target.state["precision_arma"]
             else:
                 precision = gp_target.state["precision_reg"]
-            z_i = linalg.lstsq(chol, z_i, rcond=None)[0]
+            z_i = linalg.cho_solve((chol, True), z_i)
             #reminder: det(cX) = c^d det(X)
             #reminder: det(L*L) = det(L) * det(L)
             #reminder: 1/sqrt(precision) = standard deviation or scale
@@ -212,5 +212,5 @@ class TargetGp(target.Target):
         cov_chol = self.square_error.copy()
         cov_chol *= -self.state["gp_precision"] / 2
         cov_chol = np.exp(cov_chol)
-        cov_chol = linalg.cholesky(cov_chol)
+        cov_chol = linalg.cholesky(cov_chol, True)
         self.cov_chol = cov_chol

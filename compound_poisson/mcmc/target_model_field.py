@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from numpy import linalg
+from scipy import linalg
 from scipy import stats
 
 from compound_poisson.mcmc import target
@@ -97,7 +97,7 @@ class TargetModelField(target.Target):
             z_i = self.normalise_state(
                 model_field_coarse.copy()[self.time_step])
             z_i = z_i.flatten()
-            z_i = linalg.lstsq(k_11_chol, z_i, rcond=None)[0]
+            z_i = linalg.cho_solve((k_11_chol, True), z_i)
             ln_prior_term.append(-0.5 * np.dot(z_i, z_i))
         return np.sum(ln_prior_term)
 
@@ -177,7 +177,7 @@ class TargetModelFieldArray(target.Target):
         self.n_model_field = downscale.n_model_field
         self.n_parameter_i = self.area_unmask * self.n_model_field
 
-        self.gp_precision = get_precision_prior().mean()
+        self.gp_precision = target.get_gp_precision_prior().mean()
         self.regulariser = 1e-10
         self.model_field_coarse = downscale.model_field_coarse
         self.topography_coarse = downscale.topography_coarse_normalise
@@ -281,11 +281,11 @@ class TargetModelFieldArray(target.Target):
         self.set_k_11()
         self.k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
 
-        k_11_chol = linalg.cholesky(self.k_11)
-        cov_chol = linalg.lstsq(k_11_chol, self.k_12, rcond=None)[0]
+        k_11_chol = linalg.cholesky(self.k_11, True)
+        cov_chol = linalg.cho_solve((k_11_chol, True), self.k_12)
         cov_chol = np.matmul(cov_chol.T, cov_chol)
         cov_chol = self.get_kernel_matrix(self.square_error_fine) - cov_chol
-        cov_chol = linalg.cholesky(cov_chol)
+        cov_chol = linalg.cholesky(cov_chol, True)
         self.cov_chol = cov_chol
 
     def regularise_kernel(self, kernel):
@@ -303,7 +303,7 @@ class TargetModelFieldArray(target.Target):
     def get_and_set_objective(self, gp_precision):
         self.gp_precision = gp_precision
         self.set_k_11()
-        k_11_chol = linalg.cholesky(self.k_11)
+        k_11_chol = linalg.cholesky(self.k_11, True)
 
         ln_l_term = []
         for model_field_target in self:
@@ -438,7 +438,7 @@ class GpRegressionMessage(object):
             model_field_i -= self.shift_array[i]
             model_field_i /= self.scale_array[i]
             mean_i = np.matmul(
-                k_12_t, linalg.lstsq(k_11, model_field_i, rcond=None)[0])
+                k_12_t, linalg.cho_solve((k_11, True), model_field_i))
             mean_i *= self.scale_array[i]
             mean_i += self.shift_array[i]
             mean.append(mean_i)
@@ -490,9 +490,3 @@ class GpSimulateMessage(TargetModelField):
         cov_chol = self.cov_chol.value()
         state = self.simulate_from_prior_given_gp(cov_chol, self.rng)
         return (state, self.rng)
-
-def get_precision_prior():
-    return stats.gamma(a=4/3, scale=3)
-
-def get_regulariser_precision_prior():
-    return stats.gamma(a=2, scale=1)
