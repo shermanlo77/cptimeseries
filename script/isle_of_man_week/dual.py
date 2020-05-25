@@ -14,8 +14,8 @@ def main():
     n_sample = parser.parse_args().sample
 
     seed = random.SeedSequence(70599994716119404436100749277178204047)
-    fitter = fit.downscale.FitterDownscale()
-    fitter.fit(dataset.IsleOfManTraining(), seed, n_sample, pool)
+    fitter = fit.downscale.FitterDownscaleDual()
+    fitter.fit(dataset.IsleOfManWeekTraining(), seed, n_sample, pool)
 
     pool.join()
 

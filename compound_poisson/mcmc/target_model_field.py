@@ -49,20 +49,42 @@ class TargetModelField(target.Target):
 
     def get_state(self):
         #implemented
-        model_field = self.downscale.get_model_field(self.time_step)
-        return model_field
+        return self.downscale.get_model_field(self.time_step)
+
+    def get_normalised_state(self):
+        state = self.get_state()
+        state = self.normalise_state(state)
+        return state
+
+    def normalise_state(self, state):
+        sub_vector_length = int(len(state)/self.n_model_field)
+        for i in range(self.n_model_field):
+            model_field_i_pointer = slice(
+                i*sub_vector_length, (i+1)*sub_vector_length)
+            state[model_field_i_pointer] -= self.model_field_shift[i]
+            state[model_field_i_pointer] /= self.model_field_scale[i]
+        return state
+
+    def unnormalise_state(self, state):
+        sub_vector_length = int(len(state)/self.n_model_field)
+        for i in range(self.n_model_field):
+            model_field_i_pointer = slice(
+                i*sub_vector_length, (i+1)*sub_vector_length)
+            state[model_field_i_pointer] *= self.model_field_scale[i]
+            state[model_field_i_pointer] += self.model_field_shift[i]
+        return state
 
     def update_state(self, state):
         #implemented
         self.downscale.set_model_field(state, self.time_step)
 
-    def get_log_prior(self):
-        #required for mcmc on the gaussian process parameters
-        parent = self.downscale.target_model_field
-        z = self.get_state()
-        z -= self.prior_mean
+    def get_z_inner_product(self, k_11_chol):
+        """Return the log term in the exponential of the marginal log likelihood
+            z
+        """
+        #required when optimising for gp parameter
+        parent = self.downscale.model_field_target
         ln_prior_term = []
-        chol = parent.cov_chol
         #evaluate the Normal density for each model_field, each model_field has
             #a covariance matrix which represent the correlation in space. There
             #is no correlation between different model_field. In other words,
@@ -70,18 +92,14 @@ class TargetModelField(target.Target):
             #covariance matrix has a block diagonal structure. Evaluating
             #the density with a block digonal covariance matrix can be done
             #using a for loop
-        for i in range(self.n_model_field):
+        for model_field_coarse in parent.model_field_coarse.values():
             #z is the parameter - mean
-            z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
-
-            z_i = linalg.lstsq(chol, z_i, rcond=None)[0]
-            ln_prior_term.append(-0.5 * precision * np.dot(z_i, z_i))
-        #reminder: det(cX) = c^d det(X)
-        #reminder: det(L*L) = det(L) * det(L)
-        #reminder: 1/sqrt(precision) = standard deviation or scale
-        ln_det_cov = (2*np.sum(np.log(np.diagonal(chol))
-            - self.area_unmask * math.log(precision)))
-        return np.sum(ln_prior_term) - 0.5 * self.n_model_field * ln_det_cov
+            z_i = self.normalise_state(
+                model_field_coarse.copy()[self.time_step])
+            z_i = z_i.flatten()
+            z_i = linalg.lstsq(k_11_chol, z_i, rcond=None)[0]
+            ln_prior_term.append(-0.5 * np.dot(z_i, z_i))
+        return np.sum(ln_prior_term)
 
     def set_mean(self, mean):
         #used when the gp precision changes which changes the mean
@@ -93,7 +111,7 @@ class TargetModelField(target.Target):
 
     def simulate_from_prior(self, rng):
         #implemented
-        cov_chol = self.target_model_field.cov_chol
+        cov_chol = self.downscale.model_field_target.cov_chol
         state = self.simulate_from_prior_given_gp(cov_chol, rng)
         return state
 
@@ -101,12 +119,11 @@ class TargetModelField(target.Target):
         """Simulate from the prior given gp precision parameters
 
 	    Args:
-            precision: precision to scale cov_chol
             cov_chol: cholesky of the covariance matrix
             rng: random number generator
 
         Return:
-            2 array, 0th element simulation, 1st element rng after being used
+            simulated value
         """
         model_field_vector = np.empty(self.area_unmask * self.n_model_field)
         #simulate each model_field, correlation only in space, not between
@@ -114,9 +131,9 @@ class TargetModelField(target.Target):
         for i in range(self.n_model_field):
             model_field_i = np.asarray(rng.normal(size=self.area_unmask))
             model_field_i = np.matmul(cov_chol, model_field_i)
-            model_field_i *= self.model_field_scale[i]
             model_field_vector[i*self.area_unmask : (i+1)*self.area_unmask] = (
                 model_field_i)
+        model_field_vector = self.unnormalise_state(model_field_vector)
         model_field_vector += self.prior_mean
         return model_field_vector
 
@@ -134,7 +151,7 @@ class TargetModelFieldArray(target.Target):
         area_unmask: number of points on fine grid
         n_model_field: number of model fields
         n_parameter_i: number of dimensions for a time point
-        gp_parameter: gp precision parameter
+        gp_precision: gp precision parameter
         regulariser: small constant to add to diagonal of kernel matrix
         model_field_coarse: dictionary of model fields on the coarse grid
         topography_coarse: dictionary of normalised topography on the coarse
@@ -160,7 +177,7 @@ class TargetModelFieldArray(target.Target):
         self.n_model_field = downscale.n_model_field
         self.n_parameter_i = self.area_unmask * self.n_model_field
 
-        self.gp_parameter = get_precision_prior().mean()
+        self.gp_precision = get_precision_prior().mean()
         self.regulariser = 1e-10
         self.model_field_coarse = downscale.model_field_coarse
         self.topography_coarse = downscale.topography_coarse_normalise
@@ -250,15 +267,18 @@ class TargetModelFieldArray(target.Target):
         """Return kernel matrix given matrix of squared errors
         """
         kernel_matrix = square_error.copy()
-        kernel_matrix *= -self.state["gp_precision"] / 2
+        kernel_matrix *= -self.gp_precision / 2
         kernel_matrix = np.exp(kernel_matrix)
         return kernel_matrix
 
-    def save_cov_chol(self):
-        """Update member variables k_11, k_12 and cov_chol
-        """
+    def set_k_11(self):
         self.k_11 = self.get_kernel_matrix(self.square_error_coarse)
         self.regularise_kernel(self.k_11)
+
+    def set_cov_chol(self):
+        """Update member variables k_11, k_12 and cov_chol
+        """
+        self.set_k_11()
         self.k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
 
         k_11_chol = linalg.cholesky(self.k_11)
@@ -274,22 +294,39 @@ class TargetModelFieldArray(target.Target):
         for i in range(kernel.shape[0]):
             kernel[i, i] += self.regulariser
 
-    def optimise_gp_parameter(self):
+    def optimise_gp_precision(self):
         pass
 
-    def update_mean(self):
+    def gp_objective(self, gp_precision):
+        pass
+
+    def get_and_set_objective(self, gp_precision):
+        self.gp_precision = gp_precision
+        self.set_k_11()
+        k_11_chol = linalg.cholesky(self.k_11)
+
+        ln_l_term = []
+        for model_field_target in self:
+            ln_l_term.append(model_field_target.get_z_inner_product(k_11_chol))
+        #reminder: det(cX) = c^d det(X)
+        #reminder: det(L*L) = det(L) * det(L)
+        #reminder: 1/sqrt(precision) = standard deviation or scale
+        ln_det_cov = 2*np.sum(np.log(np.diagonal(k_11_chol)))
+        return np.sum(ln_l_term) - 0.5 * self.n_parameter_i * ln_det_cov
+
+    def update_mean_and_cov(self):
         """Update the mean for each model field for each time point
 
         Update the mean for each model field for each time point. Done by
             instantiating a GpRegression object and calling regress. Required as
             a change in the gp precision parameters will change the mean.
         """
+        self.set_cov_chol()
         gp_array = []
-        gp_target = self.downscale.model_field_gp_target
         pool = self.downscale.pool
         #distribute k_11 and k_12 to all workers
-        k_11 = pool.broadcast(gp_target.k_11)
-        k_12 = pool.broadcast(gp_target.k_12)
+        k_11 = pool.broadcast(self.k_11)
+        k_12 = pool.broadcast(self.k_12)
         for target in self:
             gp_array.append(GpRegressionMessage(target, k_11, k_12))
         mean = pool.map(GpRegressionMessage.regress, gp_array)
@@ -308,10 +345,9 @@ class TargetModelFieldArray(target.Target):
         #provided rng not used as this is to be parallised
         message_array = []
         pool = self.downscale.pool
-        gp_target = self.downscale.model_field_gp_target
 
         #perpare message
-        cov_chol = pool.broadcast(gp_target.cov_chol)
+        cov_chol = pool.broadcast(self.cov_chol)
         for i, target in enumerate(self):
             #use spawned rng
             rng = self.rng_array[i]
@@ -408,7 +444,7 @@ class GpRegressionMessage(object):
             mean.append(mean_i)
         return np.concatenate(mean)
 
-class GpSimulateMessage(object):
+class GpSimulateMessage(TargetModelField):
     """For simulating model fields from the prior
 
     For simulating model fields from the prior for a given time point, designed
@@ -451,10 +487,8 @@ class GpSimulateMessage(object):
                 use
         """
         #implemented
-        precision = self.precision.value()
         cov_chol = self.cov_chol.value()
-        state = TargetModelField.simulate_from_prior_given_gp(
-            self, cov_chol, self.rng)
+        state = self.simulate_from_prior_given_gp(cov_chol, self.rng)
         return (state, self.rng)
 
 def get_precision_prior():

@@ -556,13 +556,12 @@ class DownscaleDual(Downscale):
             self.model_field_target, self.rng, self.n_sample, self.memmap_dir)
         #ordering is important, calculate the kernel matrices then posterior
             #gaussian process mean
-        self.model_field_target.optimise_gp_parameter()
-        self.model_field_target.update_mean()
+        self.model_field_target.optimise_gp_precision()
+        self.model_field_target.update_mean_and_cov()
 
     def get_mcmc_array(self):
         mcmc_array = super().get_mcmc_array()
         mcmc_array.append(self.model_field_mcmc)
-        mcmc_array.append(self.model_field_gp_mcmc)
         return mcmc_array
 
     def get_model_field(self, time_step):
@@ -571,6 +570,7 @@ class DownscaleDual(Downscale):
         Return:
             vector of length self.n_model_field * self.area_unmask, [0th model
                 field for all unmasked, 1st model field for all unmasked, ...]
+                (numpy)
         """
         model_field = []
         for model_field_i in range(self.n_model_field):
@@ -598,6 +598,7 @@ class DownscaleDual(Downscale):
         """
         super().print_mcmc(directory)
         directory = path.join(directory, "chain")
+        self.read_memmap()
 
         time_index_array = self.get_random_time_index()
 
@@ -626,14 +627,7 @@ class DownscaleDual(Downscale):
                           "model_field_" + str(i_model_field) + ".pdf"))
             plt.close()
 
-        chain = np.asarray(self.model_field_gp_mcmc[:])
-        for i, key in enumerate(self.model_field_gp_target.state):
-            chain_i = chain[:, i]
-            plt.plot(chain_i)
-            plt.xlabel("sample number")
-            plt.ylabel(key)
-            plt.savefig(path.join(directory, key + "_model_field.pdf"))
-            plt.close()
+        self.del_memmap()
 
     def get_random_time_index(self):
         """Return array of random n_plot numbers, choose from
