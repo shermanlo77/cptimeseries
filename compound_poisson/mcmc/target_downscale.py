@@ -82,7 +82,7 @@ class TargetParameter(target.Target):
                 precision = gp_target.state["precision_arma"]
             else:
                 precision = gp_target.state["precision_reg"]
-            z_i = linalg.cho_solve((chol, True), z_i)
+            z_i = linalg.solve_triangular(chol, z_i, lower=True)
             #reminder: det(cX) = c^d det(X)
             #reminder: det(L*L) = det(L) * det(L)
             #reminder: 1/sqrt(precision) = standard deviation or scale

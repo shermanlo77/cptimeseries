@@ -77,7 +77,7 @@ class TargetModelField(target.Target):
             #z is the parameter - mean
             z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
 
-            z_i = linalg.cho_solve((chol, True), z_i)
+            z_i = linalg.solve_triangular(chol, z_i, lower=True)
             ln_prior_term.append(-0.5 * precision * np.dot(z_i, z_i))
         #reminder: det(cX) = c^d det(X)
         #reminder: det(L*L) = det(L) * det(L)
@@ -208,10 +208,10 @@ class TargetModelFieldArray(target.Target):
         gp_target = self.downscale.model_field_gp_target
         pool = self.downscale.pool
         #distribute k_11 and k_12 to all workers
-        k_11 = pool.broadcast(gp_target.k_11)
+        k_11_chol = pool.broadcast(linalg.cholesky(gp_target.k_11, True))
         k_12 = pool.broadcast(gp_target.k_12)
         for target in self:
-            gp_array.append(GpRegressionMessage(target, k_11, k_12))
+            gp_array.append(GpRegressionMessage(target, k_11_chol, k_12))
         mean = pool.map(GpRegressionMessage.regress, gp_array)
         mean = np.concatenate(mean)
         self.set_mean(mean)
@@ -428,7 +428,7 @@ class TargetGp(target.Target):
         self.k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
 
         k_11_chol = linalg.cholesky(self.k_11, True)
-        cov_chol = linalg.cho_solve((k_11_chol, True), self.k_12)
+        cov_chol = linalg.solve_triangular(k_11_chol, self.k_12, lower=True)
         cov_chol = np.matmul(cov_chol.T, cov_chol)
         cov_chol = self.get_kernel_matrix(self.square_error_fine) - cov_chol
         cov_chol = linalg.cholesky(cov_chol, True)
@@ -437,7 +437,7 @@ class TargetGp(target.Target):
     def regularise_kernel(self, kernel):
         """Add 1/sqrt(reg_precision) * identity matrix to given matrix
         """
-        regulariser = 1/math.sqrt(self.state["reg_precision"])
+        regulariser = 1/self.state["reg_precision"]
         for i in range(kernel.shape[0]):
             kernel[i, i] += regulariser
 
@@ -456,18 +456,19 @@ class GpRegressionMessage(object):
         k_12: broadcast, kernel matrix, dimensions n_coarse x area_unmask
     """
 
-    def __init__(self, model_field_target, k_11, k_12):
+    def __init__(self, model_field_target, k_11_chol, k_12):
         """
         Args:
             model_field_target: TargetModelField object (not
                 TargetModelFieldArray)
-            k_11: kernel matrix, dimensions n_coarse x n_coarse
+            k_11_chol: kernel matrix, cholesky lower decomposition, dimensions
+                n_coarse x n_coarse
             k_12: kernel matrix, dimensions n_coarse x area_unmask
         """
         self.model_field_coarse = []
         self.shift_array = model_field_target.model_field_shift
         self.scale_array = model_field_target.model_field_scale
-        self.k_11 = k_11
+        self.k_11_chol = k_11_chol
         self.k_12 = k_12
         #extracted model fields for this particular time point
         for model_field in (
@@ -482,7 +483,7 @@ class GpRegressionMessage(object):
             field, returns vector, model fields are stacked on top of each other
         """
         mean = [] #array of means for each model field
-        k_11 = self.k_11.value()
+        k_11_chol = self.k_11_chol.value()
         k_12 = self.k_12.value()
         k_12_t = k_12.T
         #model fields have covariance matrix over space, but different model
@@ -493,7 +494,7 @@ class GpRegressionMessage(object):
             model_field_i -= self.shift_array[i]
             model_field_i /= self.scale_array[i]
             mean_i = np.matmul(
-                k_12_t, linalg.cho_solve((k_11, True), model_field_i))
+                k_12_t, linalg.cho_solve((k_11_chol, True), model_field_i))
             mean_i *= self.scale_array[i]
             mean_i += self.shift_array[i]
             mean.append(mean_i)
@@ -554,4 +555,4 @@ def get_precision_prior():
     return stats.gamma(a=4/3, scale=3)
 
 def get_regulariser_precision_prior():
-    return stats.gamma(a=2, scale=1)
+    return stats.gamma(a=4, scale=1)
