@@ -307,7 +307,7 @@ class TargetGp(target.Target):
         self.prior = {
             "precision": get_precision_prior(),
             "gp_precision": target.get_gp_precision_prior(),
-            "reg_precision": get_regulariser_precision_prior(),
+            "regulariser_precision": get_regulariser_precision_prior(),
         }
         self.state = {}
         self.state_before = None
@@ -435,9 +435,9 @@ class TargetGp(target.Target):
         self.cov_chol = cov_chol
 
     def regularise_kernel(self, kernel):
-        """Add 1/sqrt(reg_precision) * identity matrix to given matrix
+        """Add 1/sqrt(regulariser_precision) * identity matrix to given matrix
         """
-        regulariser = 1/self.state["reg_precision"]
+        regulariser = 1/self.state["regulariser_precision"]
         for i in range(kernel.shape[0]):
             kernel[i, i] += regulariser
 

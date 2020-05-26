@@ -561,6 +561,7 @@ class DownscaleDual(Downscale):
                                              self.rng,
                                              self.n_sample,
                                              self.memmap_dir)
+        self.model_field_gp_mcmc.proposal_covariance_small = 1e-8
         #ordering is important, calculate the kernel matrices then posterior
             #gaussian process mean
         self.model_field_gp_target.save_cov_chol()
