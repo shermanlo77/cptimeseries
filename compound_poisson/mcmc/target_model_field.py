@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from scipy import linalg
+from numpy import linalg
 from scipy import stats
 
 from compound_poisson.mcmc import target
@@ -13,7 +13,7 @@ class TargetModelField(target.Target):
         downscale: pointer to parent
         time_step: time point
         prior_mean: vector, Gaussian process mean, for each model field and
-            point in space, length n_total_parameter (in noramlised units)
+            point in space, length n_total_parameter
         model_field_shift: array, normalisation value for each model field
         model_field_scale: array, normalisation value for each model field
         area_unmask: number of points on the find grid
@@ -25,23 +25,24 @@ class TargetModelField(target.Target):
         self.downscale = downscale
         self.time_step = time_step
         self.prior_mean = None
-        self.model_field_shift = None
-        self.model_field_scale = None
+        self.model_field_shift = []
+        self.model_field_scale = []
         self.area_unmask = downscale.area_unmask
         self.n_model_field = downscale.n_model_field
         self.n_total_parameter = self.area_unmask * self.n_model_field
 
-        self.prior_mean = np.zeros(self.n_total_parameter)
-        self.model_field_shift = np.empty(downscale.n_model_field)
-        self.model_field_scale = np.empty(downscale.n_model_field)
+        self.prior_mean = np.empty(self.n_total_parameter)
         for i, model_field_coarse in enumerate(
             downscale.model_field_coarse.values()):
             #model_field_shift is mean of coarse model fields
             #model_field_scale is std of coarse model_fields
             #prior_mean is constant at the mean
-            model_field_coarse_i = model_field_coarse[time_step]
-            self.model_field_shift[i] = np.mean(model_field_coarse_i)
-            self.model_field_scale[i] = np.std(model_field_coarse_i, ddof=1)
+            self.model_field_shift.append(
+                np.mean(model_field_coarse[time_step]))
+            self.model_field_scale.append(
+                np.std(model_field_coarse[time_step], ddof=1))
+            self.prior_mean[i*self.area_unmask:(i+1)*self.area_unmask] = (
+                self.model_field_shift[i])
 
     def get_n_dim(self):
         #implmented
@@ -51,40 +52,20 @@ class TargetModelField(target.Target):
         #implemented
         return self.downscale.get_model_field(self.time_step)
 
-    def get_normalised_state(self):
-        state = self.get_state()
-        state = self.normalise_state(state)
-        return state
-
-    def normalise_state(self, state):
-        sub_vector_length = int(len(state)/self.n_model_field)
-        for i in range(self.n_model_field):
-            model_field_i_pointer = slice(
-                i*sub_vector_length, (i+1)*sub_vector_length)
-            state[model_field_i_pointer] -= self.model_field_shift[i]
-            state[model_field_i_pointer] /= self.model_field_scale[i]
-        return state
-
-    def unnormalise_state(self, state):
-        sub_vector_length = int(len(state)/self.n_model_field)
-        for i in range(self.n_model_field):
-            model_field_i_pointer = slice(
-                i*sub_vector_length, (i+1)*sub_vector_length)
-            state[model_field_i_pointer] *= self.model_field_scale[i]
-            state[model_field_i_pointer] += self.model_field_shift[i]
-        return state
-
     def update_state(self, state):
         #implemented
         self.downscale.set_model_field(state, self.time_step)
+        #required for likelihood evaluation
+        self.downscale.update_all_cp_parameters()
 
-    def get_z_inner_product(self, k_11_chol):
-        """Return the log term in the exponential of the marginal log likelihood
-            z
-        """
-        #required when optimising for gp parameter
-        parent = self.downscale.model_field_target
+    def get_log_prior(self):
+        #required for mcmc on the gaussian process parameters
+        gp_target = self.downscale.model_field_gp_target
+        z = self.get_state()
+        z -= self.prior_mean
         ln_prior_term = []
+        chol = gp_target.cov_chol
+        precision = gp_target.state["precision"]
         #evaluate the Normal density for each model_field, each model_field has
             #a covariance matrix which represent the correlation in space. There
             #is no correlation between different model_field. In other words,
@@ -92,14 +73,18 @@ class TargetModelField(target.Target):
             #covariance matrix has a block diagonal structure. Evaluating
             #the density with a block digonal covariance matrix can be done
             #using a for loop
-        for model_field_coarse in parent.model_field_coarse.values():
+        for i in range(self.n_model_field):
             #z is the parameter - mean
-            z_i = self.normalise_state(
-                model_field_coarse.copy()[self.time_step])
-            z_i = z_i.flatten()
-            z_i = linalg.cho_solve((k_11_chol, True), z_i)
-            ln_prior_term.append(-0.5 * np.dot(z_i, z_i))
-        return np.sum(ln_prior_term)
+            z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
+
+            z_i = linalg.lstsq(chol, z_i, rcond=None)[0]
+            ln_prior_term.append(-0.5 * precision * np.dot(z_i, z_i))
+        #reminder: det(cX) = c^d det(X)
+        #reminder: det(L*L) = det(L) * det(L)
+        #reminder: 1/sqrt(precision) = standard deviation or scale
+        ln_det_cov = (2*np.sum(np.log(np.diagonal(chol))
+            - self.area_unmask * math.log(precision)))
+        return np.sum(ln_prior_term) - 0.5 * self.n_model_field * ln_det_cov
 
     def set_mean(self, mean):
         #used when the gp precision changes which changes the mean
@@ -111,29 +96,34 @@ class TargetModelField(target.Target):
 
     def simulate_from_prior(self, rng):
         #implemented
-        cov_chol = self.downscale.model_field_target.cov_chol
-        state = self.simulate_from_prior_given_gp(cov_chol, rng)
+        gp_target = self.downscale.model_field_gp_target
+        precision = gp_target.state["precision"]
+        cov_chol = gp_target.cov_chol
+        state = self.simulate_from_prior_given_gp(precision, cov_chol, rng)
         return state
 
-    def simulate_from_prior_given_gp(self, cov_chol, rng):
+    def simulate_from_prior_given_gp(self, precision, cov_chol, rng):
         """Simulate from the prior given gp precision parameters
 
 	    Args:
+            precision: precision to scale cov_chol
             cov_chol: cholesky of the covariance matrix
             rng: random number generator
 
         Return:
-            simulated value
+            2 array, 0th element simulation, 1st element rng after being used
         """
         model_field_vector = np.empty(self.area_unmask * self.n_model_field)
+        scale = 1/math.sqrt(precision)
         #simulate each model_field, correlation only in space, not between
             #model_fields
         for i in range(self.n_model_field):
             model_field_i = np.asarray(rng.normal(size=self.area_unmask))
             model_field_i = np.matmul(cov_chol, model_field_i)
+            model_field_i *= self.model_field_scale[i]
             model_field_vector[i*self.area_unmask : (i+1)*self.area_unmask] = (
                 model_field_i)
-        model_field_vector = self.unnormalise_state(model_field_vector)
+        model_field_vector *= scale
         model_field_vector += self.prior_mean
         return model_field_vector
 
@@ -151,22 +141,6 @@ class TargetModelFieldArray(target.Target):
         area_unmask: number of points on fine grid
         n_model_field: number of model fields
         n_parameter_i: number of dimensions for a time point
-        gp_precision: gp precision parameter
-        regulariser: small constant to add to diagonal of kernel matrix
-        model_field_coarse: dictionary of model fields on the coarse grid
-        topography_coarse: dictionary of normalised topography on the coarse
-            grid
-        topography: dictionary of normalised topography on the fine grid
-        square_error_coarse: square error of normalise topography on coarse
-            grid, matrix dimension n_coarse x n_coarse
-        square_error_fine: square error of normalise topography on fine grid,
-            matrix dimension area_unmask x area_unmask
-        square_error_coarse_fine: square error of normalise topography between
-            fine and coarse grid, matrix dimension n_coarse x area_unmask
-        cov_chol: cholesky of kernel matrix (not covariance matrix), dimensions
-            area_unmask x area_unmask
-        k_11: kernel matrix, dimensions n_coarse x n_coarse
-        k_12: kernel matrix, dimensions n_coarse x area_unmask
     """
 
     def __init__(self, downscale):
@@ -176,46 +150,6 @@ class TargetModelFieldArray(target.Target):
         self.area_unmask = downscale.area_unmask
         self.n_model_field = downscale.n_model_field
         self.n_parameter_i = self.area_unmask * self.n_model_field
-
-        self.gp_precision = target.get_gp_precision_prior().mean()
-        self.regulariser = 1e-10
-        self.model_field_coarse = downscale.model_field_coarse
-        self.topography_coarse = downscale.topography_coarse_normalise
-        self.topography = downscale.topography_normalise
-
-        self.square_error_coarse = np.zeros(
-            (downscale.n_coarse, downscale.n_coarse))
-        self.square_error_fine = downscale.square_error
-        self.square_error_coarse_fine = np.empty(
-            (downscale.n_coarse, downscale.area_unmask))
-
-        self.cov_chol = None
-
-        self.k_11 = np.identity(downscale.n_coarse)
-        self.k_12 = np.zeros((downscale.n_coarse, downscale.area_unmask))
-        #k_22 is not needed, only required to calculate posterior covariance
-
-        n_coarse = downscale.n_coarse
-
-        #work out square error matrices
-        for topo_i in self.topography_coarse.values():
-            topo_i = topo_i.flatten()
-            for i in range(n_coarse):
-                for j in range(i+1, n_coarse):
-                    self.square_error_coarse[i, j] += math.pow(
-                        topo_i[i] - topo_i[j], 2)
-                    self.square_error_coarse[j, i] = (
-                        self.square_error_coarse[i,j])
-
-        unmask = np.logical_not(downscale.mask).flatten()
-        for key, topo_fine in self.topography.items():
-            topo_coarse = self.topography_coarse[key].flatten()
-            topo_fine = topo_fine.flatten()
-            topo_fine = topo_fine[unmask]
-            for i in range(n_coarse):
-                for j in range(downscale.area_unmask):
-                    self.square_error_coarse_fine[i, j] += math.pow(
-                        topo_coarse[i] - topo_fine[j], 2)
 
         self.set_rng_array()
         for i in range(len(downscale)):
@@ -263,70 +197,19 @@ class TargetModelFieldArray(target.Target):
         #implemented
         return self.get_log_likelihood() + self.get_log_prior()
 
-    def get_kernel_matrix(self, square_error):
-        """Return kernel matrix given matrix of squared errors
-        """
-        kernel_matrix = square_error.copy()
-        kernel_matrix *= -self.gp_precision / 2
-        kernel_matrix = np.exp(kernel_matrix)
-        return kernel_matrix
-
-    def set_k_11(self):
-        self.k_11 = self.get_kernel_matrix(self.square_error_coarse)
-        self.regularise_kernel(self.k_11)
-
-    def set_cov_chol(self):
-        """Update member variables k_11, k_12 and cov_chol
-        """
-        self.set_k_11()
-        self.k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
-
-        k_11_chol = linalg.cholesky(self.k_11, True)
-        cov_chol = linalg.cho_solve((k_11_chol, True), self.k_12)
-        cov_chol = np.matmul(cov_chol.T, cov_chol)
-        cov_chol = self.get_kernel_matrix(self.square_error_fine) - cov_chol
-        cov_chol = linalg.cholesky(cov_chol, True)
-        self.cov_chol = cov_chol
-
-    def regularise_kernel(self, kernel):
-        """Add regulariser * identity matrix to given matrix
-        """
-        for i in range(kernel.shape[0]):
-            kernel[i, i] += self.regulariser
-
-    def optimise_gp_precision(self):
-        pass
-
-    def gp_objective(self, gp_precision):
-        pass
-
-    def get_and_set_objective(self, gp_precision):
-        self.gp_precision = gp_precision
-        self.set_k_11()
-        k_11_chol = linalg.cholesky(self.k_11, True)
-
-        ln_l_term = []
-        for model_field_target in self:
-            ln_l_term.append(model_field_target.get_z_inner_product(k_11_chol))
-        #reminder: det(cX) = c^d det(X)
-        #reminder: det(L*L) = det(L) * det(L)
-        #reminder: 1/sqrt(precision) = standard deviation or scale
-        ln_det_cov = 2*np.sum(np.log(np.diagonal(k_11_chol)))
-        return np.sum(ln_l_term) - 0.5 * self.n_parameter_i * ln_det_cov
-
-    def update_mean_and_cov(self):
+    def update_mean(self):
         """Update the mean for each model field for each time point
 
         Update the mean for each model field for each time point. Done by
             instantiating a GpRegression object and calling regress. Required as
             a change in the gp precision parameters will change the mean.
         """
-        self.set_cov_chol()
         gp_array = []
+        gp_target = self.downscale.model_field_gp_target
         pool = self.downscale.pool
         #distribute k_11 and k_12 to all workers
-        k_11 = pool.broadcast(self.k_11)
-        k_12 = pool.broadcast(self.k_12)
+        k_11 = pool.broadcast(gp_target.k_11)
+        k_12 = pool.broadcast(gp_target.k_12)
         for target in self:
             gp_array.append(GpRegressionMessage(target, k_11, k_12))
         mean = pool.map(GpRegressionMessage.regress, gp_array)
@@ -345,13 +228,16 @@ class TargetModelFieldArray(target.Target):
         #provided rng not used as this is to be parallised
         message_array = []
         pool = self.downscale.pool
+        gp_target = self.downscale.model_field_gp_target
 
         #perpare message
-        cov_chol = pool.broadcast(self.cov_chol)
+        cov_chol = pool.broadcast(gp_target.cov_chol)
+        precision = pool.broadcast(gp_target.state["precision"])
         for i, target in enumerate(self):
             #use spawned rng
             rng = self.rng_array[i]
-            message_array.append(GpSimulateMessage(target, cov_chol, rng))
+            message_array.append(
+                GpSimulateMessage(target, cov_chol, precision, rng))
 
         #returns array of 2 array containing simulated model field and rng after
             #use, need to extract them and put them accordingly
@@ -385,6 +271,175 @@ class TargetModelFieldArray(target.Target):
 
     def __setitem__(self, index, value):
         self.model_field_target_array[index] = value
+
+class TargetGp(target.Target):
+    """Contains gp precision parameters and density information
+
+    Attributes:
+        downscale: pointer to parent
+        prior: dictionary of scipy.stats prior distributions
+        state: dictionary of the gp precision parameters
+        state_before: copy of state, used by mcmc
+        model_field_coarse: dictionary of model fields on the coarse grid
+        topography_coarse: dictionary of normalised topography on the coarse
+            grid
+        topography: dictionary of normalised topography on the fine grid
+        mask: boolean matrix with shape for the fine grid, true area in the grid
+            is on water, ie no rain data on water
+        square_error_coarse: square error of normalise topography on coarse
+            grid, matrix dimension n_coarse x n_coarse
+        square_error_fine: square error of normalise topography on fine grid,
+            matrix dimension area_unmask x area_unmask
+        square_error_coarse_fine: square error of normalise topography between
+            fine and coarse grid, matrix dimension n_coarse x area_unmask
+        cov_chol: cholesky of kernel matrix (not covariance matrix), dimensions
+            area_unmask x area_unmask
+        k_11: kernel matrix, dimensions n_coarse x n_coarse
+        k_12: kernel matrix, dimensions n_coarse x area_unmask
+        k_22: kernel matrix, dimensions area_unmask x area_unmask
+        mean_before: used by mcmc, copy of self.downscale.model_field_target
+            .get_prior_mean()
+        cov_chol_before: used by mcmc, copy of cov_chol
+    """
+
+    def __init__(self, downscale):
+        self.downscale = downscale
+        self.prior = {
+            "precision": get_precision_prior(),
+            "gp_precision": target.get_gp_precision_prior(),
+            "reg_precision": get_regulariser_precision_prior(),
+        }
+        self.state = {}
+        self.state_before = None
+
+        self.model_field_coarse = downscale.model_field_coarse
+        self.topography_coarse = downscale.topography_coarse_normalise
+        self.topography = downscale.topography_normalise
+
+        self.mask = downscale.mask
+        self.square_error_coarse = np.zeros(
+            (downscale.n_coarse, downscale.n_coarse))
+        self.square_error_fine = downscale.square_error
+        self.square_error_coarse_fine = np.empty(
+            (downscale.n_coarse, downscale.area_unmask))
+        self.cov_chol = None
+        self.k_11 = np.identity(downscale.n_coarse)
+        self.k_12 = np.zeros((downscale.n_coarse, downscale.area_unmask))
+        #k_22 is not needed, only required to calculate posterior covariance
+
+        self.mean_before = None
+        self.cov_chol_before = None
+
+        #set initalse state to be the prior mean
+        for key, prior in self.prior.items():
+            self.state[key] = prior.mean()
+
+        n_coarse = downscale.n_coarse
+
+        #work out square error matrices
+        for topo_i in self.topography_coarse.values():
+            topo_i = topo_i.flatten()
+            for i in range(n_coarse):
+                for j in range(i+1, n_coarse):
+                    self.square_error_coarse[i, j] += math.pow(
+                        topo_i[i] - topo_i[j], 2)
+                    self.square_error_coarse[j, i] = (
+                        self.square_error_coarse[i,j])
+
+        unmask = np.logical_not(self.mask).flatten()
+        for key, topo_fine in self.topography.items():
+            topo_coarse = self.topography_coarse[key].flatten()
+            topo_fine = topo_fine.flatten()
+            topo_fine = topo_fine[unmask]
+            for i in range(n_coarse):
+                for j in range(downscale.area_unmask):
+                    self.square_error_coarse_fine[i, j] += math.pow(
+                        topo_coarse[i] - topo_fine[j], 2)
+
+    def get_n_dim(self):
+        #implemented
+        return len(self.prior)
+
+    def get_state(self):
+        #implemented
+        return np.asarray(list(self.state.values()))
+
+    def update_state(self, state):
+        #implemented
+        for i, key in enumerate(self.state):
+            self.state[key] = state[i]
+        #when updating the gp precision parameters, the posterior mean and
+            #covariance changes, update them
+        #update covariance first as the method updates the member variables k_11
+            #and k_12, required for updating the mean
+        self.save_cov_chol()
+        self.downscale.model_field_target.update_mean()
+
+    def get_log_likelihood(self):
+        #implemented
+        return self.downscale.model_field_target.get_log_prior()
+
+    def get_log_target(self):
+        #implemented
+        return self.get_log_likelihood() + self.get_log_prior()
+
+    def get_log_prior(self):
+        ln_pdf = []
+        for key, prior in self.prior.items():
+            ln_pdf.append(prior.logpdf(self.state[key]))
+        return np.sum(ln_pdf)
+
+    def save_state(self):
+        #implemented
+        #make copy of gp precisions, posterior covariance and posterior mean
+            #of all moedel fields for all time steps
+        self.state_before = self.state.copy()
+        self.cov_chol_before = self.cov_chol.copy()
+        self.mean_before = self.downscale.model_field_target.get_prior_mean()
+
+    def revert_state(self):
+        #implemeneted
+        #revert posterior covariance and posterior mean
+        self.state = self.state_before
+        self.cov_chol_before = self.cov_chol_before
+        self.downscale.model_field_target.set_mean(self.mean_before)
+
+    def simulate_from_prior(self, rng):
+        #implemented
+        prior_simulate = []
+        for prior in self.prior.values():
+            prior.random_state = rng
+            prior_simulate.append(prior.rvs())
+        return np.asarray(prior_simulate)
+
+    def get_kernel_matrix(self, square_error):
+        """Return kernel matrix given matrix of squared errors
+        """
+        kernel_matrix = square_error.copy()
+        kernel_matrix *= -self.state["gp_precision"] / 2
+        kernel_matrix = np.exp(kernel_matrix)
+        return kernel_matrix
+
+    def save_cov_chol(self):
+        """Update member variables k_11, k_12 and cov_chol
+        """
+        self.k_11 = self.get_kernel_matrix(self.square_error_coarse)
+        self.regularise_kernel(self.k_11)
+        self.k_12 = self.get_kernel_matrix(self.square_error_coarse_fine)
+
+        k_11_chol = linalg.cholesky(self.k_11)
+        cov_chol = linalg.lstsq(k_11_chol, self.k_12, rcond=None)[0]
+        cov_chol = np.matmul(cov_chol.T, cov_chol)
+        cov_chol = self.get_kernel_matrix(self.square_error_fine) - cov_chol
+        cov_chol = linalg.cholesky(cov_chol)
+        self.cov_chol = cov_chol
+
+    def regularise_kernel(self, kernel):
+        """Add 1/sqrt(reg_precision) * identity matrix to given matrix
+        """
+        regulariser = 1/math.sqrt(self.state["reg_precision"])
+        for i in range(kernel.shape[0]):
+            kernel[i, i] += regulariser
 
 class GpRegressionMessage(object):
     """For doing gaussian process regression
@@ -438,13 +493,13 @@ class GpRegressionMessage(object):
             model_field_i -= self.shift_array[i]
             model_field_i /= self.scale_array[i]
             mean_i = np.matmul(
-                k_12_t, linalg.cho_solve((k_11, True), model_field_i))
+                k_12_t, linalg.lstsq(k_11, model_field_i, rcond=None)[0])
             mean_i *= self.scale_array[i]
             mean_i += self.shift_array[i]
             mean.append(mean_i)
         return np.concatenate(mean)
 
-class GpSimulateMessage(TargetModelField):
+class GpSimulateMessage(object):
     """For simulating model fields from the prior
 
     For simulating model fields from the prior for a given time point, designed
@@ -460,10 +515,11 @@ class GpSimulateMessage(TargetModelField):
         n_total_parameter: number of model fields x area_unmask
         cov_chol: broadcast, cholesky of kernel matrix (not covariance matrix),
             dimensions area_unmask x area_unmask
+        precision: broadcast, used to scale cov_chol
         rng: random number generator
     """
 
-    def __init__(self, model_field_target, cov_chol, rng):
+    def __init__(self, model_field_target, cov_chol, precision, rng):
         """
         Args:
             model_field_target: TargetModelField for a time point
@@ -477,6 +533,7 @@ class GpSimulateMessage(TargetModelField):
         self.area_unmask = model_field_target.area_unmask
         self.n_model_field = model_field_target.n_model_field
         self.cov_chol = cov_chol
+        self.precision = precision
         self.rng = rng
 
     def simulate_from_prior(self):
@@ -487,6 +544,14 @@ class GpSimulateMessage(TargetModelField):
                 use
         """
         #implemented
+        precision = self.precision.value()
         cov_chol = self.cov_chol.value()
-        state = self.simulate_from_prior_given_gp(cov_chol, self.rng)
+        state = TargetModelField.simulate_from_prior_given_gp(
+            self, precision, cov_chol, self.rng)
         return (state, self.rng)
+
+def get_precision_prior():
+    return stats.gamma(a=4/3, scale=3)
+
+def get_regulariser_precision_prior():
+    return stats.gamma(a=2, scale=1)
