@@ -561,6 +561,7 @@ class DownscaleDual(Downscale):
                                              self.rng,
                                              self.n_sample,
                                              self.memmap_dir)
+        self.model_field_gp_mcmc.proposal_covariance_small = 1e-8
         #ordering is important, calculate the kernel matrices then posterior
             #gaussian process mean
         self.model_field_gp_target.save_cov_chol()
@@ -605,6 +606,7 @@ class DownscaleDual(Downscale):
         """
         super().print_mcmc(directory)
         directory = path.join(directory, "chain")
+        self.read_memmap()
 
         time_index_array = self.get_random_time_index()
 
@@ -641,6 +643,8 @@ class DownscaleDual(Downscale):
             plt.ylabel(key)
             plt.savefig(path.join(directory, key + "_model_field.pdf"))
             plt.close()
+
+        self.del_memmap()
 
     def get_random_time_index(self):
         """Return array of random n_plot numbers, choose from

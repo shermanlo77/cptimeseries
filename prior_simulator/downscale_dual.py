@@ -30,7 +30,7 @@ class PriorSimulator(prior_simulator.downscale.PriorSimulator):
         for i, key in enumerate(model_field_gp_target.state):
             model_field_gp_target.state[key] = state_value[i]
         if not reg_precision is None:
-            model_field_gp_target.state["reg_precision"] = reg_precision
+            model_field_gp_target.state["regulariser_precision"] = reg_precision
         model_field_gp_target.save_cov_chol()
 
         #only interested in the first time point (to save on computation time)
@@ -70,7 +70,7 @@ class PriorSimulator(prior_simulator.downscale.PriorSimulator):
                     gp_target = downscale.model_field_gp_target
                     print("gp precision", gp_target.state["gp_precision"])
                     print("regulariser",
-                          1/math.sqrt(gp_target.state["reg_precision"]))
+                          1/math.sqrt(gp_target.state["regulariser_precision"]))
 
     def __call__(self):
         self.print()
