@@ -62,6 +62,7 @@ class Forecaster(time_series.Forecaster):
         self.memmap_path = path.join(self.memmap_dir, file_name)
 
     def simulate_forecasts(self, index_range):
+        #index_range not used
         area_unmask = self.downscale.area_unmask
         n_total_parameter = self.downscale.n_total_parameter
 

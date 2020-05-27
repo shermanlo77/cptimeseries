@@ -121,9 +121,14 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             samples in parameter_sample and z_sample.
         """
         index = rng.randint(self.burn_in, len(self.parameter_mcmc))
+        self.set_parameter_from_sample_i(index)
+        self.update_all_cp_parameters()
+
+    def set_parameter_from_sample_i(self, index):
+        """Set parameter for a specified MCMC sample
+        """
         self.set_parameter_vector(self.parameter_mcmc[index])
         self.z_array = self.z_mcmc[index]
-        self.update_all_cp_parameters()
 
     def instantiate_forecast_self(self):
         """Override - Set the parameter from the MCMC sample

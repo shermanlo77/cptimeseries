@@ -112,6 +112,7 @@ class Downscale(object):
         #unmasked points have rain, provide it to the constructor to TimeSeries
         #masked points do not have rain, cannot provide it
         time_series_array = self.time_series_array
+        TimeSeries = self.get_time_series_class()
         for lat_i in range(self.shape[0]):
             time_series_array.append([])
             for long_i in range(self.shape[1]):
@@ -119,12 +120,12 @@ class Downscale(object):
                 is_mask = self.mask[lat_i, long_i]
                 if is_mask:
                     #provide no rain
-                    time_series = TimeSeriesDownscale(
-                        x_i, poisson_rate_n_arma=n_arma,
-                        gamma_mean_n_arma=n_arma)
+                    time_series = TimeSeries(x_i,
+                                             poisson_rate_n_arma=n_arma,
+                                             gamma_mean_n_arma=n_arma)
                 else:
                     #provide rain
-                    time_series = TimeSeriesDownscale(
+                    time_series = TimeSeries(
                         x_i, rain_i.data, n_arma, n_arma)
                 #provide information to time_series
                 time_series.id = [lat_i, long_i]
@@ -144,6 +145,9 @@ class Downscale(object):
         self.n_total_parameter = self.area_unmask * self.n_parameter
         self.parameter_target = target_downscale.TargetParameter(self)
         self.parameter_gp_target = target_downscale.TargetGp(self)
+
+    def get_time_series_class(self):
+        return TimeSeriesDownscale
 
     def fit(self, pool=None):
         """Fit using Gibbs sampling
@@ -551,6 +555,10 @@ class DownscaleDual(Downscale):
 
         self.set_model_field_target_rng()
 
+    def get_time_series_class(self):
+        #override
+        return TimeSeriesDownscaleDual
+
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
@@ -685,7 +693,6 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          gamma_mean_n_arma,
                          cp_parameter_array)
         self.z_mcmc = None
-        self.model_field_mcmc_array = None
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
@@ -697,6 +704,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
 
     def forecast(self, x, n_simulation, memmap_path, i_space):
+        #override to include MCMC samples
         if self.forecaster is None:
             self.forecaster = forecast.downscale.TimeSeriesForecaster(
                 self, memmap_path, i_space)
@@ -704,6 +712,30 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         else:
             self.forecaster.memmap_path = memmap_path
             self.forecaster.resume_forecast(n_simulation)
+
+class TimeSeriesDownscaleDual(TimeSeriesDownscale):
+
+    def __init__(self,
+                 x,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
+        super().__init__(x,
+                         rainfall,
+                         poisson_rate_n_arma,
+                         gamma_mean_n_arma,
+                         cp_parameter_array)
+        self.model_field_mcmc = None
+
+    def set_parameter_from_sample_i(self, index):
+        #override
+        super().set_parameter_from_sample_i(index)
+        self.set_model_field_vector(self.model_field_mcmc[index])
+
+    def set_model_field_vector(self, model_field_vector):
+        self.x = np.reshape(
+            model_field_vector, (len(self), self.n_model_field))
 
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast
