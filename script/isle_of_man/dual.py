@@ -15,7 +15,8 @@ def main():
 
     seed = random.SeedSequence(70599994716119404436100749277178204047)
     fitter = fit.downscale.FitterDownscaleDual()
-    fitter.fit(dataset.IsleOfManWeekTraining(), seed, n_sample, pool)
+    fitter.fit(dataset.IsleOfManTraining(), seed, n_sample, pool)
+
     pool.join()
 
 if __name__ == "__main__":
