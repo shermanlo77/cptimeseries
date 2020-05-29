@@ -63,7 +63,7 @@ class Forecaster(time_series.Forecaster):
             + datetime_id + ".dat")
         self.memmap_path = path.join(self.memmap_dir, file_name)
 
-    def simulate_forecasts(self, index_range):
+    def simulate_forecasts(self, index_range, is_print=True):
         #index_range not used
         area_unmask = self.downscale.area_unmask
         n_total_parameter = self.downscale.n_total_parameter
@@ -86,7 +86,8 @@ class Forecaster(time_series.Forecaster):
                                       self.n_simulation,
                                       self.memmap_path,
                                       self.forecast_array.shape,
-                                      i_space)
+                                      i_space,
+                                      is_print)
             forecast_message.append(message)
 
         time_series_array = self.downscale.pool.map(
@@ -198,7 +199,8 @@ class ForecasterDual(Forecaster):
                         model_field_i = self.data.model_field[model_field_name]
                         model_field_i[i_time, lat_i, long_i] = x_i
 
-            super().simulate_forecasts([i_forecast])
+            super().simulate_forecasts([i_forecast], False)
+            print("Predictive sample", i_forecast)
 
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
@@ -218,7 +220,8 @@ class TimeSeriesForecaster(time_series.Forecaster):
         self.n_simulation = n_simulation
         self.memmap_shape = memmap_shape
         self.load_memmap("r+")
-        self.simulate_forecasts(range(n_simulation))
+        #False in argument to not print progress
+        self.simulate_forecasts(range(n_simulation), False)
 
     def resume_forecast(self, n_simulation, memmap_shape):
         if n_simulation > self.n_simulation:
@@ -226,7 +229,9 @@ class TimeSeriesForecaster(time_series.Forecaster):
             self.n_simulation = n_simulation
             self.memmap_shape = memmap_shape
             self.load_memmap("r+")
-            self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
+            #False in argument to not print progress
+            self.simulate_forecasts(
+                range(n_simulation_old, self.n_simulation), False)
             self.del_memmap()
 
     def load_memmap(self, mode):
@@ -243,15 +248,19 @@ class ForecastMessage(object):
                  n_simulation,
                  memmap_path,
                  memmap_shape,
-                 i_space):
+                 i_space,
+                 is_print):
         self.time_series = time_series
         self.model_field = model_field
         self.n_simulation = n_simulation
         self.memmap_path = memmap_path
         self.memmap_shape = memmap_shape
         self.i_space = i_space
+        self.is_print = is_print
 
     def forecast(self):
         self.time_series.forecast(self.model_field, self.n_simulation,
             self.memmap_path, self.memmap_shape, self.i_space)
+        if self.is_print:
+            print("Predictive location", self.i_space)
         return self.time_series

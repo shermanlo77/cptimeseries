@@ -81,7 +81,7 @@ class Forecaster(object):
         self.load_memmap("w+")
         self.simulate_forecasts(range(n_simulation))
 
-    def simulate_forecasts(self, index_range):
+    def simulate_forecasts(self, index_range, is_print=True):
         """Simulate forecasts
 
         Simulate the forecasts and save results to self.forecast_array
@@ -90,9 +90,10 @@ class Forecaster(object):
             index_range: array of points to save results onto forecast_array
         """
         for i in index_range:
-            print("Predictive sample", i)
             forecast_i = self.get_simulated_forecast()
             self.forecast_array[i] = forecast_i.y_array
+            if is_print:
+                print("Predictive sample", i)
         self.time_array = forecast_i.time_array
         self.get_forecast()
         self.del_memmap()
