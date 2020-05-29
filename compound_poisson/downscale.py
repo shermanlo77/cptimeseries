@@ -59,7 +59,8 @@ class Downscale(object):
         memmap_dir: location to store mcmc samples and forecasts
     """
 
-    def __init__(self, data, n_arma=(0,0)):
+    def __init__(self, data, n_arma=(0,0), is_test=False):
+        #is_test argument used by DownscaleForGp (see forecast/downscale.py)
         self.n_arma = n_arma
         self.time_series_array = []
         self.time_array = data.time_array
@@ -118,15 +119,15 @@ class Downscale(object):
             for long_i in range(self.shape[1]):
                 x_i, rain_i = data.get_data(lat_i, long_i)
                 is_mask = self.mask[lat_i, long_i]
-                if is_mask:
-                    #provide no rain
+                if is_mask or is_test:
+                    #provide no rain if this space is masked
+                    #or the data provided is the test set
                     time_series = TimeSeries(x_i,
                                              poisson_rate_n_arma=n_arma,
                                              gamma_mean_n_arma=n_arma)
                 else:
                     #provide rain
-                    time_series = TimeSeries(
-                        x_i, rain_i.data, n_arma, n_arma)
+                    time_series = TimeSeries(x_i, rain_i.data, n_arma, n_arma)
                 #provide information to time_series
                 time_series.id = [lat_i, long_i]
                 time_series.x_shift = self.model_field_shift
@@ -335,14 +336,16 @@ class Downscale(object):
         self.scatter_z_mcmc_sample()
 
         if self.forecaster is None:
-            self.forecaster = forecast.downscale.Forecaster(
-                self, self.memmap_dir)
+            self.forecaster = self.instantiate_forecaster()
             self.forecaster.start_forecast(n_simulation, data)
         else:
             self.forecaster.resume_forecast(n_simulation)
 
         self.del_z_mcmc_sample()
         self.del_memmap()
+
+    def instantiate_forecaster(self):
+        return forecast.downscale.Forecaster(self, self.memmap_dir)
 
     def print_mcmc(self, directory):
         """Print the mcmc chains
@@ -536,8 +539,8 @@ class DownscaleDual(Downscale):
         model_field_gp_mcmc: mcmc object wrapping model_field_gp_target
     """
 
-    def __init__(self, data, n_arma=(0,0)):
-        super().__init__(data, n_arma)
+    def __init__(self, data, n_arma=(0,0), is_test=False):
+        super().__init__(data, n_arma, is_test)
         self.model_field_coarse = data.model_field_coarse
         self.topography_coarse_normalise = data.topography_coarse_normalise
         self.n_coarse = None
@@ -677,6 +680,13 @@ class DownscaleDual(Downscale):
         super().set_rng(seed_sequence)
         self.set_model_field_target_rng()
 
+    def set_mcmc_index(self, mcmc_index):
+        for time_series in self.generate_unmask_time_series():
+            time_series.mcmc_index = mcmc_index
+
+    def instantiate_forecaster(self):
+        return forecast.downscale.ForecasterDual(self, self.memmap_dir)
+
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
     """Modify TimeSeriesSlice to only sample z
     """
@@ -703,17 +713,20 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         self.parameter_mcmc = None
         self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
 
-    def forecast(self, x, n_simulation, memmap_path, i_space):
+    def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
         #override to include MCMC samples
         if self.forecaster is None:
             self.forecaster = forecast.downscale.TimeSeriesForecaster(
                 self, memmap_path, i_space)
-            self.forecaster.start_forecast(n_simulation, x)
+            self.forecaster.start_forecast(n_simulation, x, memmap_shape)
         else:
             self.forecaster.memmap_path = memmap_path
-            self.forecaster.resume_forecast(n_simulation)
+            self.forecaster.resume_forecast(n_simulation, memmap_shape)
 
 class TimeSeriesDownscaleDual(TimeSeriesDownscale):
+
+    #change of behaviour: set_parameter_from_sample() require self.mcmc_index to
+        #to be set
 
     def __init__(self,
                  x,
@@ -727,11 +740,12 @@ class TimeSeriesDownscaleDual(TimeSeriesDownscale):
                          gamma_mean_n_arma,
                          cp_parameter_array)
         self.model_field_mcmc = None
+        self.mcmc_index = None
 
     def set_parameter_from_sample_i(self, index):
         #override
-        super().set_parameter_from_sample_i(index)
-        self.set_model_field_vector(self.model_field_mcmc[index])
+        #to ensure all time series in this downscale use same mcmc sample
+        super().set_parameter_from_sample_i(self.mcmc_index)
 
     def set_model_field_vector(self, model_field_vector):
         self.x = np.reshape(
