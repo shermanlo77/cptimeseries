@@ -87,7 +87,9 @@ class Forecaster(object):
         Simulate the forecasts and save results to self.forecast_array
 
         Args:
-            index_range: array of points to save results onto forecast_array
+            index_range: array of pointers to save results onto forecast_array
+                eg [0,1,2,3] for the first 4 inital forecasts, then [4,5,6] for
+                3 more
         """
         for i in index_range:
             forecast_i = self.get_simulated_forecast()
@@ -129,7 +131,7 @@ class Forecaster(object):
                 os.remove(memmap_path_old)
 
     def load_memmap(self, mode):
-        """Load the memmap file fore forecast_array
+        """Load the memmap file for forecast_array
 
         Args:
             mode: how to read the memmap file, eg "w+", "r+", "r"
@@ -170,11 +172,15 @@ class Forecaster(object):
         return p_rain
 
     def get_roc_curve(self, rain_warning, rain_true):
-        """Plot ROC curve, with area under curve as label
+        """Return ROC curve, with area under curve as label
 
         Args:
             rain_warning: the amount of precipitation to be detected
             rain_true: observed precipitation, array, for each time point
+
+        Return:
+            roc.Roc object, other None is returned if rain larger than
+                rain_warning was never observed
         """
         if np.any(rain_true > rain_warning):
             p_rain_warning = self.get_prob_rain(rain_warning)
