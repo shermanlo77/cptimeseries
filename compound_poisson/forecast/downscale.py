@@ -10,37 +10,27 @@ from scipy import stats
 import compound_poisson
 from compound_poisson import roc
 from compound_poisson.forecast import time_series
+from compound_poisson.forecast import forecast_abstract
 
-class Forecaster(time_series.Forecaster):
+class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts for Downscale
-
-    See superclass time_series.Forecaster. Forecasts each location independently
-        and in parallel. Each location will recieve different MCMC samples to be
-        able to implement independent parallel forecats.
 
     Attributes:
         downscale: Downscale object, to forecast from
-        time_array: array, containing dates for each point in the forecast
         data: the test set (dataset.Data object)
         forecast_array: memmap of forecasts
             dim 0: for each (unmasked) location
             dim 1: for each simulation
             dim 2: for each time point
-        n_time: number of time points
-        n_simulation: number of simulations to be done
-        memmap_dir: directory to forecast_array memmap file
-        memmap_path: file path to forecast_array memmap file
     """
 
     def __init__(self, downscale, memmap_dir):
         self.downscale = downscale
-        self.time_array = None
         self.data = None
-        self.forecast_array = None
-        self.n_time = None
-        self.n_simulation = 0
-        self.memmap_dir = memmap_dir
-        self.memmap_path = None
+        super().__init__(memmap_dir)
+
+    def make_memmap_path(self):
+        super().make_memmap_path(type(self.downscale).__name__)
 
     def start_forecast(self, n_simulation, data):
         """Start forecast simulations, to be called initially
@@ -51,62 +41,15 @@ class Forecaster(time_series.Forecaster):
         """
         self.data = data
         self.n_time = len(data)
-        self.n_simulation = n_simulation
         self.time_array = data.time_array
-        self.make_memmap_path()
-        self.load_memmap("w+")
-        self.simulate_forecasts(range(n_simulation))
-        self.del_memmap()
+        super().start_forecast(n_simulation)
 
-    def resume_forecast(self, n_simulation):
-        """Simulate more forecasts
-
-        Args:
-            n_simulation: total amount of simulations, ie should be higher than
-                previous
-        """
-        if n_simulation > self.n_simulation:
-            n_simulation_old = self.n_simulation
-            #transfer forecasts from old file to new file
-            memmap_path_old = self.memmap_path
-            self.load_memmap("r")
-            forecast_array_old = self.forecast_array
-            self.n_simulation = n_simulation
-            self.make_memmap_path()
-            self.load_memmap("w+")
-            for i in range(len(self.forecast_array)):
-                self.forecast_array[i, 0:n_simulation_old] = (
-                    forecast_array_old[i])
-            del forecast_array_old
-            #simulate more forecasts
-            self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
-            if path.exists(memmap_path_old):
-                os.remove(memmap_path_old)
-            self.del_memmap()
-
-    def make_memmap_path(self):
-        """Make a new memmap file name
-
-        Uses datetime to make it unique and identifiable
-        """
-        datetime_id = str(datetime.datetime.now())
-        datetime_id = datetime_id.replace("-", "")
-        datetime_id = datetime_id.replace(":", "")
-        datetime_id = datetime_id.replace(" ", "")
-        datetime_id = datetime_id[0:14]
-        file_name = ("_" + type(self).__name__ + type(self.downscale).__name__
-            + datetime_id + ".dat")
-        self.memmap_path = path.join(self.memmap_dir, file_name)
+    def copy_to_memmap(self, memmap_to_copy):
+        for i in range(len(self.forecast_array)):
+            memmap_to_copy_i = memmap_to_copy[i]
+            self.forecast_array[i, 0:len(memmap_to_copy_i)] = memmap_to_copy_i
 
     def simulate_forecasts(self, index_range, is_print=True):
-        """Simulate forecasts
-
-        Simulate the forecasts and save results to self.forecast_array
-
-        Args:
-            index_range: not used
-            is_print: to print progress for every sample
-        """
         area_unmask = self.downscale.area_unmask
         n_total_parameter = self.downscale.n_total_parameter
 
@@ -136,33 +79,6 @@ class Forecaster(time_series.Forecaster):
             ForecastMessage.forecast, forecast_message)
         self.downscale.replace_unmask_time_series(time_series_array)
 
-    def load_memmap(self, mode):
-        """Load the memmap file for forecast_array
-
-        Args:
-            mode: how to read the memmap file, eg "w+", "r+", "r"
-        """
-        self.forecast_array = np.memmap(self.memmap_path,
-                                        np.float64,
-                                        mode,
-                                        shape=(self.downscale.area_unmask,
-                                               self.n_simulation,
-                                               self.n_time))
-
-    def del_memmap(self):
-        """Delete the file handling
-        """
-        del self.forecast_array
-        self.forecast_array = None
-
-    def generate_time_series_forecaster(self):
-        """Generate the forecaster for every unmasked time series
-        """
-        for time_series in self.downscale.generate_unmask_time_series():
-            forecaster = time_series.forecaster
-            forecaster.load_memmap("r")
-            yield time_series.forecaster
-
     def get_prob_rain(self, rain, index=None):
         """Get the probability if it will rain at least of a certian amount
 
@@ -182,6 +98,18 @@ class Forecaster(time_series.Forecaster):
             #dim 2 is for each time point
         p_rain = np.mean(self.forecast_array[:, :, index] > rain, 1)
         return p_rain
+
+    def load_memmap(self, mode):
+        super().load_memmap(
+            mode, (self.downscale.area_unmask, self.n_simulation, self.n_time))
+
+    def generate_time_series_forecaster(self):
+        """Generate the forecaster for every unmasked time series
+        """
+        for time_series in self.downscale.generate_unmask_time_series():
+            forecaster = time_series.forecaster
+            forecaster.load_memmap("r")
+            yield time_series.forecaster
 
     def get_roc_curve_array(
         self, rain_warning_array, test_set, time_index=None):
@@ -333,13 +261,18 @@ class TimeSeriesForecaster(time_series.Forecaster):
             model_field: model fields for test set
             memmap_shape: shape of the forecast_array
         """
-        self.model_field = model_field
-        self.n_time = len(model_field)
-        self.n_simulation = n_simulation
         self.memmap_shape = memmap_shape
-        self.load_memmap("r+")
-        #False in argument to not print progress
-        self.simulate_forecasts(range(n_simulation), False)
+        self.model_field = model_field
+        super().start_forecast(n_simulation, model_field)
+
+    def make_memmap_path(self):
+        """Do nothing, memmap_path has already been provided
+        """
+        pass
+
+    def simulate_forecasts(self, index_range):
+        #do not print progress
+        super().simulate_forecasts(index_range, False)
 
     def resume_forecast(self, n_simulation, memmap_shape):
         """Simulate more forecasts
@@ -353,13 +286,12 @@ class TimeSeriesForecaster(time_series.Forecaster):
             memmap_shape: shape of the forecast_array
         """
         if n_simulation > self.n_simulation:
+            self.memmap_shape = memmap_shape
             n_simulation_old = self.n_simulation
             self.n_simulation = n_simulation
-            self.memmap_shape = memmap_shape
             self.load_memmap("r+")
             #False in argument to not print progress
-            self.simulate_forecasts(
-                range(n_simulation_old, self.n_simulation), False)
+            self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
             self.del_memmap()
 
     def load_memmap(self, mode):
@@ -371,8 +303,7 @@ class TimeSeriesForecaster(time_series.Forecaster):
         Args:
             mode: how to read the memmap file, eg "w+", "r+", "r"
         """
-        self.forecast_array = np.memmap(
-            self.memmap_path, np.float64, mode, shape=self.memmap_shape)
+        super().load_memmap(mode, self.memmap_shape)
         self.forecast_array = self.forecast_array[self.i_space]
 
 class ForecastMessage(object):
