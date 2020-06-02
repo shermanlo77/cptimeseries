@@ -262,7 +262,6 @@ class TimeSeriesForecaster(time_series.Forecaster):
             memmap_shape: shape of the forecast_array
         """
         self.memmap_shape = memmap_shape
-        self.model_field = model_field
         super().start_forecast(n_simulation, model_field)
 
     def make_memmap_path(self):
@@ -301,8 +300,10 @@ class TimeSeriesForecaster(time_series.Forecaster):
             with all spatial points so extract the corresponding slice.
 
         Args:
-            mode: how to read the memmap file, eg "w+", "r+", "r"
+            mode: not used, force "r+", prevent a "w+" because the memmap is
+                already created
         """
+        mode = "r+"
         super().load_memmap(mode, self.memmap_shape)
         self.forecast_array = self.forecast_array[self.i_space]
 

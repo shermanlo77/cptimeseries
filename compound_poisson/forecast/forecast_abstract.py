@@ -53,7 +53,8 @@ class Forecaster(object):
         datetime_id = datetime_id.replace(":", "")
         datetime_id = datetime_id.replace(" ", "")
         datetime_id = datetime_id[0:14]
-        file_name = ("_" + type(self).__name__ + description + datetime_id + ".dat")
+        file_name = ("_" + type(self).__name__ + description
+            + datetime_id + ".dat")
         self.memmap_path = path.join(self.memmap_dir, file_name)
 
     def start_forecast(self, n_simulation):
