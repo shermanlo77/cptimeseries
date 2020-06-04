@@ -156,7 +156,9 @@ def forecast(forecast, observed_rain, directory, prefix=""):
 
     time_array = forecast.time_array
     year_index_dir = get_year_index_dir(time_array)
+    year_array = np.asarray(list(year_index_dir))
 
+    rmse_array = []
     auc_array = {}
     for rain in RAIN_THRESHOLD_ARRAY:
         auc_array[rain] = []
@@ -165,6 +167,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
 
         forecast_sliced = forecast[index]
         observed_rain_i = observed_rain[index]
+        rmse_array.append(forecast_sliced.get_error_rmse(observed_rain_i))
 
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
@@ -242,12 +245,18 @@ def forecast(forecast, observed_rain, directory, prefix=""):
         label = str(rain) + " mm"
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
-        year = np.asarray(list(year_index_dir))
-        plt.plot(year[is_number], auc[is_number], '-o', label=label)
+        plt.plot(year_array[is_number], auc[is_number], '-o', label=label)
     plt.legend()
     plt.xlabel("year")
     plt.ylabel("area under curve")
     plt.savefig(path.join(directory, prefix + "_auc.pdf"))
+    plt.close()
+
+    plt.figure()
+    plt.plot(year_array, rmse_array, '-o')
+    plt.xlabel("year")
+    plt.ylabel("root mean square error (mm)")
+    plt.savefig(path.join(directory, prefix + "_rmse.pdf"))
     plt.close()
 
     plt.figure()
@@ -259,21 +268,19 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
-    file = open(path.join(directory, prefix + "_errors.txt"), "w")
-    file.write("Deviance: ")
-    file.write(str(forecast.get_error_square_sqrt(observed_rain)))
-    file.write("\n")
-    file.write("Rmse: ")
-    file.write(str(forecast.get_error_rmse(observed_rain)))
-    file.write("\n")
-    file.close()
-
     forecast.del_memmap()
 
 def downscale_forecast(forecast_array, test_set, directory, pool):
     forecast_array.load_memmap("r")
     forecast_map = ma.empty_like(test_set.rain)
     downscale = forecast_array.downscale
+    rmse_map = ma.empty_like(test_set.rain[0])
+    year_index_dir = get_year_index_dir(forecast_array.time_array)
+    year_array = np.asarray(list(year_index_dir))
+    auc_array = {}
+    rmse_array = []
+    for rain in RAIN_THRESHOLD_ARRAY:
+        auc_array[rain] = []
 
     series_dir = path.join(directory, "series_forecast")
     if not path.isdir(series_dir):
@@ -282,11 +289,14 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
     if not path.isdir(map_dir):
         os.mkdir(map_dir)
 
-    for time_series in downscale.generate_unmask_time_series():
-        lat_i = time_series.id[0]
-        long_i = time_series.id[1]
-        forecaster = time_series.forecaster
+    for time_series_i, observed_rain_i in (
+        zip(downscale.generate_unmask_time_series(),
+            test_set.generate_unmask_rain())):
+        lat_i = time_series_i.id[0]
+        long_i = time_series_i.id[1]
+        forecaster = time_series_i.forecaster
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
+        rmse_map[lat_i, long_i] = forecaster.get_error_rmse(observed_rain_i)
 
     #plot the rain
     angle_resolution = dataset.ANGLE_RESOLUTION
@@ -306,6 +316,18 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
         message_array.append(message)
     pool.map(PrintForecastMapMessage.print, message_array)
 
+    #plot rmse
+    plt.figure()
+    ax = plt.axes(projection=crs.PlateCarree())
+    im = ax.pcolor(longitude_grid,
+                   latitude_grid,
+                   rmse_map)
+    ax.coastlines(resolution="50m")
+    plt.colorbar(im)
+    ax.set_aspect("auto", adjustable=None)
+    plt.savefig(path.join(directory, "rmse_map.pdf"))
+    plt.close()
+
     #plot the forecast for each location
     message_array = []
     for time_series_i, observed_rain_i in (
@@ -316,12 +338,7 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
         message_array.append(message)
     pool.map(PrintForecastSeriesMessage.print, message_array)
 
-    year_index_dir = get_year_index_dir(forecast_array.time_array)
-    auc_array = {}
-    for rain in RAIN_THRESHOLD_ARRAY:
-        auc_array[rain] = []
-
-    for year, index in year_index_dir.items():
+    for (year, index) in year_index_dir.items():
         plt.figure()
         roc_curve_array = forecast_array.get_roc_curve_array(
             RAIN_THRESHOLD_ARRAY, test_set, index)
@@ -336,17 +353,36 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
         plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
         plt.close()
 
+        rmse_array_i = []
+        for time_series_i, observed_rain_i in (
+            zip(downscale.generate_unmask_time_series(),
+                test_set.generate_unmask_rain())):
+            forecaster_i = time_series_i.forecaster
+            forecaster_i.load_memmap("r")
+            forecast_sliced_i = time_series_i.forecaster[index]
+            observed_rain_sliced_i = observed_rain_i[index]
+            rmse_array_i.append(forecast_sliced_i.get_error_rmse(
+                observed_rain_sliced_i))
+            forecaster_i.del_memmap()
+        rmse_array.append(math.sqrt(np.mean(np.square(rmse_array_i))))
+
     plt.figure()
     for rain in RAIN_THRESHOLD_ARRAY:
         label = str(rain) + " mm"
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
-        year = np.asarray(list(year_index_dir))
-        plt.plot(year[is_number], auc[is_number], '-o', label=label)
+        plt.plot(year_array[is_number], auc[is_number], '-o', label=label)
     plt.legend()
     plt.xlabel("year")
     plt.ylabel("area under curve")
     plt.savefig(path.join(directory, "auc.pdf"))
+    plt.close()
+
+    plt.figure()
+    plt.plot(year_array, rmse_array, '-o')
+    plt.xlabel("year")
+    plt.ylabel("root mean square error (mm)")
+    plt.savefig(path.join(directory, "rmse.pdf"))
     plt.close()
 
     plt.figure()

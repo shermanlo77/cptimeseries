@@ -126,7 +126,7 @@ class Forecaster(forecast_abstract.Forecaster):
             root mean square error
         """
         n = len(true_y)
-        return np.sqrt(np.sum(np.square(self.forecast - true_y)) / n)
+        return np.sqrt(np.sum(np.square(self.forecast_median - true_y)) / n)
 
     def get_error_square_sqrt(self, true_y):
         """Return square mean sqrt error
