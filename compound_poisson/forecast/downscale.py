@@ -12,6 +12,11 @@ from compound_poisson import roc
 from compound_poisson.forecast import time_series
 from compound_poisson.forecast import forecast_abstract
 
+#note to future developer: only forecasting of the test set (future) has been
+    #implemented. Implementation of forecasting the training set should handle
+    #rng like time_series, a rng(s) for forecasting training set, another rng(s)
+    #for test set
+
 class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts for Downscale
 
@@ -194,6 +199,8 @@ class ForecasterDual(Forecaster):
         future_downscale = compound_poisson.DownscaleDual(
             self.data, self.downscale.n_arma, True) #true to show test data
         future_downscale.pool = self.downscale.pool
+        future_downscale.model_field_target.rng_array = (
+            self.downscale.model_field_target.rng_array)
 
         for i_forecast in index_range:
             #force to do one forecast for every mcmc sample
@@ -210,8 +217,7 @@ class ForecasterDual(Forecaster):
             #sample test set model field GP
             future_downscale.model_field_gp_target.update_state(gp_sample)
             model_field_sample = (
-                future_downscale.model_field_target.simulate_from_prior(
-                    self.rng))
+                future_downscale.model_field_target.simulate_from_prior())
 
             #see mcmc/target_model_field.py for the layout of the vector
                 #model_field_sample

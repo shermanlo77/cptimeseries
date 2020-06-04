@@ -223,9 +223,11 @@ class TargetModelFieldArray(target.Target):
             mean_i = mean[i*self.n_parameter_i : (i+1)*self.n_parameter_i]
             target.set_mean(mean_i)
 
-    def simulate_from_prior(self, rng):
+    def simulate_from_prior(self, rng=None):
         #implemented
-        #provided rng not used as this is to be parallised
+        #provided rng not used as this is to be parallised using multiple
+            #independent rng
+        #rng can be set by using the method set_rng_array()
         message_array = []
         pool = self.downscale.pool
         gp_target = self.downscale.model_field_gp_target
