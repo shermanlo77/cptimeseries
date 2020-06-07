@@ -1,3 +1,6 @@
+"""Wrapper classes for different multiprocess objects such as MPI.
+"""
+
 import multiprocessing
 
 from abcpy import backends
@@ -8,6 +11,8 @@ N_PROCESSESS = None
 CHUNKSIZE = 1
 
 class Serial(object):
+    """Does tasks in serial (for debugging purposes)
+    """
 
     def __init__(self):
         pass
@@ -25,6 +30,10 @@ class Serial(object):
         pass
 
 class MPIPoolExecutor(Serial):
+    """Uses mpi4py.futures.MPIPoolExecutor
+
+    To call, use, for example,: mpiexec -n 8 python3 -m mpi4py.futures script.py
+    """
 
     def __init__(self):
         self.pool = futures.MPIPoolExecutor()
@@ -34,7 +43,15 @@ class MPIPoolExecutor(Serial):
         results = list(results)
         return results
 
+    def join(self):
+        self.pool.shutdown()
+
 class Pool(Serial):
+    """Uses multiprocessing.Pool
+
+    Number of workers defined by the global variable N_PROCESSESS, default is
+        None which uses the default number of workers
+    """
 
     def __init__(self):
         self.pool = multiprocessing.Pool(N_PROCESSESS)
@@ -48,6 +65,10 @@ class Pool(Serial):
         self.pool.join()
 
 class BackendMPI(Serial):
+    """Uses abcpy.backends.BackendMPI
+
+    To call, use, for example,: mpiexec -np 8 python3 script.py
+    """
 
     def __init__(self):
         self.pool = backends.BackendMPI()
