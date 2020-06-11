@@ -15,7 +15,7 @@ def main():
 
     seed = random.SeedSequence(41678064398867675209821814469664968203)
     fitter = fit.downscale.FitterDownscaleDual()
-    fitter.fit(dataset.WalesTest10(), seed, n_sample, pool)
+    fitter.fit(dataset.Wales10Test(), seed, n_sample, pool)
 
     pool.join()
 
