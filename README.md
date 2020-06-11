@@ -69,6 +69,8 @@ Results are saved in the `result` directory. Delete it if you wish to restart th
   * Training set: 1979-1999 inclusive
   * Test set: 2000-2019 inclusive
 
+For the Wales dataset, use `mpiexec -n 8 python3 -m mpi4py.futures downscale.py` to use 8 threads for example.
+
 Run the script `downscale.py` and `dual.py` to do MCMC sampling without/with model field sampling respectively. Afterwards, run the script `downscale_forecast.py` and/or `dual_forecast.py` to do forecast sampling without/with model field sampling respectively.
 
 The options may be provided which may be useful for development or debugging purposes. The following examples are provided:
