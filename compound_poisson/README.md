@@ -19,3 +19,6 @@ Under the hood code for Bayesian inference for spatial-temporal compound-Poisson
   * Developers note: `TimeSeriesDownscale` and `TimeSeriesDownscaleDual` are subclasses of `TimeSeriesSlice` and are used in the `Downscale` family of classes.
 * `print.py` contains functions for plotting figures for `TimeSeries` and `Forecaster` objects.
 * `roc.py` contain a class for plotting ROC curves. Used by `print.py` and `forecast`.
+* `multiprocess.py` contain wrapper classes for multi-thread work. Adjusting the instantiation of objects for multi-thread work can be done here. Please refer to the manual of the corresponding package when using MPI:
+  * [mpi4py.futures](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html)
+  * [abcpy.backends](https://abcpy.readthedocs.io/en/v0.5.7/parallelization.html)
