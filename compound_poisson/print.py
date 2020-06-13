@@ -3,6 +3,7 @@
 These functions could be made to methods for the corresponding classes...
 """
 
+import datetime
 import math
 import os
 from os import path
@@ -185,6 +186,16 @@ def get_year_index_dir(time_array):
         year_index_dir[year] = slice(index[0], index[-1]+1)
     return year_index_dir
 
+def convert_year_to_date(year_array):
+    """Convert array of years (integer or float) to datetime object
+
+    Month 1, day 1 used
+    """
+    date_array = []
+    for year in year_array:
+        date_array.append(datetime.date(year, 1, 1))
+    return date_array
+
 def forecast(forecast, observed_rain, directory, prefix=""):
     """For plotting compound_poisson.forecast.time_series.Forecaster objects
 
@@ -321,7 +332,8 @@ def forecast(forecast, observed_rain, directory, prefix=""):
         label = str(rain) + " mm"
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
-        plt.plot(year_array[is_number], auc[is_number], '-o', label=label)
+        year_plot = convert_year_to_date(year_array[is_number])
+        plt.plot(year_plot, auc[is_number], '-o', label=label)
     plt.legend()
     plt.xlabel("year")
     plt.ylabel("area under curve")
@@ -330,7 +342,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
 
     #plot rmse for each year
     plt.figure()
-    plt.plot(year_array, rmse_array, '-o')
+    plt.plot(convert_year_to_date(year_array), rmse_array, '-o')
     plt.xlabel("year")
     plt.ylabel("root mean square error (mm)")
     plt.savefig(path.join(directory, prefix + "_rmse.pdf"))
@@ -485,7 +497,8 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
         label = str(rain) + " " + rain_units
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
-        plt.plot(year_array[is_number], auc[is_number], '-o', label=label)
+        year_plot = convert_year_to_date(year_array[is_number])
+        plt.plot(year_plot, auc[is_number], '-o', label=label)
     plt.legend()
     plt.xlabel("year")
     plt.ylabel("area under curve")
@@ -494,7 +507,7 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
 
     #plot rmse for each year
     plt.figure()
-    plt.plot(year_array, rmse_array, '-o')
+    plt.plot(convert_year_to_date(year_array), rmse_array, '-o')
     plt.xlabel("year")
     plt.ylabel("root mean square error (" + rain_units + ")")
     plt.savefig(path.join(directory, "rmse.pdf"))
