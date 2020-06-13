@@ -170,14 +170,24 @@ class ForecasterDual(Forecaster):
         achieved.
 
     Attributes:
-        rng: spawned rng to sample from the MCMC samples
+        rng: rng to select a sample from the MCMC samples
+        rng_array: spawned rng to sample the model fields for each time point
     """
 
     def __init__(self, downscale, memmap_dir):
         super().__init__(downscale, memmap_dir)
         #rng used so that all time series in the forecast use the same mcmc
             #sample
-        self.rng = downscale.spawn_rng()
+	self.rng = None
+        self.rng_array = []
+
+    def start_forecast(self, n_simulation, data):
+        #override
+        #spawn multiple rng
+        self.n_time = len(data)
+        self.rng = self.downscale.spawn_rng(1)
+        self.rng_array = self.downscale.spawn_rng(self.n_time)
+        super().start_forecast(n_simulation, data)
 
     def simulate_forecasts(self, index_range):
         """Simulate forecasts
@@ -199,8 +209,7 @@ class ForecasterDual(Forecaster):
         future_downscale = compound_poisson.DownscaleDual(
             self.data, self.downscale.n_arma, True) #true to show test data
         future_downscale.pool = self.downscale.pool
-        future_downscale.model_field_target.rng_array = (
-            self.downscale.model_field_target.rng_array)
+        future_downscale.model_field_target.rng_array = self.rng_array
 
         for i_forecast in index_range:
             #force to do one forecast for every mcmc sample
