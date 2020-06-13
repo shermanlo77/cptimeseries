@@ -461,6 +461,7 @@ def downscale_forecast(forecast_array, test_set, directory, pool):
     pool.map(PrintForecastSeriesMessage.print, message_array)
 
     #for each year, plot roc curve, get rmse
+    #current implementation makes parallelising this too RAM intensive
     for (year, index) in year_index_dir.items():
         plt.figure()
         roc_curve_array = forecast_array.get_roc_curve_array(
