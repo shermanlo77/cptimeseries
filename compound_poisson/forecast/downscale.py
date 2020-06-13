@@ -178,7 +178,7 @@ class ForecasterDual(Forecaster):
         super().__init__(downscale, memmap_dir)
         #rng used so that all time series in the forecast use the same mcmc
             #sample
-	self.rng = None
+        self.rng = None
         self.rng_array = []
 
     def start_forecast(self, n_simulation, data):
