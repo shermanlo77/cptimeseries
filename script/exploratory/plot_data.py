@@ -1,14 +1,20 @@
-#!/usr/bin/python
+"""Functions for exploratory analysis
 
-#script exploratory analysis
-#
-#variables looked at: rainfall, model fields over space and time
-#cities looked at: London, Cardiff, Edinburgh, Belfast, Dublin
-#
-#plot mean (over time) for each point in space (as a heat map)
-#plot time series for each city (along with acf and pacf
-#scatter plot yesterday and today rainfall for each city
-#matrix plot of all the variables for each city
+Variables looked at:
+    precipitation (fine grid) over space and time
+    model fields (coarse grid but also fine grid using default interpolation)
+        over space and time
+    topography over space (fine grid but also coarse grid using default
+        interpolation)
+Cities looked at:
+    London
+    Cardiff (exact coordinates cannot be used as the resolution used would get
+        an area over water)
+    Edinburgh
+    Belfast
+    Dublin
+    and more can be hard coded
+"""
 
 import math
 import os
@@ -25,6 +31,18 @@ from statsmodels.tsa import stattools
 import dataset
 
 def plot_data(data):
+    """For plotting figures given the dataset
+
+    See the individual functions for description of figures:
+        plot_rain()
+        plot_model_fields()
+        plot_matrix()
+        plot_topography()
+
+    Args:
+        data: dataset.data object
+    """
+
     #required so that python datetime can be converted and can be plotted on a
         #graph
     pd.plotting.register_matplotlib_converters()
@@ -44,6 +62,22 @@ def plot_data(data):
     plot_topography(data, figure_dir)
 
 def plot_rain(data, figure_dir):
+    """Plot figures for the precipitation
+
+    Plots:
+        Mean precipitation over time (heatmap)
+        For each city:
+            precipitation time series
+            cdf
+            acf
+            pacf
+        For each time (first year for now):
+            observed precipitation (heatmap)
+
+    Args:
+        data: dataset.data object
+        figure_dir: where to save the figures
+    """
     rain_dir = path.join(figure_dir, "rain")
     if not path.isdir(rain_dir):
         os.mkdir(rain_dir)
@@ -149,6 +183,22 @@ def plot_rain(data, figure_dir):
         plt.close()
 
 def plot_model_fields(data, figure_dir):
+    """Plot figures for the model fields
+
+    Plots:
+        For each time (first year for now):
+            observed model fields (heatmap) on coarse grid
+            observed model fields (heatmap) on fine grid
+        For each city (intepolationg required):
+            model fields time series
+            acf
+            pacf
+
+    Args:
+        data: dataset.data object
+        figure_dir: where to save the figures
+    """
+
     mf_dir = path.join(figure_dir, "model_field")
     if not path.isdir(mf_dir):
         os.mkdir(mf_dir)
@@ -177,11 +227,13 @@ def plot_model_fields(data, figure_dir):
     if not path.isdir(coarse_mean_dir):
         os.mkdir(coarse_mean_dir)
 
+    #create array to loop over different grids (fine grid then coarse grid)
     latitude_array = [latitude_grid, latitude_coarse_grid]
     longitude_array = [longitude_grid, longitude_coarse_grid]
     model_field_array = [data.model_field, data.model_field_coarse]
     dir_array = [fine_mean_dir, coarse_mean_dir]
 
+    #for fine grid, then coarse grid
     for i, dir in enumerate(dir_array):
         #for each model field
         for model_field, value in model_field_array[i].items():
@@ -207,11 +259,12 @@ def plot_model_fields(data, figure_dir):
         os.mkdir(coarse_map_dir)
     dir_array  = [fine_map_dir, coarse_map_dir]
 
+    #for each grid (eg coarse and fine)
     for i, dir in enumerate(dir_array):
         #for each model field
         for model_field, value in model_field_array[i].items():
             for i_time in range(365):
-                #plot the mean model field (over time) as a heat map
+                #heatmap plot
                 plt.figure()
                 ax = plt.axes(projection=crs.PlateCarree())
                 im = ax.pcolor(longitude_array[i],
@@ -275,11 +328,18 @@ def plot_model_fields(data, figure_dir):
             plt.close()
 
 def plot_matrix(data, figure_dir):
-    ##########          MATRIX PLOT          ##########
+    """Plot figures for the topography
+
+    The model fields will need to be interpolated
+
+    Args:
+        data: dataset.data object
+        figure_dir: where to save the figures
+    """
     figure_dir = path.join(figure_dir, "matrix")
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
-    #for each captial, do matrix plot of all the variables
+    #for each city, do matrix plot of all the variables
     for city in dataset.CITY_LOCATION:
 
         data_frame = {}
@@ -296,6 +356,14 @@ def plot_matrix(data, figure_dir):
         plt.close()
 
 def plot_topography(data, figure_dir):
+    """Matrix plot for the precipitation and model fields for each city
+
+    Both on fine grid and coarse grid, interpolate from fine grid to coarse grid
+
+    Args:
+        data: dataset.data object
+        figure_dir: where to save the figures
+    """
     topo_dir = path.join(figure_dir, "topography")
     if not path.isdir(topo_dir):
         os.mkdir(topo_dir)
