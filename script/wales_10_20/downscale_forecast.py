@@ -15,7 +15,7 @@ def main():
     n_simulation = parser.parse_args().sample
     burn_in = parser.parse_args().burnin
     if burn_in is None:
-        burn_in = 1000
+        burn_in = 3000
     is_print = not parser.parse_args().noprint
 
     fitter = fit.downscale.FitterDownscale()
