@@ -17,6 +17,7 @@ Cities looked at:
 """
 
 import math
+import multiprocessing
 import os
 from os import path
 import pathlib
@@ -56,12 +57,14 @@ def plot_data(data):
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
 
-    plot_rain(data, figure_dir)
-    plot_model_fields(data, figure_dir)
+    pool = multiprocessing.Pool()
+
+    plot_rain(data, figure_dir, pool)
+    plot_model_fields(data, figure_dir, pool)
     plot_matrix(data, figure_dir)
     plot_topography(data, figure_dir)
 
-def plot_rain(data, figure_dir):
+def plot_rain(data, figure_dir, pool):
     """Plot figures for the precipitation
 
     Plots:
@@ -161,28 +164,48 @@ def plot_rain(data, figure_dir):
         plt.close()
 
     #plot the rain
+    message_array = []
     for i in range(365):
-
         rain_plot = data.rain[i].copy()
         rain_plot.mask[rain_plot == 0] = True
+        figure_title = ("precipitation (" + data.rain_units + ") : "
+            + str(data.time_array[i]))
+        path_to_figure = path.join(map_dir, str(i) + ".png")
 
+        message = HeatmapPlotMessage(longitude_grid,
+                                     latitude_grid,
+                                     rain_plot,
+                                     figure_title,
+                                     path_to_figure)
+        message_array.append(message)
+    pool.map(HeatmapPlotMessage.print, message_array)
+
+
+class HeatmapPlotMessage(object):
+
+    def __init__(
+        self, longitude_grid, latitude_grid, value, title, path_to_figure):
+        self.longitude_grid = longitude_grid
+        self.latitude_grid = latitude_grid
+        self.value = value
+        self.title = title
+        self.path_to_figure = path_to_figure
+
+    def print(self):
         plt.figure()
         ax = plt.axes(projection=crs.PlateCarree())
-        im = ax.pcolor(longitude_grid,
-                       latitude_grid,
-                       rain_plot,
-                       vmin=0,
-                       vmax=50)
+        im = ax.pcolor(self.longitude_grid,
+                       self.latitude_grid,
+                       self.value)
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
-        plt.title(
-            "precipitation (" + data.rain_units + ") : "
-            + str(data.time_array[i]))
-        plt.savefig(path.join(map_dir, str(i) + ".png"))
+        plt.title(self.title)
+        plt.savefig(self.path_to_figure)
         plt.close()
 
-def plot_model_fields(data, figure_dir):
+
+def plot_model_fields(data, figure_dir, pool):
     """Plot figures for the model fields
 
     Plots:
@@ -263,22 +286,21 @@ def plot_model_fields(data, figure_dir):
     for i, dir in enumerate(dir_array):
         #for each model field
         for model_field, value in model_field_array[i].items():
+            #plot model field for each day in parallel
+            message_array = []
             for i_time in range(365):
                 #heatmap plot
-                plt.figure()
-                ax = plt.axes(projection=crs.PlateCarree())
-                im = ax.pcolor(longitude_array[i],
-                               latitude_array[i],
-                               value[i_time])
-                ax.coastlines(resolution="50m")
-                plt.colorbar(im)
-                ax.set_aspect("auto", adjustable=None)
-                plt.title(
-                    model_field + " (" + units[model_field] + ") : "
+                figure_title = (model_field + " (" + units[model_field] + ") : "
                     + str(data.time_array[i_time]))
-                plt.savefig(
-                    path.join(dir, model_field + "_" + str(i_time) + ".png"))
-                plt.close()
+                path_to_figure = path.join(
+                    dir, model_field + "_" + str(i_time) + ".png")
+                message = HeatmapPlotMessage(longitude_array[i],
+                                             latitude_array[i],
+                                             value[i_time],
+                                             figure_title,
+                                             path_to_figure)
+                message_array.append(message)
+            pool.map(HeatmapPlotMessage.print, message_array)
 
     #for each city time series
     for city in dataset.CITY_LOCATION:
