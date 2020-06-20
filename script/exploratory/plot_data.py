@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ma
 import pandas as pd
+import scipy.stats
 from statsmodels.tsa import stattools
 
 import dataset
@@ -163,7 +164,20 @@ def plot_rain(data, figure_dir, pool):
         plt.savefig(path.join(series_dir, "rainfall_pacf_" + city + ".pdf"))
         plt.close()
 
-    #plot the rain
+        #plot correlation between pair of locations
+            #choose a city, then work out correlation with every point
+        cross_correlation = spatial_cross_correlation(
+            rainfall_series, data.rain)
+        figure_title = "Precipitation cross correlation with " + city
+        figure_path = path.join(rain_dir, "cross_"+city+".pdf")
+        message = HeatmapPlotMessage(longitude_grid,
+                                     latitude_grid,
+                                     cross_correlation,
+                                     figure_title,
+                                     figure_path)
+        message.print()
+
+    #plot the rain (spatial map for each time step)
     message_array = []
     for i in range(365):
         rain_plot = data.rain[i].copy()
@@ -179,7 +193,6 @@ def plot_rain(data, figure_dir, pool):
                                      path_to_figure)
         message_array.append(message)
     pool.map(HeatmapPlotMessage.print, message_array)
-
 
 class HeatmapPlotMessage(object):
 
@@ -234,6 +247,9 @@ def plot_model_fields(data, figure_dir, pool):
     series_dir = path.join(mf_dir, "series")
     if not path.isdir(series_dir):
         os.mkdir(series_dir)
+    cross_dir = path.join(mf_dir, "cross")
+    if not path.isdir(cross_dir):
+        os.mkdir(cross_dir)
 
     time = data.time_array
     angle_resolution = dataset.ANGLE_RESOLUTION
@@ -312,6 +328,8 @@ def plot_model_fields(data, figure_dir, pool):
 
             time_series = np.asarray(time_series)
             units = data.model_field_units[model_field]
+            cross_correlation = spatial_cross_correlation(
+                time_series, data.model_field[model_field])
 
             #get the acf and pacf
             #in the model fields, 4 readings per day, want to have 1.5 years of
@@ -348,6 +366,17 @@ def plot_model_fields(data, figure_dir, pool):
             plt.savefig(
                 path.join(series_dir, model_field + "_pacf_" + city + ".pdf"))
             plt.close()
+
+            #plot correlation between pairs of locations
+            figure_title = model_field + " cross correlation with " + city
+            figure_path = path.join(
+                cross_dir, model_field+"_cross_"+city+".pdf")
+            message = HeatmapPlotMessage(longitude_array[0],
+                                         latitude_array[0],
+                                         cross_correlation,
+                                         figure_title,
+                                         figure_path)
+            message.print()
 
 def plot_matrix(data, figure_dir):
     """Plot figures for the topography
@@ -419,3 +448,26 @@ def plot_topography(data, figure_dir):
             plt.title(key)
             plt.savefig(path.join(dir_array[i], "topo_" + key + ".pdf"))
             plt.close()
+
+def spatial_cross_correlation(reference_series, value_map):
+    """Corrleation of one location with every other location
+
+    Args:
+        reference_series: the time series of a location to be comapred with
+        value_map: dim 0: time, dim 1 and 2: 2d map, values of each location and
+            time
+
+    Return:
+        2d array, same shape as value_map[0, :, :], contains correlations
+    """
+    cross_correlation = value_map[0].copy()
+    if type(cross_correlation) is ma.core.MaskedArray:
+        mask = cross_correlation.mask
+    else:
+        mask = np.zeros(cross_correlation.shape, dtype=np.bool_)
+    for i in range(cross_correlation.shape[0]):
+        for j in range(cross_correlation.shape[1]):
+            if not mask[i, j]:
+                cross_correlation[i, j] = scipy.stats.pearsonr(
+                    reference_series, value_map[:, i, j])[0]
+    return cross_correlation
