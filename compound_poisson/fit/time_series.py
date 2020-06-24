@@ -25,8 +25,9 @@ class Fitter(fitter.Fitter):
         time_series.fit()
         return time_series
 
-    def print_mcmc(self, time_series, dataset):
+    def print_mcmc(self, time_series, dataset, pool=None):
         #get the true parameters if it exists
+        #pool not used
         if dataset.time_series is None:
             true_parameter = None
         else:

@@ -19,9 +19,9 @@ class Fitter(fitter.Fitter):
         downscale.fit(pool)
         return downscale
 
-    def print_mcmc(self, downscale, dataset=None):
+    def print_mcmc(self, downscale, dataset=None, pool=multiprocess.Serial):
         #arg dataset not used
-        downscale.print_mcmc(self.figure_dir)
+        downscale.print_mcmc(self.figure_dir, pool)
 
     def do_forecast(self, downscale, dataset, n_simulation, pool):
         #dataset is Data object (see dataset module)

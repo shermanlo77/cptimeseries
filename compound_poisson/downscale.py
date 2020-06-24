@@ -347,16 +347,20 @@ class Downscale(object):
     def instantiate_forecaster(self):
         return forecast.downscale.Forecaster(self, self.memmap_dir)
 
-    def print_mcmc(self, directory):
+    def print_mcmc(self, directory, pool):
         """Print the mcmc chains
         """
         directory = path.join(directory, "chain")
         if not path.isdir(directory):
             os.mkdir(directory)
+        location_directory = path.join(directory, "locations")
+        if not path.isdir(location_directory):
+            os.mkdir(location_directory)
         self.read_memmap()
         self.scatter_z_mcmc_sample()
         position_index_array = self.get_random_position_index()
 
+        #pick random locations and plot their mcmc chains
         chain = np.asarray(self.parameter_mcmc[:])
         area_unmask = self.area_unmask
         parameter_name = (
@@ -370,6 +374,19 @@ class Downscale(object):
             plt.ylabel(parameter_name[i])
             plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
             plt.close()
+
+        #plot each chain for each location
+        #note to developer: memory problem when parallelising
+            #only for Cardiff for now (19, 22)
+        message_array = []
+        for i_space, time_series in enumerate(
+            self.generate_unmask_time_series()):
+            if str(time_series.id) == "[19, 22]":
+                message = PlotMcmcMessage(
+                    self, chain, time_series, i_space, location_directory)
+                message_array.append(message)
+                print(time_series.id)
+        pool.map(PlotMcmcMessage.print, message_array)
 
         chain = np.asarray(self.parameter_gp_mcmc[:])
         for i, key in enumerate(self.parameter_gp_target.state):
@@ -610,12 +627,12 @@ class DownscaleDual(Downscale):
                 time_series.x[time_step, i_model_field] = model_field_vector[
                     i_model_field * self.area_unmask + i_space]
 
-    def print_mcmc(self, directory):
+    def print_mcmc(self, directory, pool):
         """Print the mcmc chains
 
         Require the call of read_memmap() beforehand
         """
-        super().print_mcmc(directory)
+        super().print_mcmc(directory, pool)
         directory = path.join(directory, "chain")
         self.read_memmap()
 
@@ -761,3 +778,26 @@ class ForecastMessage(object):
 
     def forecast(self):
         return self.time_series.forecast(self.model_field, self.n_simulation)
+
+class PlotMcmcMessage(object):
+
+    def __init__(self, downscale, chain, time_series, i_space, directory):
+        self.sub_directory = path.join(directory, str(time_series.id))
+        if not path.isdir(self.sub_directory):
+            os.mkdir(self.sub_directory)
+        self.parameter_name = time_series.get_parameter_vector_name()
+        self.i_space = i_space
+        self.area_unmask = downscale.area_unmask
+        self.chain = chain
+
+    def print(self):
+        for i_parameter in range(len(self.parameter_name)):
+            chain_i = self.chain[:, i_parameter*self.area_unmask + self.i_space]
+            plt.figure()
+            plt.plot(chain_i)
+            plt.xlabel("sample number")
+            plt.ylabel(self.parameter_name[i_parameter])
+            plt.savefig(
+                path.join(self.sub_directory,
+                          "parameter_" + str(i_parameter) + ".pdf"))
+            plt.close()

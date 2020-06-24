@@ -68,7 +68,7 @@ class Fitter(object):
                 else:
                     model.resume_fitting(n_sample, pool)
                 joblib.dump(model, result_file)
-        self.print_mcmc(model, dataset)
+        self.print_mcmc(model, dataset, pool)
 
     def initial_fit(self, dataset, seed, n_sample=None, pool=None):
         """Initial fit
@@ -84,7 +84,7 @@ class Fitter(object):
         #pool is required by downscale
         raise NotImplementedError
 
-    def print_mcmc(self, model, dataset=None):
+    def print_mcmc(self, model, dataset=None, pool=None):
         """Print mcmc chain of the fitted model
         """
         #dataset is required by time_series for plotting true values
