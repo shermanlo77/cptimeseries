@@ -46,6 +46,7 @@ Keywords:
 Run the script `hyper_slice.py` to run 10 000 MCMC samples. Afterwards, run `hyper_slice_forecast.py` to sample 1 000 forecast samples. Figures are plotted and saved in the `figure` directory.
 
 The options may be provided which may be useful for development or debugging purposes. The following examples are provided:
+
 * `python3 hyper_slice.py`
     * Does the default number of MCMC samples
     * If MCMC samples are detected from a previous run, only print out figures
@@ -84,6 +85,7 @@ For the Wales dataset, use `mpiexec -n 8 python3 -m mpi4py.futures downscale.py`
 Run the script `downscale.py` and `dual.py` to do MCMC sampling without/with model field sampling respectively. Afterwards, run the script `downscale_forecast.py` and/or `dual_forecast.py` to do forecast sampling without/with model field sampling respectively.
 
 The options may be provided which may be useful for development or debugging purposes. The following examples are provided:
+
 * `python3 downscale.py`
     * Does the default number of MCMC samples
     * If MCMC samples are detected from a previous run, only print out figures
