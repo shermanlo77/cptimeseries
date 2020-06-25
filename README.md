@@ -23,14 +23,14 @@ Keywords:
 * `joblib`
 * `pupygrib`
 * `cartopy`
-  * [Installation instructions](https://scitools.org.uk/cartopy/docs/latest/installing.html)
+    * [Installation instructions](https://scitools.org.uk/cartopy/docs/latest/installing.html)
 * `netCDF4`
-  * [Installation instructions](https://unidata.github.io/netcdf4-python/netCDF4/index.html)
-  * `cftime` must be *version 1.0.4.2*. This is because future releases change the use of num2date, see the [change log](https://github.com/Unidata/cftime/blob/master/Changelog) for further details.
+    * [Installation instructions](https://unidata.github.io/netcdf4-python/netCDF4/index.html)
+    * `cftime` must be *version 1.0.4.2*. This is because future releases change the use of num2date, see the [change log](https://github.com/Unidata/cftime/blob/master/Changelog) for further details.
 * `gdal`
-  * [Possible help when installing](https://gis.stackexchange.com/questions/28966/python-gdal-package-missing-header-file-when-installing-via-pip)
+    * [Possible help when installing](https://gis.stackexchange.com/questions/28966/python-gdal-package-missing-header-file-when-installing-via-pip)
 * `mpi4py`
-  * Requires [MPICH](https://www.mpich.org/)
+    * Requires [MPICH](https://www.mpich.org/)
 * `abcpy`
 
 ## Single Location Scripts
