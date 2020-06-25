@@ -1,15 +1,16 @@
 # Compound Poisson
 * Copyright (c) 2020 Sherman Lo
+* MIT LICENSE
 
 Under the hood code for Bayesian inference for spatial-temporal compound-Poisson data.
 
 ## Sub-packages
 * `fit`
-  * Wrapper classes for fitting the model onto data
+    * Wrapper classes for fitting the model onto data
 * `forecast`
-  * Classes for conducting forecasts given the fitted model
+    * Classes for conducting forecasts given the fitted model
 * `mcmc`
-  * Implementations of MCMC algorithms and target distributions
+    * Implementations of MCMC algorithms and target distributions
 
 ## Description of code
 * `time_series.py` contains the base class `TimeSeries` used for single location time series. It uses the modules `terms.py`, which handles compound poisson terms and sums, `arma.py`, which handles ARMA terms for training and forecasting, and `parameter.py`, which handles the compound poisson parameters which varies with time.
@@ -20,5 +21,5 @@ Under the hood code for Bayesian inference for spatial-temporal compound-Poisson
 * `print.py` contains functions for plotting figures for `TimeSeries` and `Forecaster` objects.
 * `roc.py` contain a class for plotting ROC curves. Used by `print.py` and `forecast`.
 * `multiprocess.py` contain wrapper classes for multi-thread work. Adjusting the instantiation of objects for multi-thread work can be done here. Please refer to the manual of the corresponding package when using MPI:
-  * [mpi4py.futures](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html)
-  * [abcpy.backends](https://abcpy.readthedocs.io/en/v0.5.7/parallelization.html)
+    * [mpi4py.futures](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html)
+    * [abcpy.backends](https://abcpy.readthedocs.io/en/v0.5.7/parallelization.html)

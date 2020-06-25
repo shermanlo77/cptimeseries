@@ -1,11 +1,13 @@
 # Downscale using Compound Poisson
 * Copyright (c) 2020 Sherman Lo
+* MIT LICENSE
 
 Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle.
 
 The modification of code is required to use your own data. This is because the code is designed for `.grib` and `.nc` files with specific grids. Please see LICENCE for further information on how you can use this code for your purpose.
 
 Keywords:
+
 * Downscaling
 * Compound Poisson
 * Gaussian Process
