@@ -18,6 +18,27 @@ The main difference when using the `.gz` files rather than the `.nc` and `.grib`
     * Cardiff
     * (other cities have been coded in)
 * Multiple locations
-    * Isle of Man (6 spatial points)
+    * Isle of Man (6 spatial points) (useful for debugging code)
     * Wales (about ~350 spatial points)
-    * British Isles (about ~3000 spatial points)
+    * British Isles (about ~3000 spatial points) (referred to as `Ana` which stands for reanalysis)
+
+## List of objects
+
+* Single locations
+    * `LondonSimulatedTraining` 1980-1989 inclusive
+    * `LondonTraining` 1980-1989 inclusive
+    * `LondonTest` 1990-1999 inclusive
+    * `CardiffTraining` 1979-1999 inclusive
+    * `CardiffTrainingHalf` 1990-1999 inclusive
+    * `CardiffTest` 2000-2019 inclusive
+* Multiple locations
+    * `IsleOfManTraining` 1980-1989 inclusive
+    * `IsleOfManTest` 1990-1999 inclusive
+    * `Wales10Training` 1980-1989 inclusive
+    * `Wales10Test` 1990-1999 inclusive
+    * `WalesTraining` 1979-1999 inclusive
+    * `WalesTest` 2000-2019 inclusive
+    * `AnaDual10Training` 1980-1989 inclusive
+    * `AnaDual10Test` 1990-1999 inclusive
+    * `AnaDualTraining` 1979-1999 inclusive
+    * `AnaDualTest` 2000-2019 inclusive

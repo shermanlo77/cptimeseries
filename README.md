@@ -110,4 +110,7 @@ The options may be provided which may be useful for development or debugging pur
 The code uses multiple threads so using a multi-core processor(s) is recommended.
 
 ## Notes for Developers
-Please see the package `compound_poisson` for under the hood code and documentations.
+* Please see the package `compound_poisson` for under the hood code and documentations.
+* There is a bug for `dual_forecast.py` scripts for large datasets and large MCMC samples. RAM usage increase rapidly which may be fixed by careful memory management.
+* The options are there for debugging purposes and/or to cater for limited resources such as time.
+* A note on reproducibility. Results store many random number generators and their states which are used MCMC sampling and forecasting, therefore figures are reproducible. However, obtaining more MCMC samples after forecasting will cause future forecasts to use a different set of random numbers. Making a backup of the results before any forecasting is recommended.
