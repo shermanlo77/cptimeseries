@@ -219,6 +219,7 @@ class Mcmc(object):
         self.n_sample = n_keep
         self.sample_pointer = self.n_sample
         del sample_array_old
+        self.del_memmap()
 
     def __len__(self):
         return len(self.sample_array)
