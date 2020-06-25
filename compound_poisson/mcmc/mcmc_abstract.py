@@ -99,6 +99,8 @@ class Mcmc(object):
             del sample_array_old
 
     def delete_old_memmap(self):
+        """DANGEROUS: Actually delete the file containing the old MCMC samples
+        """
         if path.exists(self.memmap_path_old):
             os.remove(self.memmap_path_old)
 
@@ -109,6 +111,8 @@ class Mcmc(object):
                                       shape=(self.n_sample, self.n_dim))
 
     def del_memmap(self):
+        """Delete reference to the memmap
+        """
         del self.sample_array
         self.sample_array = None
 
@@ -194,6 +198,27 @@ class Mcmc(object):
             return True
         else:
             return False
+
+    def discard_sample(self, n_keep):
+        """Discard initial mcmc samples to save hard disk space
+
+        For each mcmc, make a new memmap and store the last n_keep mcmc samples.
+            For saftey reasons, you will have to delete the old memmap file
+            yourself.
+
+        Args:
+            n_keep: number of mcmc samples to keep (from the end of the chain)
+        """
+        self.read_memmap()
+        sample_array_old = self.sample_array
+        self.memmap_path_old = self.memmap_path
+        self.instantiate_memmap(path.dirname(self.memmap_path),
+                                n_keep,
+                                self.n_dim)
+        self.sample_array[:] = sample_array_old[-n_keep:len(sample_array_old)]
+        self.n_sample = n_keep
+        self.sample_pointer = self.n_sample
+        del sample_array_old
 
     def __len__(self):
         return len(self.sample_array)

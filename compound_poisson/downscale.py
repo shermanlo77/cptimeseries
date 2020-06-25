@@ -486,6 +486,20 @@ class Downscale(object):
         for mcmc in self.get_mcmc_array():
             mcmc.delete_old_memmap()
 
+    def discard_sample(self, n_keep):
+        """Discard initial mcmc samples to save hard disk space
+
+        For each mcmc, make a new memmap and store the last n_keep mcmc samples.
+            For saftey reasons, you will have to delete the old memmap file
+            yourself.
+
+        Args:
+            n_keep: number of mcmc samples to keep (from the end of the chain)
+        """
+        for mcmc in self.get_mcmc_array():
+            mcmc.discard_sample(n_keep)
+        self.n_sample = n_keep
+
     def set_seed_seq(self, seed_sequence):
         self.seed_seq = seed_sequence
         self.rng = self.spawn_rng()
