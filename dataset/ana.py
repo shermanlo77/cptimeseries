@@ -67,6 +67,22 @@ class AnaDual1Test(data.DataDualGrid):
         self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
         self.trim([3653-365, 3653])
 
+class AnaDual5Test(data.DataDualGrid):
+
+    def __init__(self):
+        super().__init__()
+
+    def load_data(self):
+        path_here = pathlib.Path(__file__).parent.absolute()
+        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Mar20")
+        self.load_model_field(path.join(dir_to_data, "ana_cpdn_new_2.grib"))
+        self.interpolate_model_field()
+        dir_to_data = path.join(path_here, "..", "Data", "Rain_Data_Nov19")
+        self.load_rain(path.join(dir_to_data, "rr_ens_mean_0.1deg_reg_v20"
+            ".0e_197901-201907_uk.nc"))
+        self.load_topo(path.join(dir_to_data, "topo_0.1_degree.grib"))
+        self.trim([3653-5*365-1, 3653])
+
 class AnaDual10Training(data.DataDualGrid):
 
     def __init__(self):

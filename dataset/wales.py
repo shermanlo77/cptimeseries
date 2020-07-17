@@ -56,3 +56,12 @@ class Wales1Test(dataset.ana.AnaDual1Test):
     def load_data(self):
         super().load_data()
         self.crop(LAT, LONG)
+
+class Wales5Test(dataset.ana.AnaDual5Test):
+
+    def __init__(self):
+        super().__init__()
+
+    def load_data(self):
+        super().load_data()
+        self.crop(LAT, LONG)
