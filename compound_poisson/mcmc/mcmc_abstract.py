@@ -247,7 +247,12 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, is_initial_sample=True):
         #mcmc_index = rng.randint(0, len(mcmc_array))
         ## Quick fix to sample some steps more, some steps less
         # self.z_mcmc, self.parameter_mcmc,self.parameter_gp_mcmc,self.model_field_mcmc,self.model_field_gp_mcmc
-        mcmc_index = np.random.choice(5, 1, p=[0.819672131147541, 0.08196721311475409, 0.00819672131147541, 0.08196721311475409, 0.00819672131147541])
+        #mcmc_index = np.random.choice(5, 1, p=[0.819672131147541, 0.08196721311475409, 0.00819672131147541, 0.08196721311475409, 0.00819672131147541])
+        ## DownscaleDual
+        #mcmc_index = np.random.choice(5, 1, p=[0.819672131147541, 0.08196721311475409, 0.00819672131147541,
+        #                                       0.08196721311475409, 0.00819672131147541])
+        ## Downscale
+        mcmc_index = np.random.choice(3, 1, p=[.4, .5, .1])
         for i_mcmc, mcmc in enumerate(mcmc_array):
             if i_mcmc == mcmc_index:
                 mcmc.step()
