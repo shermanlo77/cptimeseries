@@ -233,7 +233,24 @@ class Mcmc(object):
         self.sample_array[self.sample_pointer] = state
         self.sample_pointer += 1
 
-def do_gibbs_sampling(mcmc_array, n_sample, rng, is_initial_sample=True):
+def do_gibbs_sampling(mcmc_array, n_sample, rng, prob_sample,
+        is_initial_sample=True):
+    """Do Gibbs sampling
+
+    Given the mcmc of all components, do a Gibbs sampling. One sample is
+        obtained by choosing one component at random and that component does a
+        mcmc step, the rest of the components stay where they are, aka random
+        scan.
+
+    Args:
+        mcmc_array: array of mcmc objects
+        n_sample: number of samples to be obtained
+        rng: random number generator
+        prob_sample: array of probabilities, same length as mcmc_array, must
+            add up to one, each element correspond to a component, probability
+            that component gets sampled in a Gibbs step
+        is_initial_sample: boolean, the initial value is a sample if True
+    """
     #initial value is a sample
     if is_initial_sample:
         print("Sample initial")
@@ -243,16 +260,7 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, is_initial_sample=True):
     #Gibbs sampling
     for i_step in range(n_sample):
         print("Sample", i_step)
-        #select random component
-        #mcmc_index = rng.randint(0, len(mcmc_array))
-        ## Quick fix to sample some steps more, some steps less
-        # self.z_mcmc, self.parameter_mcmc,self.parameter_gp_mcmc,self.model_field_mcmc,self.model_field_gp_mcmc
-        #mcmc_index = np.random.choice(5, 1, p=[0.819672131147541, 0.08196721311475409, 0.00819672131147541, 0.08196721311475409, 0.00819672131147541])
-        ## DownscaleDual
-        #mcmc_index = np.random.choice(5, 1, p=[0.819672131147541, 0.08196721311475409, 0.00819672131147541,
-        #                                       0.08196721311475409, 0.00819672131147541])
-        ## Downscale
-        mcmc_index = np.random.choice(3, 1, p=[.4, .5, .1])
+        mcmc_index = rng.choice(len(mcmc_array), 1, p=prob_sample)
         for i_mcmc, mcmc in enumerate(mcmc_array):
             if i_mcmc == mcmc_index:
                 mcmc.step()

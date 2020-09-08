@@ -48,6 +48,7 @@ class Downscale(object):
         parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
         z_mcmc: array of all ZMcmc objects (owned by each unmasked time series)
         n_sample: number of mcmc samples
+        gibbs_weight: probability of sampling each mcmc in self.get_mcmc_array()
         burn_in: number of initial mcmc samples to discard when forecasting
         model_field_shift: mean of model field, vector, entry for each model
             field
@@ -83,6 +84,7 @@ class Downscale(object):
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
         self.n_sample = 10000
+        self.gibbs_weight = [0.5, 0.4, 0.1]
         self.burn_in = 0
         self.model_field_shift = []
         self.model_field_scale = []
@@ -162,7 +164,8 @@ class Downscale(object):
         self.initalise_z()
         self.instantiate_mcmc()
         mcmc_array = self.get_mcmc_array()
-        mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
+        mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng,
+                self.gibbs_weight)
         self.del_memmap()
         self.pool = None
 
@@ -181,7 +184,8 @@ class Downscale(object):
                 mcmc_i.extend_memmap(n_sample)
             #in resume, do not use initial value as sample (False in arg 3)
             mcmc.do_gibbs_sampling(
-                mcmc_array, n_sample - self.n_sample, self.rng, False)
+                mcmc_array, n_sample - self.n_sample, self.rng,
+                self.gibbs_weight, False)
             self.n_sample = n_sample
             self.delete_old_memmap()
         self.del_memmap()
@@ -546,6 +550,11 @@ class Downscale(object):
         self_dict['pool'] = None
         return self_dict
 
+################################################################################
+################################################################################
+#                        DEPRECATED CLASS
+################################################################################
+################################################################################
 class DownscaleDual(Downscale):
     """Collection of multiple TimeSeries objects
 
@@ -718,6 +727,9 @@ class DownscaleDual(Downscale):
     def instantiate_forecaster(self):
         return forecast.downscale.ForecasterDual(self, self.memmap_dir)
 
+################################################################################
+################################################################################
+
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
     """Modify TimeSeriesSlice to only sample z
     """
@@ -754,6 +766,9 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
             self.forecaster.memmap_path = memmap_path
             self.forecaster.resume_forecast(n_simulation, memmap_shape)
 
+################################################################################
+#                             TO BE DEPRECATED
+################################################################################
 class TimeSeriesDownscaleDual(TimeSeriesDownscale):
 
     #change of behaviour: set_parameter_from_sample() require self.mcmc_index to
@@ -781,6 +796,8 @@ class TimeSeriesDownscaleDual(TimeSeriesDownscale):
     def set_model_field_vector(self, model_field_vector):
         self.x = np.reshape(
             model_field_vector, (len(self), self.n_model_field))
+################################################################################
+################################################################################
 
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast

@@ -24,6 +24,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         parameter_mcmc: Mcmc object which does MCMC using parameter_target
         z_target: wrapper Target object to evaluate the posterior of z
         z_mcmc: Mcmc object which does MCMC using z_target
+        gibbs_weight: probability of sampling each mcmc in self.get_mcmc_array()
         burn_in: integer, which samples to discard when doing posterior sampling
             which is used for forecasting
         memmap_dir: directory to store the MCMC samples
@@ -45,6 +46,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.parameter_mcmc = None
         self.z_target = target_time_series.TargetZ(self)
         self.z_mcmc = None
+        self.gibbs_weight = [0.55, 0.45]
         self.burn_in = 0
         self.memmap_dir = ""
 
@@ -57,7 +59,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.initalise_z()
         self.instantiate_mcmc()
         mcmc_array = self.get_mcmc_array()
-        mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng)
+        mcmc.do_gibbs_sampling(
+            mcmc_array, self.n_sample, self.rng, self.gibbs_weight)
 
     def resume_fitting(self, n_sample):
         """Run more MCMC samples
@@ -71,7 +74,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
                 mcmc_i.extend_memmap(n_sample)
             #in resume, do not use initial value as sample (False in arg 3)
             mcmc.do_gibbs_sampling(
-                mcmc_array, n_sample - self.n_sample, self.rng, False)
+                mcmc_array, n_sample - self.n_sample, self.rng,
+                self.gibbs_weight, False)
             self.n_sample = n_sample
             self.delete_old_memmap()
 
@@ -320,6 +324,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         self.precision_target = target_time_series.TargetPrecision(self)
         #mcmc object evaluated at instantiate_mcmc
         self.precision_mcmc = None
+        self.gibbs_weight = [0.5, 0.4, 0.1]
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
