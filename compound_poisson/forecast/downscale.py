@@ -155,97 +155,6 @@ class Forecaster(forecast_abstract.Forecaster):
                 roc_array.append(None)
         return roc_array
 
-class ForecasterDual(Forecaster):
-    """Forecaster used by DownscaleDual
-
-    Extended to be able to use samples from the MCMC. Forecasting for
-        DownscaleDual is different compared to Downscale, this is because model
-        fields of the test set needs to be sampled. All model fields for all
-        time points are sampled altogether because they have a spatial
-        correlation.
-    For a forecast sample, all spatial parameters and training set model fields
-        are set from the same MCMC sample. All test set model fields are
-        sampled, parallel in time. Then for each location, in parallel, produce
-        one forecast. This is repeated until a requested number of forecasts is
-        achieved.
-
-    Attributes:
-        rng: rng to select a sample from the MCMC samples
-        rng_array: spawned rng to sample the model fields for each time point
-    """
-
-    def __init__(self, downscale, memmap_dir):
-        super().__init__(downscale, memmap_dir)
-        #rng used so that all time series in the forecast use the same mcmc
-            #sample
-        self.rng = None
-        self.rng_array = []
-
-    def start_forecast(self, n_simulation, data):
-        #override
-        #spawn multiple rng
-        self.n_time = len(data)
-        self.rng = self.downscale.spawn_rng(1)
-        self.rng_array = self.downscale.spawn_rng(self.n_time)
-        super().start_forecast(n_simulation, data)
-
-    def simulate_forecasts(self, index_range):
-        """Simulate forecasts
-
-        Override. Set all parameters and model fields from the mcmc sample, then
-            do one forecast. This is repeated for all pointers in index_range.
-
-        Args:
-            index_range: array of pointers to save results onto forecast_array
-        """
-        area_unmask = self.downscale.area_unmask
-        n_model_field = self.downscale.n_model_field
-        model_field_mcmc = self.downscale.model_field_mcmc
-        gp_mcmc = self.downscale.model_field_gp_mcmc
-        n_mcmc_sample = len(model_field_mcmc)
-
-        #instantiate a DownscaleDual to do gaussian process regression and
-            #sampling
-        future_downscale = compound_poisson.DownscaleDual(
-            self.data, self.downscale.n_arma, True) #true to show test data
-        future_downscale.pool = self.downscale.pool
-        future_downscale.model_field_target.rng_array = self.rng_array
-
-        for i_forecast in index_range:
-            #force to do one forecast for every mcmc sample
-            self.n_simulation = i_forecast+1
-
-            #set parameters and model fields from a mcmc sample
-                #the setting of the parameters is done in the super class method
-            mcmc_index = self.rng.randint(self.downscale.burn_in, n_mcmc_sample)
-            self.downscale.set_mcmc_index(mcmc_index)
-            model_field_sample = model_field_mcmc[mcmc_index]
-            gp_sample = gp_mcmc[mcmc_index]
-            self.downscale.model_field_target.update_state(model_field_sample)
-
-            #sample test set model field GP
-            future_downscale.model_field_gp_target.update_state(gp_sample)
-            model_field_sample = (
-                future_downscale.model_field_target.simulate_from_prior())
-
-            #see mcmc/target_model_field.py for the layout of the vector
-                #model_field_sample
-            #change the test data to have the model field GP sample
-            for i_time in range(len(future_downscale)):
-                for i_model_field, model_field_name in enumerate(
-                    self.data.model_field):
-                    for i_space, (lat_i, long_i) in enumerate(
-                        self.data.generate_unmask_coordinates()):
-                        x_i = model_field_sample[
-                            i_time*n_model_field*area_unmask
-                            + i_model_field*area_unmask
-                            + i_space]
-                        model_field_i = self.data.model_field[model_field_name]
-                        model_field_i[i_time, lat_i, long_i] = x_i
-
-            super().simulate_forecasts([i_forecast], False)
-            print("Predictive sample", i_forecast)
-
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
 
@@ -347,3 +256,98 @@ class ForecastMessage(object):
         if self.is_print:
             print("Predictive location", self.i_space)
         return self.time_series
+
+################################################################################
+#                              DEPRECATED
+################################################################################
+
+class ForecasterDual(Forecaster):
+    """Forecaster used by DownscaleDual
+
+    Extended to be able to use samples from the MCMC. Forecasting for
+        DownscaleDual is different compared to Downscale, this is because model
+        fields of the test set needs to be sampled. All model fields for all
+        time points are sampled altogether because they have a spatial
+        correlation.
+    For a forecast sample, all spatial parameters and training set model fields
+        are set from the same MCMC sample. All test set model fields are
+        sampled, parallel in time. Then for each location, in parallel, produce
+        one forecast. This is repeated until a requested number of forecasts is
+        achieved.
+
+    Attributes:
+        rng: rng to select a sample from the MCMC samples
+        rng_array: spawned rng to sample the model fields for each time point
+    """
+
+    def __init__(self, downscale, memmap_dir):
+        super().__init__(downscale, memmap_dir)
+        #rng used so that all time series in the forecast use the same mcmc
+            #sample
+        self.rng = None
+        self.rng_array = []
+
+    def start_forecast(self, n_simulation, data):
+        #override
+        #spawn multiple rng
+        self.n_time = len(data)
+        self.rng = self.downscale.spawn_rng(1)
+        self.rng_array = self.downscale.spawn_rng(self.n_time)
+        super().start_forecast(n_simulation, data)
+
+    def simulate_forecasts(self, index_range):
+        """Simulate forecasts
+
+        Override. Set all parameters and model fields from the mcmc sample, then
+            do one forecast. This is repeated for all pointers in index_range.
+
+        Args:
+            index_range: array of pointers to save results onto forecast_array
+        """
+        area_unmask = self.downscale.area_unmask
+        n_model_field = self.downscale.n_model_field
+        model_field_mcmc = self.downscale.model_field_mcmc
+        gp_mcmc = self.downscale.model_field_gp_mcmc
+        n_mcmc_sample = len(model_field_mcmc)
+
+        #instantiate a DownscaleDual to do gaussian process regression and
+            #sampling
+        future_downscale = compound_poisson.DownscaleDual(
+            self.data, self.downscale.n_arma, True) #true to show test data
+        future_downscale.pool = self.downscale.pool
+        future_downscale.model_field_target.rng_array = self.rng_array
+
+        for i_forecast in index_range:
+            #force to do one forecast for every mcmc sample
+            self.n_simulation = i_forecast+1
+
+            #set parameters and model fields from a mcmc sample
+                #the setting of the parameters is done in the super class method
+            mcmc_index = self.rng.randint(self.downscale.burn_in, n_mcmc_sample)
+            self.downscale.set_mcmc_index(mcmc_index)
+            model_field_sample = model_field_mcmc[mcmc_index]
+            gp_sample = gp_mcmc[mcmc_index]
+            self.downscale.model_field_target.update_state(model_field_sample)
+
+            #sample test set model field GP
+            future_downscale.model_field_gp_target.update_state(gp_sample)
+            model_field_sample = (
+                future_downscale.model_field_target.simulate_from_prior())
+
+            #see mcmc/target_model_field.py for the layout of the vector
+                #model_field_sample
+            #change the test data to have the model field GP sample
+            for i_time in range(len(future_downscale)):
+                for i_model_field, model_field_name in enumerate(
+                    self.data.model_field):
+                    for i_space, (lat_i, long_i) in enumerate(
+                        self.data.generate_unmask_coordinates()):
+                        x_i = model_field_sample[
+                            i_time*n_model_field*area_unmask
+                            + i_model_field*area_unmask
+                            + i_space]
+                        model_field_i = self.data.model_field[model_field_name]
+                        model_field_i[i_time, lat_i, long_i] = x_i
+
+            super().simulate_forecasts([i_forecast], False)
+            print("Predictive sample", i_forecast)

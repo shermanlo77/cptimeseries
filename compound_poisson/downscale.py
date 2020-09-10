@@ -550,11 +550,80 @@ class Downscale(object):
         self_dict['pool'] = None
         return self_dict
 
+class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
+    """Modify TimeSeriesSlice to only sample z
+    """
+
+    def __init__(self,
+                 x,
+                 rainfall=None,
+                 poisson_rate_n_arma=None,
+                 gamma_mean_n_arma=None,
+                 cp_parameter_array=None):
+        super().__init__(x,
+                         rainfall,
+                         poisson_rate_n_arma,
+                         gamma_mean_n_arma,
+                         cp_parameter_array)
+        self.z_mcmc = None
+
+    def instantiate_mcmc(self):
+        """Instantiate all MCMC objects
+
+        Override
+        Only instantiate slice sampling for z
+        """
+        self.parameter_mcmc = None
+        self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
+
+    def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
+        #override to include MCMC samples
+        if self.forecaster is None:
+            self.forecaster = forecast.downscale.TimeSeriesForecaster(
+                self, memmap_path, i_space)
+            self.forecaster.start_forecast(n_simulation, x, memmap_shape)
+        else:
+            self.forecaster.memmap_path = memmap_path
+            self.forecaster.resume_forecast(n_simulation, memmap_shape)
+
+class ForecastMessage(object):
+    #message to pass, see Downscale.forecast
+
+    def __init__(self, time_series, model_field, n_simulation):
+        self.time_series = time_series
+        self.model_field = model_field
+        self.n_simulation = n_simulation
+
+    def forecast(self):
+        return self.time_series.forecast(self.model_field, self.n_simulation)
+
+class PlotMcmcMessage(object):
+
+    def __init__(self, downscale, chain, time_series, i_space, directory):
+        self.sub_directory = path.join(directory, str(time_series.id))
+        if not path.isdir(self.sub_directory):
+            os.mkdir(self.sub_directory)
+        self.parameter_name = time_series.get_parameter_vector_name()
+        self.i_space = i_space
+        self.area_unmask = downscale.area_unmask
+        self.chain = chain
+
+    def print(self):
+        for i_parameter in range(len(self.parameter_name)):
+            chain_i = self.chain[:, i_parameter*self.area_unmask + self.i_space]
+            plt.figure()
+            plt.plot(chain_i)
+            plt.xlabel("sample number")
+            plt.ylabel(self.parameter_name[i_parameter])
+            plt.savefig(
+                path.join(self.sub_directory,
+                          "parameter_" + str(i_parameter) + ".pdf"))
+            plt.close()
+
 ################################################################################
+#                              DEPRECATED
 ################################################################################
-#                        DEPRECATED CLASS
-################################################################################
-################################################################################
+
 class DownscaleDual(Downscale):
     """Collection of multiple TimeSeries objects
 
@@ -727,48 +796,6 @@ class DownscaleDual(Downscale):
     def instantiate_forecaster(self):
         return forecast.downscale.ForecasterDual(self, self.memmap_dir)
 
-################################################################################
-################################################################################
-
-class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
-    """Modify TimeSeriesSlice to only sample z
-    """
-
-    def __init__(self,
-                 x,
-                 rainfall=None,
-                 poisson_rate_n_arma=None,
-                 gamma_mean_n_arma=None,
-                 cp_parameter_array=None):
-        super().__init__(x,
-                         rainfall,
-                         poisson_rate_n_arma,
-                         gamma_mean_n_arma,
-                         cp_parameter_array)
-        self.z_mcmc = None
-
-    def instantiate_mcmc(self):
-        """Instantiate all MCMC objects
-
-        Override
-        Only instantiate slice sampling for z
-        """
-        self.parameter_mcmc = None
-        self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
-
-    def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
-        #override to include MCMC samples
-        if self.forecaster is None:
-            self.forecaster = forecast.downscale.TimeSeriesForecaster(
-                self, memmap_path, i_space)
-            self.forecaster.start_forecast(n_simulation, x, memmap_shape)
-        else:
-            self.forecaster.memmap_path = memmap_path
-            self.forecaster.resume_forecast(n_simulation, memmap_shape)
-
-################################################################################
-#                             TO BE DEPRECATED
-################################################################################
 class TimeSeriesDownscaleDual(TimeSeriesDownscale):
 
     #change of behaviour: set_parameter_from_sample() require self.mcmc_index to
@@ -796,39 +823,3 @@ class TimeSeriesDownscaleDual(TimeSeriesDownscale):
     def set_model_field_vector(self, model_field_vector):
         self.x = np.reshape(
             model_field_vector, (len(self), self.n_model_field))
-################################################################################
-################################################################################
-
-class ForecastMessage(object):
-    #message to pass, see Downscale.forecast
-
-    def __init__(self, time_series, model_field, n_simulation):
-        self.time_series = time_series
-        self.model_field = model_field
-        self.n_simulation = n_simulation
-
-    def forecast(self):
-        return self.time_series.forecast(self.model_field, self.n_simulation)
-
-class PlotMcmcMessage(object):
-
-    def __init__(self, downscale, chain, time_series, i_space, directory):
-        self.sub_directory = path.join(directory, str(time_series.id))
-        if not path.isdir(self.sub_directory):
-            os.mkdir(self.sub_directory)
-        self.parameter_name = time_series.get_parameter_vector_name()
-        self.i_space = i_space
-        self.area_unmask = downscale.area_unmask
-        self.chain = chain
-
-    def print(self):
-        for i_parameter in range(len(self.parameter_name)):
-            chain_i = self.chain[:, i_parameter*self.area_unmask + self.i_space]
-            plt.figure()
-            plt.plot(chain_i)
-            plt.xlabel("sample number")
-            plt.ylabel(self.parameter_name[i_parameter])
-            plt.savefig(
-                path.join(self.sub_directory,
-                          "parameter_" + str(i_parameter) + ".pdf"))
-            plt.close()

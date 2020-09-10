@@ -38,6 +38,10 @@ class FitterDownscale(Fitter):
     def __init__(self, directory=""):
         super().__init__(compound_poisson.Downscale, directory)
 
+################################################################################
+#                              DEPRECATED
+################################################################################
+
 class FitterDownscaleDual(Fitter):
 
     def __init__(self, directory=""):
