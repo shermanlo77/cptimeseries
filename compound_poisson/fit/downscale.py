@@ -1,5 +1,6 @@
 import compound_poisson
 from compound_poisson import multiprocess
+from compound_poisson import forecast
 from compound_poisson.fit import fitter
 
 class Fitter(fitter.Fitter):
@@ -29,7 +30,7 @@ class Fitter(fitter.Fitter):
 
     def print_forecast(self, downscale, dataset, pool):
         #dataset is Data object (see dataset module)
-        compound_poisson.print.downscale_forecast(
+        forecast.print.downscale(
             downscale.forecaster, dataset, self.figure_dir, pool)
 
 class FitterDownscale(Fitter):

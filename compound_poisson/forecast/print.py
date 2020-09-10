@@ -57,7 +57,7 @@ def convert_year_to_date(year_array):
         date_array.append(datetime.date(year, 1, 1))
     return date_array
 
-def forecast(forecast, observed_rain, directory, prefix=""):
+def time_series(forecast, observed_rain, directory, prefix=""):
     """For plotting compound_poisson.forecast.time_series.Forecaster objects
 
     Plots the forecasts for each year:
@@ -222,7 +222,7 @@ def forecast(forecast, observed_rain, directory, prefix=""):
     #memmap of forecasts no longer needed
     forecast.del_memmap()
 
-def downscale_forecast(forecast_array, test_set, directory, pool):
+def downscale(forecast_array, test_set, directory, pool):
     """For plotting compound_poisson.forecast.downscale.Forecaster objects
 
     Plots:
@@ -430,5 +430,5 @@ class PrintForecastSeriesMessage(object):
             os.mkdir(self.series_sub_dir)
 
     def print(self):
-        forecast(
+        time_series(
             self.forecaster, self.observed_rain_i, self.series_sub_dir, "test")

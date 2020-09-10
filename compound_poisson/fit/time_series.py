@@ -7,6 +7,7 @@ import numpy as np
 
 import compound_poisson
 from compound_poisson.fit import fitter
+from compound_poisson import forecast
 
 class Fitter(fitter.Fitter):
 
@@ -50,11 +51,11 @@ class Fitter(fitter.Fitter):
     def print_forecast(self, time_series, dataset, pool=None):
         #dataset contains (training set, test set)
         rain = dataset[0].get_rain()
-        compound_poisson.print.forecast(
+        forecast.print.time_series(
             time_series.self_forecaster, rain, self.figure_dir, "training")
 
         rain = dataset[1].get_rain()
-        compound_poisson.print.forecast(
+        forecast.print.time_series(
             time_series.forecaster, rain, self.figure_dir, "test")
 
 class FitterMcmc(Fitter):

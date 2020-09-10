@@ -10,4 +10,3 @@ from compound_poisson.time_series_mcmc import TimeSeriesHyperSlice
 from compound_poisson import fit
 from compound_poisson import forecast
 from compound_poisson import parameter
-from compound_poisson import print
