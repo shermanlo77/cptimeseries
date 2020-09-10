@@ -19,7 +19,7 @@ def main():
     rain = london.rain
     time_series = compound_poisson.TimeSeries(model_field, rain)
     time_series.time_array = london.time_array
-    compound_poisson.print.time_series(time_series, figure_dir)
+    time_series.print_figures(figure_dir)
 
     for i in range(time_series.n_model_field):
         plt.figure()

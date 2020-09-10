@@ -4,7 +4,6 @@ import pathlib
 
 import matplotlib.pyplot as plt
 
-import compound_poisson
 import dataset
 
 def main():
@@ -15,7 +14,7 @@ def main():
 
     london = dataset.LondonSimulatedTraining()
     time_series = london.time_series
-    compound_poisson.print.time_series(time_series, figure_dir)
+    time_series.print_figures(figure_dir)
 
     for i in range(time_series.n_model_field):
         plt.figure()

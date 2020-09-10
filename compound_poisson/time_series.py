@@ -1,9 +1,15 @@
 import math
+from os import path
 import pathlib
 
+import cycler
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
 import pandas
+import pandas.plotting
+from statsmodels.tsa import stattools
 from scipy import special
 
 from compound_poisson import arma
@@ -622,6 +628,133 @@ class TimeSeries(object):
         """
         for parameter in self.cp_parameter_array:
             parameter.cast_arma(arma_class)
+
+    def print_figures(self, directory, prefix=""):
+        """Print figures
+
+        Save figure for precipitation time series
+        Save figure for cumulative frequency of precipitation in the time series
+        Save figures for sample autocorrelation and partial autocorrelation
+        Save figures for the poisson rate, gamma mean, gamma dispersion, latent
+            variable Z over time
+        Save the TimeSeries in text (converted to string which shows parameters)
+
+        Args:
+            directory: where to save the figures
+            prefix: what to name the figures
+        """
+
+        #required when plotting times on an axis
+        pandas.plotting.register_matplotlib_converters()
+
+        colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
+        cycle = cycler.cycler(color=[colours[0]], linewidth=[1])
+
+        #get autocorrelations
+        acf = stattools.acf(self.y_array, nlags=20, fft=True)
+        try:
+            pacf = stattools.pacf(self.y_array, nlags=20)
+        except(stattools.LinAlgError):
+            pacf = np.full(21, np.nan)
+
+        #print precipitation time series
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.plot(self.time_array, self.y_array)
+        plt.xlabel("time")
+        plt.ylabel("rainfall (mm)")
+        plt.savefig(path.join(directory, prefix + "rainfall.pdf"))
+        plt.close()
+
+        #print precipitation cumulative frequency
+        #draw dot for mass at 0 mm
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        rain_sorted = np.sort(self.y_array)
+        cdf = np.asarray(range(len(self)))
+        plt.plot(rain_sorted, cdf)
+        if np.any(rain_sorted == 0):
+            non_zero_index = rain_sorted.nonzero()[0]
+            if non_zero_index.size > 0:
+                non_zero_index = rain_sorted.nonzero()[0][0] - 1
+            else:
+                non_zero_index = len(cdf) - 1
+            plt.scatter(0, cdf[non_zero_index])
+        plt.xlabel("rainfall (mm)")
+        plt.ylabel("cumulative frequency")
+        plt.savefig(path.join(directory, prefix + "cdf.pdf"))
+        plt.close()
+
+        #plot sample autocorrelation
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.bar(np.asarray(range(acf.size)), acf)
+        plt.axhline(1/math.sqrt(len(self)), linestyle='--', linewidth=1)
+        plt.axhline(-1/math.sqrt(len(self)), linestyle='--', linewidth=1)
+        plt.xlabel("time (day)")
+        plt.ylabel("autocorrelation")
+        plt.savefig(path.join(directory, prefix + "acf.pdf"))
+        plt.close()
+
+        #plot sample partial autocorrelation
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.bar(np.asarray(range(pacf.size)), pacf)
+        plt.axhline(1/math.sqrt(len(self)), linestyle='--', linewidth=1)
+        plt.axhline(-1/math.sqrt(len(self)), linestyle='--', linewidth=1)
+        plt.xlabel("time (day)")
+        plt.ylabel("partial autocorrelation")
+        plt.savefig(path.join(directory, prefix + "pacf.pdf"))
+        plt.close()
+
+        #plot the poisson rate over time
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.plot(self.time_array, self.poisson_rate.value_array)
+        plt.xlabel("time")
+        plt.ylabel("poisson rate")
+        plt.savefig(path.join(directory, prefix + "poisson_rate.pdf"))
+        plt.close()
+
+        #plot the gamma mean over time
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.plot(self.time_array, self.gamma_mean.value_array)
+        plt.xlabel("time")
+        plt.ylabel("gamma mean (mm)")
+        plt.savefig(path.join(directory, prefix + "gamma_mean.pdf"))
+        plt.close()
+
+        #plot the gamme dispersion over time
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.plot(self.time_array, self.gamma_dispersion.value_array)
+        plt.xlabel("time")
+        plt.ylabel("gamma dispersion")
+        plt.savefig(path.join(directory, prefix + "gamma_dispersion.pdf"))
+        plt.close()
+
+        #plot the latent variable z over time
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle)
+        plt.plot(self.time_array, self.z_array)
+        plt.xlabel("time")
+        plt.ylabel("Z")
+        plt.savefig(path.join(directory, prefix + "z.pdf"))
+        plt.close()
+
+        #print the parameters in text
+        file = open(path.join(directory, prefix + "parameter.txt"), "w")
+        file.write(str(self))
+        file.close()
 
     def __str__(self):
         #return the reg parameters for each cp parameter
