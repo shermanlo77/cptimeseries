@@ -18,7 +18,7 @@ def main():
         burn_in = 3000
     is_print = not parser.parse_args().noprint
 
-    fitter = fit.downscale.FitterDownscaleDual()
+    fitter = fit.downscale.FitterDownscale()
     fitter.forecast(dataset.WalesTest(), n_simulation, burn_in, pool, is_print)
     pool.join()
 

@@ -15,7 +15,7 @@ def main():
         burn_in = 2000
 
     fitter = fit.time_series.FitterHyperSlice()
-    fitter.forecast((dataset.CardiffTrainingHalf(), dataset.CardiffTest()),
+    fitter.forecast((dataset.Cardiff10Training(), dataset.CardiffTest()),
                     n_simulation,
                     burn_in)
 

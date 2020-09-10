@@ -449,6 +449,25 @@ class Data(object):
         self.rain = self.rain[time[0]:time[1], :, :]
         self.time_array = self.time_array[time[0]:time[1]]
 
+    def trim_by_year(self, year_start, year_end):
+        #year_start inclusive
+        #year_end exclusive
+        array_index = np.zeros(len(self), dtype=np.bool);
+        year_array = np.arange(year_start, year_end);
+        for year in year_array:
+            for i, date in enumerate(self.time_array):
+                if date.year == year:
+                    array_index[i] = True
+
+        for key, model_field in self.model_field.items():
+            self.model_field[key] = model_field[array_index, :, :]
+        self.rain = self.rain[array_index, :, :]
+
+        self.time_array = np.asarray(self.time_array)
+        self.time_array = self.time_array[array_index]
+        self.time_array = self.time_array.tolist()
+
+
     def generate_unmask_rain(self):
         for lat_i, long_i in self.generate_unmask_coordinates():
             yield self.rain[:, lat_i, long_i]

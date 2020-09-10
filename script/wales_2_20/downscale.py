@@ -13,9 +13,9 @@ def main():
     parser.add_argument("--sample", help="number of mcmc samples", type=int)
     n_sample = parser.parse_args().sample
 
-    seed = random.SeedSequence(41678064398867675209821814469664968203)
-    fitter = fit.downscale.FitterDownscaleDual()
-    fitter.fit(dataset.Wales5Test(), seed, n_sample, pool)
+    seed = random.SeedSequence(213813216190336800634916510170977268768)
+    fitter = fit.downscale.FitterDownscale()
+    fitter.fit(dataset.Wales2Training(), seed, n_sample, pool)
 
     pool.join()
 

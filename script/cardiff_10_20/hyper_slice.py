@@ -12,7 +12,7 @@ def main():
 
     seed = random.SeedSequence(177782466634943011322205683796258167716)
     fitter = fit.time_series.FitterHyperSlice()
-    fitter.fit(dataset.CardiffTrainingHalf(), seed, n_sample)
+    fitter.fit(dataset.Cardiff10Training(), seed, n_sample)
 
 if __name__ == "__main__":
     main()
