@@ -233,7 +233,7 @@ class Mcmc(object):
         self.sample_array[self.sample_pointer] = state
         self.sample_pointer += 1
 
-def do_gibbs_sampling(mcmc_array, n_sample, rng, prob_sample,
+def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
         is_initial_sample=True):
     """Do Gibbs sampling
 
@@ -246,11 +246,14 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, prob_sample,
         mcmc_array: array of mcmc objects
         n_sample: number of samples to be obtained
         rng: random number generator
-        prob_sample: array of probabilities, same length as mcmc_array, must
-            add up to one, each element correspond to a component, probability
-            that component gets sampled in a Gibbs step
+        gibbs_weight: array of probabilities up to a constant, same length as
+            mcmc_array, each element correspond to a component, proportional to
+            probability that component gets sampled in a Gibbs step
         is_initial_sample: boolean, the initial value is a sample if True
     """
+
+    prob_sample = np.asarray(gibbs_weight)
+    prob_sample = prob_sample / np.sum(prob_sample)
     #initial value is a sample
     if is_initial_sample:
         print("Sample initial")

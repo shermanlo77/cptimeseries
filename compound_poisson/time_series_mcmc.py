@@ -24,7 +24,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         parameter_mcmc: Mcmc object which does MCMC using parameter_target
         z_target: wrapper Target object to evaluate the posterior of z
         z_mcmc: Mcmc object which does MCMC using z_target
-        gibbs_weight: probability of sampling each mcmc in self.get_mcmc_array()
+        gibbs_weight: up to a constant, probability of sampling each mcmc in
+            self.get_mcmc_array()
         burn_in: integer, which samples to discard when doing posterior sampling
             which is used for forecasting
         memmap_dir: directory to store the MCMC samples
@@ -46,7 +47,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.parameter_mcmc = None
         self.z_target = target_time_series.TargetZ(self)
         self.z_mcmc = None
-        self.gibbs_weight = [0.55, 0.45]
+        self.gibbs_weight = [0.003*len(self), 1]
         self.burn_in = 0
         self.memmap_dir = ""
 
@@ -324,7 +325,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         self.precision_target = target_time_series.TargetPrecision(self)
         #mcmc object evaluated at instantiate_mcmc
         self.precision_mcmc = None
-        self.gibbs_weight = [0.5, 0.4, 0.1]
+        self.gibbs_weight = [0.003*len(self), 1, 0.2]
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
