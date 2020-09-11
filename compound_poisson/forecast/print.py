@@ -95,7 +95,16 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     year_index_dir = get_year_index_dir(time_array)
     year_array = np.asarray(list(year_index_dir))
 
-    rmse_array = [] #array for storing rmse for each year
+    #array for storing errors for each year
+    rmse_array = []
+    r10_array = []
+    mae_array = []
+
+    #error for the entire test set
+    rmse = forecast.get_error_rmse(observed_rain)
+    r10 = forecast.get_error_r10(observed_rain)
+    mae = forecast.get_error_mae(observed_rain)
+
     #dictionary of AUC for different thresholds, key is amount of rain, value is
         #array containing AUC for each year
     auc_array = {}
@@ -109,6 +118,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         forecast_sliced = forecast[index]
         observed_rain_i = observed_rain[index]
         rmse_array.append(forecast_sliced.get_error_rmse(observed_rain_i))
+        r10_array.append(forecast_sliced.get_error_r10(observed_rain_i))
+        mae_array.append(forecast_sliced.get_error_mae(observed_rain_i))
 
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
@@ -201,12 +212,35 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_auc.pdf"))
     plt.close()
 
+    year_x_axis = convert_year_to_date(year_array)
+    first_year = year_x_axis[0]
+    last_year = year_x_axis[len(year_x_axis)-1]
+
     #plot rmse for each year
     plt.figure()
-    plt.plot(convert_year_to_date(year_array), rmse_array, '-o')
+    plt.plot(year_x_axis, rmse_array, '-o')
+    plt.hlines(rmse, first_year, last_year, linestyles='dashed')
     plt.xlabel("year")
     plt.ylabel("root mean square error (mm)")
     plt.savefig(path.join(directory, prefix + "_rmse.pdf"))
+    plt.close()
+
+    #plot r10 for each year
+    plt.figure()
+    plt.plot(year_x_axis, r10_array, '-o')
+    plt.hlines(r10, first_year, last_year, linestyles='dashed')
+    plt.xlabel("year")
+    plt.ylabel("r10 error(mm)")
+    plt.savefig(path.join(directory, prefix + "_r10.pdf"))
+    plt.close()
+
+    #plot mae for each year
+    plt.figure()
+    plt.plot(year_x_axis, mae_array, '-o')
+    plt.hlines(mae, first_year, last_year, linestyles='dashed')
+    plt.xlabel("year")
+    plt.ylabel("mean absolute error (mm)")
+    plt.savefig(path.join(directory, prefix + "_mae.pdf"))
     plt.close()
 
     #plot roc curve for the entire test set

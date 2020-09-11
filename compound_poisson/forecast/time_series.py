@@ -114,19 +114,47 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_curve = None
         return roc_curve
 
-    def get_error_rmse(self, true_y):
-        """Return root mean square error
-
-        Compare forecast with a given true_y using the root mean squared error
+    def get_error_rmse(self, observed_data):
+        """Return the root mean squared error
 
         Args:
-            true_y: array of y
+            observed_data: numpy array containing the observed rain for each day
 
         Return:
-            root mean square error
+            root mean squared error
         """
-        n = len(true_y)
-        return np.sqrt(np.sum(np.square(self.forecast_median - true_y)) / n)
+        n = len(observed_data)
+        return np.sqrt(
+            np.sum(np.square(self.forecast_median - observed_data)) / n)
+
+    def get_error_r10(self, observed_data):
+        """Return the root mean squared error only for observed precipitation
+            over 10 mm
+
+        Args:
+            observed_data: numpy array containing the observed rain for each day
+
+        Return:
+            root mean squared error (only for observed precipitation over 10 mm)
+        """
+        is_above_10 = observed_data >= 10
+        observed_10 = observed_data[is_above_10]
+        forecast_10 = self.forecast_median[is_above_10]
+        n = len(observed_10)
+        return np.sqrt(
+            np.sum(np.square(forecast_10 - observed_10)) / n)
+
+    def get_error_mae(self, observed_data):
+        """Return the mean absolute error
+
+        Args:
+            observed_data: numpy array containing the observed rain for each day
+
+        Return:
+            mean absolute error
+        """
+        n = len(observed_data)
+        return np.sum(np.absolute(self.forecast_median - observed_data)) / n
 
     def get_error_square_sqrt(self, true_y):
         """Return square mean sqrt error

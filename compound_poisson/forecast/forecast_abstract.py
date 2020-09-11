@@ -4,6 +4,8 @@ from os import path
 
 import numpy as np
 
+from compound_poisson import multiprocess
+
 class Forecaster(object):
     """Contain Monte Carlo forecasts
 
@@ -120,7 +122,7 @@ class Forecaster(object):
         raise NotImplementedError
 
     def get_prob_rain(self, rain, index=None):
-        """Get the probability if it will rain at least of a certian amount
+        """Get the probability if it will rain at least of a certain amount
 
         Args:
             rain: scalar, amount of rain to evaluate the probability
