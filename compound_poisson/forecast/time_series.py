@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
+from compound_poisson.forecast import error
 from compound_poisson.forecast import forecast_abstract
 from compound_poisson import roc
 
@@ -123,9 +124,9 @@ class Forecaster(forecast_abstract.Forecaster):
         Return:
             root mean squared error
         """
-        n = len(observed_data)
-        return np.sqrt(
-            np.sum(np.square(self.forecast_median - observed_data)) / n)
+        rmse = error.RootMeanSquareError()
+        rmse.add_data(self, observed_data)
+        return rmse.get_error()
 
     def get_error_r10(self, observed_data):
         """Return the root mean squared error only for observed precipitation
@@ -137,12 +138,9 @@ class Forecaster(forecast_abstract.Forecaster):
         Return:
             root mean squared error (only for observed precipitation over 10 mm)
         """
-        is_above_10 = observed_data >= 10
-        observed_10 = observed_data[is_above_10]
-        forecast_10 = self.forecast_median[is_above_10]
-        n = len(observed_10)
-        return np.sqrt(
-            np.sum(np.square(forecast_10 - observed_10)) / n)
+        r10 = error.RootMeanSquare10Error()
+        r10.add_data(self, observed_data)
+        return r10.get_error()
 
     def get_error_mae(self, observed_data):
         """Return the mean absolute error
@@ -153,41 +151,9 @@ class Forecaster(forecast_abstract.Forecaster):
         Return:
             mean absolute error
         """
-        n = len(observed_data)
-        return np.sum(np.absolute(self.forecast_median - observed_data)) / n
-
-    def get_error_square_sqrt(self, true_y):
-        """Return square mean sqrt error
-
-        Compare forecast with a given true_y using the square mean sqrt error.
-            This is the Tweedie deviance with p = 1.5
-
-        Args:
-            true_y: array of y
-
-        Return:
-            square mean sqrt error, can be infinite
-        """
-        n = len(true_y)
-        error = np.zeros(n)
-        is_infinite = False
-        for i in range(n):
-            y = true_y[i]
-            y_hat = self.forecast[i]
-            if y == 0:
-                error[i] = math.sqrt(y_hat)
-            else:
-                if y_hat == 0:
-                    is_infinite = True
-                    break
-                else:
-                    sqrt_y_hat = math.sqrt(y_hat)
-                    error[i] = (4 * math.pow(math.sqrt(y) - sqrt_y_hat, 2)
-                        / sqrt_y_hat)
-        if is_infinite:
-            return math.inf
-        else:
-            return math.pow(np.sum(error) / n, 2)
+        mae = error.MeanAbsoluteError()
+        mae.add_data(self, observed_data)
+        return mae.get_error()
 
     def __getitem__(self, index):
         #only to be used for plotting purposes
