@@ -19,6 +19,7 @@ import pandas.plotting
 
 import compound_poisson
 from compound_poisson import roc
+from compound_poisson.forecast import error
 import dataset
 
 RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]
@@ -230,7 +231,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.plot(year_x_axis, r10_array, '-o')
     plt.hlines(r10, first_year, last_year, linestyles='dashed')
     plt.xlabel("year")
-    plt.ylabel("r10 error(mm)")
+    plt.ylabel("r10 error (mm)")
     plt.savefig(path.join(directory, prefix + "_r10.pdf"))
     plt.close()
 
@@ -290,13 +291,18 @@ def downscale(forecast_array, test_set, directory, pool):
         #precipitation for each point in space and time, 0th dimension is time,
         #remaining is space
     forecast_map = ma.empty_like(test_set.rain)
-    #root mean square error, 2 dimension, for each point in space
+    #errors, 2 dimension, for each point in space
     rmse_map = ma.empty_like(test_set.rain[0])
+    r10_map = ma.empty_like(test_set.rain[0])
+    mae_map = ma.empty_like(test_set.rain[0])
     #area under curve, dictionary, keys: for each precipitation in
         #RAIN_THRESHOLD_ARRAY, value: array, auc for each year
     auc_array = {}
-    #root mean square error for each year
+    #errors for each year
     rmse_array = []
+    r10_array = []
+    mae_array = []
+    #auc for each year
     for rain in RAIN_THRESHOLD_ARRAY:
         auc_array[rain] = []
 
@@ -319,6 +325,8 @@ def downscale(forecast_array, test_set, directory, pool):
         forecaster = time_series_i.forecaster
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
         rmse_map[lat_i, long_i] = forecaster.get_error_rmse(observed_rain_i)
+        r10_map[lat_i, long_i] = forecaster.get_error_r10(observed_rain_i)
+        mae_map[lat_i, long_i] = forecaster.get_error_mae(observed_rain_i)
 
     #plot the spatial forecast for each time (in parallel)
     message_array = []
@@ -333,17 +341,19 @@ def downscale(forecast_array, test_set, directory, pool):
         message_array.append(message)
     pool.map(PrintForecastMapMessage.print, message_array)
 
-    #plot rmse
-    plt.figure()
-    ax = plt.axes(projection=crs.PlateCarree())
-    im = ax.pcolor(longitude_grid,
-                   latitude_grid,
-                   rmse_map)
-    ax.coastlines(resolution="50m")
-    plt.colorbar(im)
-    ax.set_aspect("auto", adjustable=None)
-    plt.savefig(path.join(directory, "rmse_map.pdf"))
-    plt.close()
+    #plot the errors
+    for error_name, error_map in zip(
+        ["rmse", "r10", "mae"], [rmse_map, r10_map, mae_map]):
+        plt.figure()
+        ax = plt.axes(projection=crs.PlateCarree())
+        im = ax.pcolor(longitude_grid,
+                       latitude_grid,
+                       error_map)
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.savefig(path.join(directory, error_name+"_map.pdf"))
+        plt.close()
 
     #plot the forecast (time series) for each location (in parallel)
     message_array = []
@@ -372,20 +382,18 @@ def downscale(forecast_array, test_set, directory, pool):
         plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
         plt.close()
 
-        #work out root mean square over space
-        rmse_array_i = []
-        for time_series_i, observed_rain_i in (
-            zip(downscale.generate_unmask_time_series(),
-                test_set.generate_unmask_rain())):
-            forecaster_i = time_series_i.forecaster
-            forecaster_i.load_memmap("r")
-            forecast_sliced_i = time_series_i.forecaster[index]
-            observed_rain_sliced_i = observed_rain_i[index]
-            rmse_array_i.append(forecast_sliced_i.get_error_rmse(
-                observed_rain_sliced_i))
-            forecaster_i.del_memmap()
-        #root mean square, so need to sum the squares
-        rmse_array.append(math.sqrt(np.mean(np.square(rmse_array_i))))
+        #work out errors over space
+        rmse = forecast_array.get_error(error.RootMeanSquareError(), index)
+        rmse_array.append(rmse)
+        r10 = forecast_array.get_error(error.RootMeanSquare10Error(), index)
+        r10_array.append(r10)
+        mae = forecast_array.get_error(error.MeanAbsoluteError(), index)
+        mae_array.append(mae)
+
+    #errors usng the entire test set
+    rmse = forecast_array.get_error(error.RootMeanSquareError())
+    r10 = forecast_array.get_error(error.RootMeanSquare10Error())
+    mae = forecast_array.get_error(error.MeanAbsoluteError())
 
     #plot auc for each year
     plt.figure()
@@ -401,12 +409,35 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.savefig(path.join(directory, "auc.pdf"))
     plt.close()
 
+    year_x_axis = convert_year_to_date(year_array)
+    first_year = year_x_axis[0]
+    last_year = year_x_axis[len(year_x_axis)-1]
+
     #plot rmse for each year
     plt.figure()
-    plt.plot(convert_year_to_date(year_array), rmse_array, '-o')
+    plt.plot(year_x_axis, rmse_array, '-o')
+    plt.hlines(rmse, first_year, last_year, linestyles='dashed')
     plt.xlabel("year")
     plt.ylabel("root mean square error (" + rain_units + ")")
     plt.savefig(path.join(directory, "rmse.pdf"))
+    plt.close()
+
+    #plot r10 for each year
+    plt.figure()
+    plt.plot(year_x_axis, r10_array, '-o')
+    plt.hlines(r10, first_year, last_year, linestyles='dashed')
+    plt.xlabel("year")
+    plt.ylabel("r10 error (" + rain_units + ")")
+    plt.savefig(path.join(directory, "r10.pdf"))
+    plt.close()
+
+    #plot mae for each year
+    plt.figure()
+    plt.plot(year_x_axis, mae_array, '-o')
+    plt.hlines(mae, first_year, last_year, linestyles='dashed')
+    plt.xlabel("year")
+    plt.ylabel("mean absolute error  (" + rain_units + ")")
+    plt.savefig(path.join(directory, "mae.pdf"))
     plt.close()
 
     #plot roc curve over the entire test set
