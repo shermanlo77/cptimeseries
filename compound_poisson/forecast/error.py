@@ -19,6 +19,12 @@ class Error(object):
     def get_error(self):
         raise NotImplementedError
 
+    def get_short_name():
+        raise NotImplementedError
+
+    def get_name():
+        raise NotImplementedError
+
 class RootMeanSquareError(Error):
 
     def __init__(self):
@@ -33,6 +39,12 @@ class RootMeanSquareError(Error):
     def get_error(self):
         return math.sqrt(self.sum_square / self.n)
 
+    def get_short_name():
+        return "rmse"
+
+    def get_axis_label():
+        return "root mean square error"
+
 class RootMeanSquare10Error(RootMeanSquareError):
 
     def __init__(self):
@@ -44,6 +56,12 @@ class RootMeanSquare10Error(RootMeanSquareError):
         forecast_10 = forecast.forecast_median[is_above_10]
         self.n += len(observed_10)
         self.sum_square += np.sum(np.square(forecast_10 - observed_10))
+
+    def get_short_name():
+        return "r10"
+
+    def get_axis_label():
+        return "rmse 10"
 
 class MeanAbsoluteError(Error):
 
@@ -59,3 +77,9 @@ class MeanAbsoluteError(Error):
 
     def get_error(self):
         return self.sum_error / self.n
+
+    def get_short_name():
+        return "mae"
+
+    def get_axis_label():
+        return "mean absolute error"
