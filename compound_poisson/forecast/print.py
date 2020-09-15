@@ -20,43 +20,11 @@ import pandas.plotting
 import compound_poisson
 from compound_poisson import roc
 from compound_poisson.forecast import error
+from compound_poisson.forecast import time_segmentation
 import dataset
 
 RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]
 RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 10, 15]
-
-def get_year_index_dir(time_array):
-    """For splitting the time_array into different years, used for plotting
-        figures for different years
-
-    Args:
-        time_array: array of dates
-
-    Return:
-        dictionary, keys are years, values are slice objects pointing to that
-            year
-    """
-    #key: years #value: index of times with that year
-    year_index_dir = {}
-    for i, time in enumerate(time_array):
-        year = time.year
-        if not year in year_index_dir:
-            year_index_dir[year] = []
-        year_index_dir[year].append(i)
-    #convert index into slice objects
-    for year, index in year_index_dir.items():
-        year_index_dir[year] = slice(index[0], index[-1]+1)
-    return year_index_dir
-
-def convert_year_to_date(year_array):
-    """Convert array of years (integer or float) to datetime object
-
-    Month 1, day 1 used
-    """
-    date_array = []
-    for year in year_array:
-        date_array.append(datetime.date(year, 1, 1))
-    return date_array
 
 def time_series(forecast, observed_rain, directory, prefix=""):
     """For plotting compound_poisson.forecast.time_series.Forecaster objects
@@ -93,8 +61,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #split time_array into different years
     time_array = forecast.time_array
-    year_index_dir = get_year_index_dir(time_array)
-    year_array = np.asarray(list(year_index_dir))
+    year_segmentator = time_segmentation.YearSegmentator(time_array)
+    date_array = []
 
     #array for storing errors for each year
     rmse_array = []
@@ -113,7 +81,10 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         auc_array[rain] = []
 
     #for each year
-    for year, index in year_index_dir.items():
+    for date, index in year_segmentator:
+
+        year = date.year
+        date_array.append(date)
 
         #slice the current forecast and observation and plot
         forecast_sliced = forecast[index]
@@ -205,21 +176,19 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         label = str(rain) + " mm"
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
-        year_plot = convert_year_to_date(year_array[is_number])
-        plt.plot(year_plot, auc[is_number], '-o', label=label)
+        plt.plot(date_array, auc[is_number], '-o', label=label)
     plt.legend()
     plt.xlabel("year")
     plt.ylabel("area under curve")
     plt.savefig(path.join(directory, prefix + "_auc.pdf"))
     plt.close()
 
-    year_x_axis = convert_year_to_date(year_array)
-    first_year = year_x_axis[0]
-    last_year = year_x_axis[len(year_x_axis)-1]
+    first_year = date_array[0]
+    last_year = date_array[len(date_array)-1]
 
     #plot rmse for each year
     plt.figure()
-    plt.plot(year_x_axis, rmse_array, '-o')
+    plt.plot(date_array, rmse_array, '-o')
     plt.hlines(rmse, first_year, last_year, linestyles='dashed')
     plt.xlabel("year")
     plt.ylabel("root mean square error (mm)")
@@ -228,7 +197,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #plot r10 for each year
     plt.figure()
-    plt.plot(year_x_axis, r10_array, '-o')
+    plt.plot(date_array, r10_array, '-o')
     plt.hlines(r10, first_year, last_year, linestyles='dashed')
     plt.xlabel("year")
     plt.ylabel("r10 error (mm)")
@@ -237,7 +206,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #plot mae for each year
     plt.figure()
-    plt.plot(year_x_axis, mae_array, '-o')
+    plt.plot(date_array, mae_array, '-o')
     plt.hlines(mae, first_year, last_year, linestyles='dashed')
     plt.xlabel("year")
     plt.ylabel("mean absolute error (mm)")
