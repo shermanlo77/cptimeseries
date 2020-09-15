@@ -70,9 +70,9 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     mae_array = []
 
     #error for the entire test set
-    rmse = forecast.get_error_rmse(observed_rain)
-    r10 = forecast.get_error_r10(observed_rain)
-    mae = forecast.get_error_mae(observed_rain)
+    rmse = forecast.get_error(observed_rain, error.RootMeanSquareError())
+    r10 = forecast.get_error(observed_rain, error.RootMeanSquare10Error())
+    mae = forecast.get_error(observed_rain, error.MeanAbsoluteError())
 
     #dictionary of AUC for different thresholds, key is amount of rain, value is
         #array containing AUC for each year
@@ -89,9 +89,15 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         #slice the current forecast and observation and plot
         forecast_sliced = forecast[index]
         observed_rain_i = observed_rain[index]
-        rmse_array.append(forecast_sliced.get_error_rmse(observed_rain_i))
-        r10_array.append(forecast_sliced.get_error_r10(observed_rain_i))
-        mae_array.append(forecast_sliced.get_error_mae(observed_rain_i))
+        rmse_array.append(
+            forecast_sliced.get_error(observed_rain_i,
+                                      error.RootMeanSquareError()))
+        r10_array.append(
+            forecast_sliced.get_error(observed_rain_i,
+                                      error.RootMeanSquare10Error()))
+        mae_array.append(
+            forecast_sliced.get_error(observed_rain_i,
+                                      error.MeanAbsoluteError()))
 
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median

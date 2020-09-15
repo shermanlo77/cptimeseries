@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-from compound_poisson.forecast import error
 from compound_poisson.forecast import forecast_abstract
 from compound_poisson import roc
 
@@ -115,45 +114,16 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_curve = None
         return roc_curve
 
-    def get_error_rmse(self, observed_data):
-        """Return the root mean squared error
+    def get_error(self, observed_data, error, index=None):
+        """Evaluate the forecast prediction of the test set
 
         Args:
+            error: a newly instantiated compound_poisson.forecast.error.Error
+                object
             observed_data: numpy array containing the observed rain for each day
-
-        Return:
-            root mean squared error
         """
-        rmse = error.RootMeanSquareError()
-        rmse.add_data(self, observed_data)
-        return rmse.get_error()
-
-    def get_error_r10(self, observed_data):
-        """Return the root mean squared error only for observed precipitation
-            over 10 mm
-
-        Args:
-            observed_data: numpy array containing the observed rain for each day
-
-        Return:
-            root mean squared error (only for observed precipitation over 10 mm)
-        """
-        r10 = error.RootMeanSquare10Error()
-        r10.add_data(self, observed_data)
-        return r10.get_error()
-
-    def get_error_mae(self, observed_data):
-        """Return the mean absolute error
-
-        Args:
-            observed_data: numpy array containing the observed rain for each day
-
-        Return:
-            mean absolute error
-        """
-        mae = error.MeanAbsoluteError()
-        mae.add_data(self, observed_data)
-        return mae.get_error()
+        error.add_data(self, observed_data)
+        return error.get_error()
 
     def __getitem__(self, index):
         #only to be used for plotting purposes
