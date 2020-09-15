@@ -155,8 +155,11 @@ class Forecaster(forecast_abstract.Forecaster):
                 roc_array.append(None)
         return roc_array
 
-    def get_error(self, error, index=None):
-        """Evaluate the forecast prediction of the test set
+    def add_data_to_error(self, error, index=None):
+        """Add more data to a Error object
+
+        Add more data to an Error object, used for assessing the forecast
+            prediction of the test set
 
         Args:
             error: a newly instantiated compound_poisson.forecast.error.Error
@@ -176,7 +179,17 @@ class Forecaster(forecast_abstract.Forecaster):
 
             error.add_data(forecaster_i, observed_rain_i)
             forecaster_i.del_memmap()
-        return error.get_error()
+        return error
+
+    def get_error(self, error, index=None):
+        """Assess the forecast prediction of the test set
+
+        Args:
+            error: a newly instantiated compound_poisson.forecast.error.Error
+                object
+            index: optional, index of times
+        """
+        return self.add_data_to_error(error, index).get_error()
 
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class

@@ -181,7 +181,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
-    error_segmentation.TimeSeries.plot_error(
+    error_segmenator = error_segmentation.TimeSeries()
+    error_segmenator.plot_error(
         forecast, observed_rain, year_segmentator, directory, prefix)
 
     #memmap of forecasts no longer needed
@@ -228,10 +229,6 @@ def downscale(forecast_array, test_set, directory, pool):
     #area under curve, dictionary, keys: for each precipitation in
         #RAIN_THRESHOLD_ARRAY, value: array, auc for each year
     auc_array = {}
-    #errors for each year
-    rmse_array = []
-    r10_array = []
-    mae_array = []
     #auc for each year
     for rain in RAIN_THRESHOLD_ARRAY:
         auc_array[rain] = []
@@ -322,19 +319,6 @@ def downscale(forecast_array, test_set, directory, pool):
         plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
         plt.close()
 
-        #work out errors over space
-        rmse = forecast_array.get_error(error.RootMeanSquareError(), index)
-        rmse_array.append(rmse)
-        r10 = forecast_array.get_error(error.RootMeanSquare10Error(), index)
-        r10_array.append(r10)
-        mae = forecast_array.get_error(error.MeanAbsoluteError(), index)
-        mae_array.append(mae)
-
-    #errors usng the entire test set
-    rmse = forecast_array.get_error(error.RootMeanSquareError())
-    r10 = forecast_array.get_error(error.RootMeanSquare10Error())
-    mae = forecast_array.get_error(error.MeanAbsoluteError())
-
     #plot auc for each year
     plt.figure()
     for rain in RAIN_THRESHOLD_ARRAY:
@@ -349,33 +333,6 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.savefig(path.join(directory, "auc.pdf"))
     plt.close()
 
-    #plot rmse for each year
-    plt.figure()
-    plt.plot(date_array, rmse_array, '-o')
-    plt.hlines(rmse, date_array[0], date_array[-1], linestyles='dashed')
-    plt.xlabel("year")
-    plt.ylabel("root mean square error (" + rain_units + ")")
-    plt.savefig(path.join(directory, "rmse.pdf"))
-    plt.close()
-
-    #plot r10 for each year
-    plt.figure()
-    plt.plot(date_array, r10_array, '-o')
-    plt.hlines(r10, date_array[0], date_array[-1], linestyles='dashed')
-    plt.xlabel("year")
-    plt.ylabel("r10 error (" + rain_units + ")")
-    plt.savefig(path.join(directory, "r10.pdf"))
-    plt.close()
-
-    #plot mae for each year
-    plt.figure()
-    plt.plot(date_array, mae_array, '-o')
-    plt.hlines(mae, date_array[0], date_array[-1], linestyles='dashed')
-    plt.xlabel("year")
-    plt.ylabel("mean absolute error  (" + rain_units + ")")
-    plt.savefig(path.join(directory, "mae.pdf"))
-    plt.close()
-
     #plot roc curve over the entire test set
     plt.figure()
     roc_curve_array = forecast_array.get_roc_curve_array(
@@ -385,6 +342,9 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.legend(loc="lower right")
     plt.savefig(path.join(directory, "test_roc_full.pdf"))
     plt.close()
+
+    error_segmenator = error_segmentation.Downscale()
+    error_segmenator.plot_error(forecast_array, year_segmentator, directory)
 
 class PrintForecastMapMessage(object):
     """For printing forecast over space for a given time point (in parallel)

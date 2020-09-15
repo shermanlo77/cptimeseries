@@ -43,7 +43,7 @@ class RootMeanSquareError(Error):
         return "rmse"
 
     def get_axis_label():
-        return "root mean square error"
+        return "root mean square error (mm)"
 
 class RootMeanSquare10Error(RootMeanSquareError):
 
@@ -61,7 +61,7 @@ class RootMeanSquare10Error(RootMeanSquareError):
         return "r10"
 
     def get_axis_label():
-        return "rmse 10"
+        return "rmse 10 (mm)"
 
 class MeanAbsoluteError(Error):
 
@@ -82,4 +82,4 @@ class MeanAbsoluteError(Error):
         return "mae"
 
     def get_axis_label():
-        return "mean absolute error"
+        return "mean absolute error (mm)"

@@ -20,7 +20,11 @@ ERROR_CLASSES = [
 
 class TimeSeries(object):
 
-    def plot_error(forecast,
+    def __init__(self):
+        pass
+
+    def plot_error(self,
+                   forecast,
                    observed_rain,
                    time_segmentator,
                    directory,
@@ -49,16 +53,12 @@ class TimeSeries(object):
         #for each segmentation
         for date, index in time_segmentator:
             time_array.append(date) #get the date of this segmentation
-            #slice the data to capture this segmentation
-            forecast_sliced = forecast[index]
-            observed_rain_i = observed_rain[index]
 
-            #add data from this segmentation
-            for i_error, error_class in enumerate(ERROR_CLASSES):
-                error_all_array[i_error].add_data(
-                    forecast_sliced, observed_rain_i)
-                error_plot_array[i_error].append(
-                    forecast_sliced.get_error(observed_rain_i, error_class()))
+            self.evaluate_error(forecast,
+                                observed_rain,
+                                index,
+                                error_all_array,
+                                error_plot_array)
 
         #plot for each error
         pandas.plotting.register_matplotlib_converters()
@@ -75,3 +75,42 @@ class TimeSeries(object):
                 path.join(directory,
                           prefix + "_" + error_class.get_short_name() + ".pdf"))
             plt.close()
+
+    def evaluate_error(self,
+                       forecast,
+                       observed_rain,
+                       index,
+                       error_all_array,
+                       error_plot_array):
+        #slice the data to capture this segmentation
+        forecast_sliced = forecast[index]
+        observed_rain_i = observed_rain[index]
+        #add data from this segmentation
+        for i_error, error_class in enumerate(ERROR_CLASSES):
+            error_all_array[i_error].add_data(
+                forecast_sliced, observed_rain_i)
+            error_plot_array[i_error].append(
+                forecast_sliced.get_error(observed_rain_i, error_class()))
+
+class Downscale(TimeSeries):
+
+    def plot_error(self,
+                   forecast,
+                   time_segmentator,
+                   directory,
+                   prefix=""):
+        #the forecaster object for downscale already has the test set
+        super().plot_error(forecast, None, time_segmentator, directory, prefix)
+
+    def evaluate_error(self,
+                       forecast,
+                       observed_rain,
+                       index,
+                       error_all_array,
+                       error_plot_array):
+        #observed_rain unused
+        #add data from this segmentation
+        for i_error, error_class in enumerate(ERROR_CLASSES):
+            forecast.add_data_to_error(error_all_array[i_error], index)
+            error_plot_array[i_error].append(
+                forecast.get_error(error_class(), index))
