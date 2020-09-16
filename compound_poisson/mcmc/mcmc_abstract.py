@@ -221,6 +221,9 @@ class Mcmc(object):
         del sample_array_old
         self.del_memmap()
 
+    def return_self(self):
+        return self
+
     def __len__(self):
         return len(self.sample_array)
 
@@ -232,6 +235,43 @@ class Mcmc(object):
             state = state.astype(self.dtype)
         self.sample_array[self.sample_pointer] = state
         self.sample_pointer += 1
+
+class ReadOnlyFromSlice(Mcmc):
+
+    def __init__(self, mcmc, slice_index):
+        super().__init__(mcmc.dtype)
+        self.n_sample = mcmc.n_sample
+        self.n_dim = mcmc.n_dim
+        self.memmap_path = mcmc.memmap_path
+        self.slice_index = slice_index
+        self.mcmc = None
+
+    def wrap_mcmc(self, mcmc):
+        self.mcmc = mcmc
+
+    def sample(self):
+        #will throw an exception if self.mcmc is still None, designed to ensure
+            #nothing is done when sample() is called where intended
+        self.mcmc.sample()
+
+    def instantiate_memmap(self, directory, n_sample, n_dim):
+        """Override to do nothing
+        """
+        pass
+
+    def read_to_write_memmap(self):
+        """Override to do nothing
+        """
+        pass
+
+    def read_memmap(self):
+        super().read_memmap()
+        sliced_sample_array = self.sample_array[:, self.slice_index]
+        del self.sample_array
+        self.sample_array = sliced_sample_array
+
+    def return_self(self):
+        return self.mcmc
 
 def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
         is_initial_sample=True):

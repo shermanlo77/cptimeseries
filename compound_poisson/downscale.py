@@ -404,7 +404,9 @@ class Downscale(object):
         chain = []
         for i, time_series in enumerate(self.generate_unmask_time_series()):
             if i in position_index_array:
+                time_series.read_memmap()
                 chain.append(np.mean(time_series.z_mcmc[:], 1))
+                time_series.del_memmap()
         plt.plot(np.transpose(np.asarray(chain)))
         plt.xlabel("sample number")
         plt.ylabel("mean z")
@@ -412,7 +414,6 @@ class Downscale(object):
         plt.close()
 
         self.del_memmap()
-        self.del_scattered_mcmc_sample()
 
     def get_random_position_index(self):
         """Return array of random n_plot numbers, choose from
@@ -461,30 +462,21 @@ class Downscale(object):
 
     def scatter_z_mcmc_sample(self):
         for i, time_series in enumerate(self.generate_unmask_time_series()):
-            time_series.z_mcmc = self.z_mcmc[:, i*len(self):(i+1)*len(self)]
+            z_mcmc_slice = mcmc.ReadOnlyFromSlice(
+                self.z_mcmc, slice(i*len(self), (i+1)*len(self)))
+            z_mcmc_slice.wrap_mcmc(time_series.z_mcmc.return_self())
+            time_series.z_mcmc = z_mcmc_slice
 
     def scatter_parameter_mcmc_sample(self):
         for i, time_series in enumerate(self.generate_unmask_time_series()):
-            time_series.parameter_mcmc = self.parameter_mcmc[
-                :, i : self.n_total_parameter : self.area_unmask]
+            mcmc_slice = mcmc.ReadOnlyFromSlice(
+                self.parameter_mcmc,
+                slice(i, self.n_total_parameter, self.area_unmask))
+            time_series.parameter_mcmc = mcmc_slice
 
     def scatter_mcmc_sample(self):
         self.scatter_z_mcmc_sample()
         self.scatter_parameter_mcmc_sample()
-
-    def del_scattered_z_mcmc_sample(self):
-        for time_series in self.generate_unmask_time_series():
-            del time_series.z_mcmc
-            time_series.z_mcmc = None
-
-    def del_scattered_parameter_mcmc_sample(self):
-        for time_series in self.generate_unmask_time_series():
-            del time_series.parameter_mcmc
-            time_series.parameter_mcmc = None
-
-    def del_scattered_mcmc_sample(self):
-        self.del_scattered_z_mcmc_sample()
-        self.del_scattered_parameter_mcmc_sample()
 
     def set_burn_in(self, burn_in):
         self.burn_in = burn_in
@@ -605,6 +597,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
 
     def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
         #override to include MCMC samples
+        self.read_memmap()
         if self.forecaster is None:
             self.forecaster = forecast.downscale.TimeSeriesForecaster(
                 self, memmap_path, i_space)
@@ -612,6 +605,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         else:
             self.forecaster.memmap_path = memmap_path
             self.forecaster.resume_forecast(n_simulation, memmap_shape)
+        self.del_memmap()
 
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast

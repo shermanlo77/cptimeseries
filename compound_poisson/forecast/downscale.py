@@ -17,8 +17,6 @@ from compound_poisson.forecast import forecast_abstract
     #rng like time_series, a rng(s) for forecasting training set, another rng(s)
     #for test set
 
-WORKERS_PER_BATCH = 16
-
 class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts for Downscale
 
@@ -78,16 +76,9 @@ class Forecaster(forecast_abstract.Forecaster):
                                       is_print)
             forecast_message.append(message)
 
-            if (((i_space+1) % WORKERS_PER_BATCH) == 0
-                or (i_space == (area_unmask-1))):
+        time_series_array = self.downscale.pool.map(
+            ForecastMessage.forecast, forecast_message)
 
-                time_series_array = self.downscale.pool.map(
-                    ForecastMessage.forecast, forecast_message)
-                for time_series_forecasted in time_series_array:
-                    self.downscale.replace_single_time_series(
-                        time_series_forecasted)
-                time_series_array = []
-                forecast_message = []
 
     def get_prob_rain(self, rain, index=None):
         """Get the probability if it will rain at least of a certian amount
