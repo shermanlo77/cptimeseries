@@ -439,6 +439,14 @@ class Downscale(object):
                 if not self.mask[lat_i, long_i]:
                     yield self.time_series_array[lat_i][long_i]
 
+    def replace_single_time_series(self, time_series):
+        """Replace a single time series in time_series_array, locataion is
+            identified using time_series.id
+        """
+        lat_i = time_series.id[0]
+        long_i = time_series.id[1]
+        self.time_series_array[lat_i][long_i] = time_series
+
     def replace_unmask_time_series(self, time_series):
         """Replace all unmaksed time series with provided time series array
 
