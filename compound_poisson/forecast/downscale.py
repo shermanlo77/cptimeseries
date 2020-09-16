@@ -65,11 +65,6 @@ class Forecaster(forecast_abstract.Forecaster):
             lat_i = time_series.id[0]
             long_i = time_series.id[1]
             x_i = self.data.get_model_field(lat_i, long_i)
-            #extract mcmc chain corresponding to this location
-            parameter_mcmc = self.downscale.parameter_mcmc[:]
-            parameter_mcmc = parameter_mcmc[
-                :, range(i_space, n_total_parameter, area_unmask)]
-            time_series.parameter_mcmc = parameter_mcmc
 
             message = ForecastMessage(time_series,
                                       x_i,

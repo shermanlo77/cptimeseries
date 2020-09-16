@@ -337,7 +337,7 @@ class Downscale(object):
             pool = multiprocess.Serial()
         self.pool = pool
         self.read_memmap()
-        self.scatter_z_mcmc_sample()
+        self.scatter_mcmc_sample()
 
         if self.forecaster is None:
             self.forecaster = self.instantiate_forecaster()
@@ -345,7 +345,7 @@ class Downscale(object):
         else:
             self.forecaster.resume_forecast(n_simulation)
 
-        self.del_z_mcmc_sample()
+        self.del_scattered_mcmc_sample()
         self.del_memmap()
 
     def instantiate_forecaster(self):
@@ -361,7 +361,7 @@ class Downscale(object):
         if not path.isdir(location_directory):
             os.mkdir(location_directory)
         self.read_memmap()
-        self.scatter_z_mcmc_sample()
+        self.scatter_mcmc_sample()
         position_index_array = self.get_random_position_index()
 
         #pick random locations and plot their mcmc chains
@@ -412,6 +412,7 @@ class Downscale(object):
         plt.close()
 
         self.del_memmap()
+        self.del_scattered_mcmc_sample()
 
     def get_random_position_index(self):
         """Return array of random n_plot numbers, choose from
@@ -454,10 +455,28 @@ class Downscale(object):
         for i, time_series in enumerate(self.generate_unmask_time_series()):
             time_series.z_mcmc = self.z_mcmc[:, i*len(self):(i+1)*len(self)]
 
-    def del_z_mcmc_sample(self):
+    def scatter_parameter_mcmc_sample(self):
+        for i, time_series in enumerate(self.generate_unmask_time_series()):
+            time_series.parameter_mcmc = self.parameter_mcmc[
+                :, i : self.n_total_parameter : self.area_unmask]
+
+    def scatter_mcmc_sample(self):
+        self.scatter_z_mcmc_sample()
+        self.scatter_parameter_mcmc_sample()
+
+    def del_scattered_z_mcmc_sample(self):
         for time_series in self.generate_unmask_time_series():
             del time_series.z_mcmc
             time_series.z_mcmc = None
+
+    def del_scattered_parameter_mcmc_sample(self):
+        for time_series in self.generate_unmask_time_series():
+            del time_series.parameter_mcmc
+            time_series.parameter_mcmc = None
+
+    def del_scattered_mcmc_sample(self):
+        self.del_scattered_z_mcmc_sample()
+        self.del_scattered_parameter_mcmc_sample()
 
     def set_burn_in(self, burn_in):
         self.burn_in = burn_in
