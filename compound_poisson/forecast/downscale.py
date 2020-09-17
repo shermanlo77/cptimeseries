@@ -78,7 +78,7 @@ class Forecaster(forecast_abstract.Forecaster):
 
         time_series_array = self.downscale.pool.map(
             ForecastMessage.forecast, forecast_message)
-
+        self.downscale.replace_unmask_time_series(time_series_array)
 
     def get_prob_rain(self, rain, index=None):
         """Get the probability if it will rain at least of a certian amount

@@ -345,7 +345,6 @@ class Downscale(object):
         else:
             self.forecaster.resume_forecast(n_simulation)
 
-        self.del_scattered_mcmc_sample()
         self.del_memmap()
 
     def instantiate_forecaster(self):
