@@ -181,9 +181,37 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
-    error_segmenator = error_segmentation.TimeSeries()
-    error_segmenator.plot_error(
-        forecast, observed_rain, year_segmentator, directory, prefix)
+    error_segmentator = error_segmentation.TimeSeries()
+    spring_segmentator = time_segmentation.SpringSegmentator(time_array)
+    summer_segmentator = time_segmentation.SummerSegmentator(time_array)
+    autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
+    winter_segmentator = time_segmentation.WinterSegmentator(time_array)
+
+    error_segmentator.plot_error(forecast,
+                                 observed_rain,
+                                 year_segmentator,
+                                 directory,
+                                 prefix)
+    error_segmentator.plot_error(forecast,
+                                 observed_rain,
+                                 spring_segmentator,
+                                 directory,
+                                 prefix+"_spring")
+    error_segmentator.plot_error(forecast,
+                                 observed_rain,
+                                 summer_segmentator,
+                                 directory,
+                                 prefix+"_summer")
+    error_segmentator.plot_error(forecast,
+                                 observed_rain,
+                                 autumn_segmentator,
+                                 directory,
+                                 prefix+"_autumn")
+    error_segmentator.plot_error(forecast,
+                                 observed_rain,
+                                 winter_segmentator,
+                                 directory,
+                                 prefix+"_winter")
 
     #memmap of forecasts no longer needed
     forecast.del_memmap()
@@ -343,8 +371,31 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.savefig(path.join(directory, "test_roc_full.pdf"))
     plt.close()
 
-    error_segmenator = error_segmentation.Downscale()
-    error_segmenator.plot_error(forecast_array, year_segmentator, directory)
+    error_segmentator = error_segmentation.Downscale()
+    spring_segmentator = time_segmentation.SpringSegmentator(time_array)
+    summer_segmentator = time_segmentation.SummerSegmentator(time_array)
+    autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
+    winter_segmentator = time_segmentation.WinterSegmentator(time_array)
+
+    error_segmentator.plot_error(forecast_array,
+                                 year_segmentator,
+                                 directory)
+    error_segmentator.plot_error(forecast_array,
+                                 spring_segmentator,
+                                 directory,
+                                 "spring")
+    error_segmentator.plot_error(forecast_array,
+                                 summer_segmentator,
+                                 directory,
+                                 "summer")
+    error_segmentator.plot_error(forecast_array,
+                                 autumn_segmentator,
+                                 directory,
+                                 "autumn")
+    error_segmentator.plot_error(forecast_array,
+                                 winter_segmentator,
+                                 directory,
+                                 "winter")
 
 class PrintForecastMapMessage(object):
     """For printing forecast over space for a given time point (in parallel)

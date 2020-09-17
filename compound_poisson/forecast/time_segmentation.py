@@ -11,6 +11,7 @@ How to use or implement:
 """
 
 import datetime
+from dateutil import relativedelta
 
 class TimeSegmentator(object):
 
@@ -21,12 +22,12 @@ class TimeSegmentator(object):
         raise NotImplementedError
 
 class YearSegmentator(TimeSegmentator):
+    #assumes the data always start on the 1st January
 
     def __init__(self, time_array):
         super().__init__(time_array)
 
     def __iter__(self):
-        #key: years #value: index of times with that year
         index_start = 0
         for i, time in enumerate(self.time_array):
             if i>0:
@@ -36,3 +37,67 @@ class YearSegmentator(TimeSegmentator):
                     index = slice(index_start, i+1)
                     yield (year, index)
                     index_start = i+1
+
+class SeasonSegmentator(TimeSegmentator):
+    """For segmentating seasons, assuming they are 3 months long
+
+    Attributes:
+        start_month: integer, month of the start of the season, inclusive,
+            to be used for datetime
+        start_day: integer, day of the start of the season, inclusive,
+            to be used for datetime
+        end_month: integer, month of the end of the season, exclusive,
+            to be used for datetime
+        end__day: integer, day of the end of the season, exclusive,
+            to be used for datetime
+    """
+
+    def __init__(self, time_array, start_month, start_day, end_month, end_day):
+        super().__init__(time_array)
+        self.start_month = start_month
+        self.start_day = start_day
+        self.end_month = end_month
+        self.end_day = end_day
+
+    def get_time_for_season(self, index):
+        #represent the season with the date in the middle of the season
+        #index is the pointer to the start of the season
+        date = self.time_array[index]
+        delta = relativedelta.relativedelta(months=1, days=14)
+        return date + delta
+
+    def __iter__(self):
+        index_start = 0
+        is_in_season = False
+        delta = relativedelta.relativedelta(days=1)
+        for i, time in enumerate(self.time_array):
+            if is_in_season:
+                time_add_one = time + delta
+                if (time_add_one.month == self.end_month
+                    and time_add_one.day == self.end_day):
+                    is_in_season = False
+                    season_date = self.get_time_for_season(index_start)
+                    index = slice(index_start, i+1)
+                    yield (season_date, index)
+                    index_start = None
+            else:
+                if (time.month == self.start_month
+                    and time.day == self.start_day):
+                    is_in_season = True
+                    index_start = i
+
+class SpringSegmentator(SeasonSegmentator):
+    def __init__(self, time_array):
+        super().__init__(time_array, 3, 1, 6, 1)
+
+class SummerSegmentator(SeasonSegmentator):
+    def __init__(self, time_array):
+        super().__init__(time_array, 6, 1, 9, 1)
+
+class AutumnSegmentator(SeasonSegmentator):
+    def __init__(self, time_array):
+        super().__init__(time_array, 9, 1, 12, 1)
+
+class WinterSegmentator(SeasonSegmentator):
+    def __init__(self, time_array):
+        super().__init__(time_array, 12, 1, 3, 1)

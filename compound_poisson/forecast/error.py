@@ -52,10 +52,18 @@ class RootMeanSquare10Error(RootMeanSquareError):
 
     def add_data(self, forecast, observed_data):
         is_above_10 = observed_data >= 10
-        observed_10 = observed_data[is_above_10]
-        forecast_10 = forecast.forecast_median[is_above_10]
-        self.n += len(observed_10)
-        self.sum_square += np.sum(np.square(forecast_10 - observed_10))
+        if np.any(is_above_10):
+            observed_10 = observed_data[is_above_10]
+            forecast_10 = forecast.forecast_median[is_above_10]
+            self.n += len(observed_10)
+            self.sum_square += np.sum(np.square(forecast_10 - observed_10))
+
+    def get_error(self):
+        #handle sistuations where it never rained more than 10 mm
+        if self.n == 0:
+            return math.nan
+        else:
+            return super().get_error()
 
     def get_short_name():
         return "r10"

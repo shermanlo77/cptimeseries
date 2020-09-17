@@ -46,8 +46,8 @@ class TimeSeries(object):
         error_plot_array = []
 
         #init error objects and variables
-        for error_class in ERROR_CLASSES:
-            error_all_array.append(error_class())
+        for Error in ERROR_CLASSES:
+            error_all_array.append(Error())
             error_plot_array.append([])
 
         #for each segmentation
@@ -60,21 +60,25 @@ class TimeSeries(object):
                                 error_all_array,
                                 error_plot_array)
 
-        #plot for each error
-        pandas.plotting.register_matplotlib_converters()
-        for i_error, error_class in enumerate(ERROR_CLASSES):
-            plt.figure()
-            plt.plot(time_array, error_plot_array[i_error], '-o')
-            plt.hlines(error_all_array[i_error].get_error(),
-                       time_array[0],
-                       time_array[-1],
-                       linestyles='dashed')
-            plt.xlabel("date")
-            plt.ylabel(error_class.get_axis_label())
-            plt.savefig(
-                path.join(directory,
-                          prefix + "_" + error_class.get_short_name() + ".pdf"))
-            plt.close()
+        #it is possible for the time_array to be empty, for example, r10 would
+            #be empty is it never rained more than 10 mm
+        if time_array:
+            #plot for each error
+            pandas.plotting.register_matplotlib_converters()
+            for i_error, error_class in enumerate(ERROR_CLASSES):
+                plt.figure()
+                plt.plot(time_array, error_plot_array[i_error], '-o')
+                plt.hlines(error_all_array[i_error].get_error(),
+                           time_array[0],
+                           time_array[-1],
+                           linestyles='dashed')
+                plt.xlabel("date")
+                plt.ylabel(error_class.get_axis_label())
+                plt.savefig(
+                    path.join(directory,
+                              (prefix + "_" + error_class.get_short_name()
+                                  + ".pdf")))
+                plt.close()
 
     def evaluate_error(self,
                        forecast,
