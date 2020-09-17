@@ -384,11 +384,9 @@ class Downscale(object):
         message_array = []
         for i_space, time_series in enumerate(
             self.generate_unmask_time_series()):
-            if str(time_series.id) == "[19, 22]":
-                message = PlotMcmcMessage(
-                    self, chain, time_series, i_space, location_directory)
-                message_array.append(message)
-                print(time_series.id)
+            message = PlotMcmcMessage(
+                self, chain, time_series, i_space, location_directory)
+            message_array.append(message)
         pool.map(PlotMcmcMessage.print, message_array)
 
         chain = np.asarray(self.parameter_gp_mcmc[:])
@@ -606,6 +604,13 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
             self.forecaster.resume_forecast(n_simulation, memmap_shape)
         self.del_memmap()
 
+    def print_chain_property(self, directory):
+        """Override: There are no chain properties to plot, eg acceptance rate.
+            For chain properties, look for mcmc objects in the Downscale object
+            which should own instances of this class
+        """
+        pass
+
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast
 
@@ -620,25 +625,13 @@ class ForecastMessage(object):
 class PlotMcmcMessage(object):
 
     def __init__(self, downscale, chain, time_series, i_space, directory):
+        self.time_series = time_series
         self.sub_directory = path.join(directory, str(time_series.id))
         if not path.isdir(self.sub_directory):
             os.mkdir(self.sub_directory)
-        self.parameter_name = time_series.get_parameter_vector_name()
-        self.i_space = i_space
-        self.area_unmask = downscale.area_unmask
-        self.chain = chain
 
     def print(self):
-        for i_parameter in range(len(self.parameter_name)):
-            chain_i = self.chain[:, i_parameter*self.area_unmask + self.i_space]
-            plt.figure()
-            plt.plot(chain_i)
-            plt.xlabel("sample number")
-            plt.ylabel(self.parameter_name[i_parameter])
-            plt.savefig(
-                path.join(self.sub_directory,
-                          "parameter_" + str(i_parameter) + ".pdf"))
-            plt.close()
+        self.time_series.print_mcmc(self.sub_directory)
 
 ################################################################################
 #                              DEPRECATED
