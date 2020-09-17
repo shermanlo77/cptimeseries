@@ -129,6 +129,22 @@ def time_series(forecast, observed_rain, directory, prefix=""):
             path.join(directory, prefix + "_residual_" + str(year) + ".pdf"))
         plt.close()
 
+        #plot residual as a distribution
+        residual = (forecast_sliced.forecast_array
+            - np.tile(observed_rain_i, [forecast_sliced.n_simulation, 1]))
+        upper_residual = np.quantile(residual, 0.95, 0)
+        lower_residual = np.quantile(residual, 0.05, 0)
+        plt.figure()
+        plt.fill_between(time_array_i,
+                         lower_residual,
+                         upper_residual)
+        plt.xlabel("time")
+        plt.ylabel("residual (mm)")
+        plt.savefig(
+            path.join(
+                directory, prefix + "_residual_dist_" + str(year) + ".pdf"))
+        plt.close()
+
         #plot ROC curve, save AUC as well
         plt.figure()
         for rain in RAIN_THRESHOLD_ARRAY:
