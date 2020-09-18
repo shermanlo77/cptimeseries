@@ -229,6 +229,17 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                                  directory,
                                  prefix+"_winter")
 
+    residual_hist = error.ResidualHist()
+    residual_hist.add_data(forecast, observed_rain)
+    residual_hist.get_error()
+    plt.savefig(path.join(directory, prefix + "_residual_hist.pdf"))
+
+    plt.figure()
+    plt.scatter(residual_hist.observed_data, residual_hist.residual, 2)
+    plt.xlabel("observed precipitation (mm)")
+    plt.ylabel("residual (mm)")
+    plt.savefig(path.join(directory, prefix + "_residual_scatter.pdf"))
+
     #memmap of forecasts no longer needed
     forecast.del_memmap()
 
