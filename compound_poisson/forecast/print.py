@@ -21,6 +21,7 @@ import compound_poisson
 from compound_poisson import roc
 from compound_poisson.forecast import error
 from compound_poisson.forecast import error_segmentation
+from compound_poisson.forecast import residual_analysis
 from compound_poisson.forecast import time_segmentation
 import dataset
 
@@ -230,17 +231,23 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                                  directory,
                                  prefix+"_winter")
 
-    residual_hist = error.ResidualHist()
-    residual_hist.add_data(forecast, observed_rain)
-    residual_hist.get_error()
+    residual_plot = residual_analysis.ResidualBaPlotter()
+    residual_plot.add_data(forecast, observed_rain)
+    residual_plot.plot_heatmap()
     plt.savefig(path.join(directory, prefix + "_residual_hist.pdf"))
     plt.close()
 
-    plt.figure()
-    plt.scatter(residual_hist.observed_data, residual_hist.residual, 2)
-    plt.xlabel("observed precipitation (mm)")
-    plt.ylabel("residual (mm)")
+    residual_plot.plot_scatter()
     plt.savefig(path.join(directory, prefix + "_residual_scatter.pdf"))
+    plt.close()
+
+    residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
+    residual_plot.plot_heatmap()
+    plt.savefig(path.join(directory, prefix + "_residual_qq_hist.pdf"))
+    plt.close()
+
+    residual_plot.plot_scatter()
+    plt.savefig(path.join(directory, prefix + "_residual_qq_scatter.pdf"))
     plt.close()
 
     #memmap of forecasts no longer needed

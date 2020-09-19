@@ -1,6 +1,5 @@
 import math
 
-from matplotlib import pyplot as plt
 import numpy as np
 
 class Error(object):
@@ -92,27 +91,3 @@ class MeanAbsoluteError(Error):
 
     def get_axis_label():
         return "mean absolute error (mm)"
-
-class ResidualHist(Error):
-
-    def __init__(self):
-        super().__init__()
-        self.residual = np.array([])
-        self.observed_data = np.array([])
-
-    def add_data(self, forecast, observed_data):
-        self.residual = np.concatenate(
-            (self.residual, forecast.forecast_median - observed_data))
-        self.observed_data = np.concatenate(
-            (self.observed_data, observed_data))
-
-    def get_error(self):
-        [hist, x_edges, y_edges] = np.histogram2d(
-            self.observed_data, self.residual, 30, density=True)
-        hist[hist==0] = hist[hist>0].min()
-        hist *= len(self.residual)
-        plt.figure()
-        plt.pcolormesh(x_edges, y_edges, np.log10(hist).T)
-        plt.xlabel("observed precipitation (mm)")
-        plt.ylabel("residual (mm)")
-        plt.colorbar()
