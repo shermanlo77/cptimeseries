@@ -68,7 +68,7 @@ class TimeSeries(object):
             for i_error, error_class in enumerate(ERROR_CLASSES):
                 plt.figure()
                 plt.plot(time_array, error_plot_array[i_error], '-o')
-                plt.hlines(error_all_array[i_error].get_error(),
+                plt.hlines(error_all_array[i_error].get_root_bias_squared(),
                            time_array[0],
                            time_array[-1],
                            linestyles='dashed')

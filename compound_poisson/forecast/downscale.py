@@ -185,7 +185,7 @@ class Forecaster(forecast_abstract.Forecaster):
                 object
             index: optional, index of times
         """
-        return self.add_data_to_error(error, index).get_error()
+        return self.add_data_to_error(error, index).get_root_bias_squared()
 
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class

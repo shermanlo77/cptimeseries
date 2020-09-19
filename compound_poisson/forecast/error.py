@@ -11,12 +11,13 @@ class Error(object):
     """
 
     def __init__(self):
-        pass
+        self.error_array = []
+        self.bias_squared_sum = 0
 
     def add_data(self, forecast, observed_data):
         raise NotImplementedError
 
-    def get_error(self):
+    def get_root_bias_squared(self):
         raise NotImplementedError
 
     def get_short_name():
@@ -28,16 +29,19 @@ class Error(object):
 class RootMeanSquareError(Error):
 
     def __init__(self):
-        self.n = 0;
-        self.sum_square = 0;
+        super().__init__()
+        self.n = 0
 
     def add_data(self, forecast, observed_data):
+        self.bias_squared_sum += self.square_error(
+            forecast.forecast_median, observed_data)
         self.n += len(observed_data)
-        self.sum_square += np.sum(
-            np.square(forecast.forecast_median - observed_data))
 
-    def get_error(self):
-        return math.sqrt(self.sum_square / self.n)
+    def square_error(self, prediction, observe):
+        return np.sum(np.square(prediction - observe))
+
+    def get_root_bias_squared(self):
+        return math.sqrt(self.bias_squared_sum / self.n)
 
     def get_short_name():
         return "rmse"
@@ -56,14 +60,14 @@ class RootMeanSquare10Error(RootMeanSquareError):
             observed_10 = observed_data[is_above_10]
             forecast_10 = forecast.forecast_median[is_above_10]
             self.n += len(observed_10)
-            self.sum_square += np.sum(np.square(forecast_10 - observed_10))
+            self.bias_squared_sum += self.square_error(forecast_10, observed_10)
 
-    def get_error(self):
+    def get_root_bias_squared(self):
         #handle sistuations where it never rained more than 10 mm
         if self.n == 0:
             return math.nan
         else:
-            return super().get_error()
+            return super().get_root_bias_squared()
 
     def get_short_name():
         return "r10"
@@ -76,15 +80,17 @@ class MeanAbsoluteError(Error):
     def __init__(self):
         super().__init__()
         self.n = 0;
-        self.sum_error = 0;
 
     def add_data(self, forecast, observed_data):
         self.n += len(observed_data)
-        self.sum_error += np.sum(
-            np.absolute(forecast.forecast_median - observed_data))
+        self.bias_squared_sum += self.absolute_error(
+            forecast.forecast_median, observed_data)
 
-    def get_error(self):
-        return self.sum_error / self.n
+    def absolute_error(self, prediction, observe):
+        return np.sum(np.absolute(prediction - observe))
+
+    def get_root_bias_squared(self):
+        return self.bias_squared_sum / self.n
 
     def get_short_name():
         return "mae"
