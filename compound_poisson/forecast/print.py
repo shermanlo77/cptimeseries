@@ -180,7 +180,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         label = str(rain) + " mm"
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
-        plt.plot(date_array, auc[is_number], '-o', label=label)
+        date_array_plot = np.array(date_array)[is_number]
+        plt.plot(date_array_plot, auc[is_number], '-o', label=label)
     plt.legend()
     plt.xlabel("year")
     plt.ylabel("area under curve")
