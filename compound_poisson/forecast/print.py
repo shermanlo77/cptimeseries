@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ma
 import pandas.plotting
+from scipy import stats
 
 import compound_poisson
 from compound_poisson import roc
@@ -272,10 +273,18 @@ def downscale(forecast_array, test_set, directory, pool):
         #precipitation for each point in space and time, 0th dimension is time,
         #remaining is space
     forecast_map = ma.empty_like(test_set.rain)
-    #losses, 2 dimension, for each point in space
-    rmse_map = ma.empty_like(test_set.rain[0])
-    r10_map = ma.empty_like(test_set.rain[0])
-    mae_map = ma.empty_like(test_set.rain[0])
+    #array of dictionaries, one for each loss class
+        #each element contains a dictionary of maps
+    loss_map_array = []
+    quantile_array = stats.norm.cdf([-1, 0, 1])
+    for i_loss in range(len(loss_segmentation.LOSS_CLASSES)):
+        dic = {}
+        dic["bias"] = ma.empty_like(test_set.rain[0])
+        dic["lower_loss"] = ma.empty_like(test_set.rain[0])
+        dic["loss"] = ma.empty_like(test_set.rain[0])
+        dic["upper_loss"] = ma.empty_like(test_set.rain[0])
+        loss_map_array.append(dic)
+
     #area under curve, dictionary, keys: for each precipitation in
         #RAIN_THRESHOLD_ARRAY, value: array, auc for each year
     auc_array = {}
@@ -299,14 +308,40 @@ def downscale(forecast_array, test_set, directory, pool):
         long_i = time_series_i.id[1]
         forecaster = time_series_i.forecaster
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
-        rmse_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, loss.RootMeanSquareError(forecaster.n_simulation))
-        r10_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, loss.RootMeanSquare10Error(
-                forecaster.n_simulation))
-        mae_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, loss.MeanAbsoluteError(forecaster.n_simulation))
+
+        #get the value for each loss
+        for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
+            loss_i = Loss(forecaster.n_simulation)
+            loss_i.add_data(forecaster, observed_rain_i)
+
+            loss_map_array[i_loss]["bias"][lat_i, long_i] = (
+                loss_i.get_bias_loss())
+
+            loss_i_quantile = loss_i.get_loss_quantile(quantile_array)
+            loss_map_array[i_loss]["lower_loss"][lat_i, long_i] = (
+                loss_i_quantile[0])
+            loss_map_array[i_loss]["loss"][lat_i, long_i] = (
+                loss_i_quantile[1])
+            loss_map_array[i_loss]["upper_loss"][lat_i, long_i] = (
+                loss_i_quantile[2])
+
     forecast_array.del_locations_memmap()
+
+    #plot the losses
+    for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
+        for metric, loss_map in loss_map_array[i_loss].items():
+            plt.figure()
+            ax = plt.axes(projection=crs.PlateCarree())
+            im = ax.pcolor(longitude_grid,
+                           latitude_grid,
+                           loss_map)
+            ax.coastlines(resolution="50m")
+            plt.colorbar(im)
+            ax.set_aspect("auto", adjustable=None)
+            plt.savefig(
+                path.join(
+                    directory, Loss.get_short_name()+"_"+metric+"_map.pdf"))
+            plt.close()
 
     #plot the spatial forecast for each time (in parallel)
     message_array = []
@@ -320,20 +355,6 @@ def downscale(forecast_array, test_set, directory, pool):
                                           file_path)
         message_array.append(message)
     pool.map(PrintForecastMapMessage.print, message_array)
-
-    #plot the losses
-    for loss_name, loss_map in zip(
-        ["rmse", "r10", "mae"], [rmse_map, r10_map, mae_map]):
-        plt.figure()
-        ax = plt.axes(projection=crs.PlateCarree())
-        im = ax.pcolor(longitude_grid,
-                       latitude_grid,
-                       loss_map)
-        ax.coastlines(resolution="50m")
-        plt.colorbar(im)
-        ax.set_aspect("auto", adjustable=None)
-        plt.savefig(path.join(directory, loss_name+"_map.pdf"))
-        plt.close()
 
     #plot the forecast (time series) for each location (in parallel)
     message_array = []
