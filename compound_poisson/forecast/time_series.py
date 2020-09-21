@@ -123,7 +123,7 @@ class Forecaster(forecast_abstract.Forecaster):
             observed_data: numpy array containing the observed rain for each day
         """
         error.add_data(self, observed_data)
-        return error.get_root_bias_squared()
+        return error.get_bias_loss()
 
     def __getitem__(self, index):
         #only to be used for plotting purposes

@@ -193,7 +193,7 @@ class Forecaster(forecast_abstract.Forecaster):
             index: optional, index of times
         """
         self.add_data_to_loss(loss, index)
-        return loss.get_root_bias_squared()
+        return loss.get_bias_loss()
 
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class

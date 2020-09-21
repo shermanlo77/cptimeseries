@@ -205,31 +205,16 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
     winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
-    loss_segmentator.plot_loss(forecast,
-                               observed_rain,
-                               year_segmentator,
-                               directory,
-                               prefix)
-    loss_segmentator.plot_loss(forecast,
-                               observed_rain,
-                               spring_segmentator,
-                               directory,
-                               prefix+"_spring")
-    loss_segmentator.plot_loss(forecast,
-                               observed_rain,
-                               summer_segmentator,
-                               directory,
-                               prefix+"_summer")
-    loss_segmentator.plot_loss(forecast,
-                               observed_rain,
-                               autumn_segmentator,
-                               directory,
-                               prefix+"_autumn")
-    loss_segmentator.plot_loss(forecast,
-                               observed_rain,
-                               winter_segmentator,
-                               directory,
-                               prefix+"_winter")
+    loss_segmentator.evaluate_loss(forecast, observed_rain, year_segmentator)
+    loss_segmentator.plot_loss(directory, prefix)
+    loss_segmentator.evaluate_loss(forecast, observed_rain, spring_segmentator)
+    loss_segmentator.plot_loss(directory, prefix+"_spring")
+    loss_segmentator.evaluate_loss(forecast, observed_rain, summer_segmentator)
+    loss_segmentator.plot_loss(directory, prefix+"_summer")
+    loss_segmentator.evaluate_loss(forecast, observed_rain, autumn_segmentator)
+    loss_segmentator.plot_loss(directory, prefix+"_autumn")
+    loss_segmentator.evaluate_loss(forecast, observed_rain, winter_segmentator)
+    loss_segmentator.plot_loss(directory, prefix+"_winter")
 
     residual_plot = residual_analysis.ResidualBaPlotter()
     residual_plot.add_data(forecast, observed_rain)
@@ -417,25 +402,17 @@ def downscale(forecast_array, test_set, directory, pool):
     winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
     forecast_array.load_locations_memmap("r")
-    loss_segmentator.plot_loss(forecast_array,
-                               year_segmentator,
-                               directory)
-    loss_segmentator.plot_loss(forecast_array,
-                               spring_segmentator,
-                               directory,
-                               "spring")
-    loss_segmentator.plot_loss(forecast_array,
-                               summer_segmentator,
-                               directory,
-                               "summer")
-    loss_segmentator.plot_loss(forecast_array,
-                               autumn_segmentator,
-                               directory,
-                               "autumn")
-    loss_segmentator.plot_loss(forecast_array,
-                               winter_segmentator,
-                               directory,
-                               "winter")
+    loss_segmentator.evaluate_loss(forecast_array, year_segmentator)
+    loss_segmentator.plot_loss(directory)
+    loss_segmentator.evaluate_loss(forecast_array, spring_segmentator)
+    loss_segmentator.plot_loss(directory, "spring")
+    loss_segmentator.evaluate_loss(forecast_array, summer_segmentator)
+    loss_segmentator.plot_loss(directory, "summer")
+    loss_segmentator.evaluate_loss(forecast_array, autumn_segmentator)
+    loss_segmentator.plot_loss(directory, "autumn")
+    loss_segmentator.evaluate_loss(forecast_array, winter_segmentator)
+    loss_segmentator.plot_loss(directory, "winter")
+
     forecast_array.del_locations_memmap()
 
     forecast_array.del_memmap()
