@@ -114,17 +114,6 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_curve = None
         return roc_curve
 
-    def get_error(self, observed_data, error, index=None):
-        """Evaluate the forecast prediction of the test set
-
-        Args:
-            error: a newly instantiated compound_poisson.forecast.error.Error
-                object
-            observed_data: numpy array containing the observed rain for each day
-        """
-        error.add_data(self, observed_data)
-        return error.get_bias_loss()
-
     def __getitem__(self, index):
         #only to be used for plotting purposes
         #does not copy model fields

@@ -159,42 +159,6 @@ class Forecaster(forecast_abstract.Forecaster):
                 roc_array.append(None)
         return roc_array
 
-    def add_data_to_loss(self, loss, index=None):
-        """Add more data to a Loss object
-
-        Add more data to an Loss object, used for assessing the forecast
-            prediction of the test set
-
-        Args:
-            Loss: a newly instantiated compound_poisson.forecast.loss.Loss
-                object
-            index: optional, index of times
-        """
-        downscale = self.downscale
-        for time_series_i, observed_rain_i in (
-            zip(downscale.generate_unmask_time_series(),
-                self.data.generate_unmask_rain())):
-            forecaster_i = time_series_i.forecaster
-            forecaster_i.load_memmap("r")
-
-            if not index is None:
-                forecaster_i = time_series_i.forecaster[index]
-                observed_rain_i = observed_rain_i[index]
-
-            loss.add_data(forecaster_i, observed_rain_i)
-            forecaster_i.del_memmap()
-
-    def get_error(self, loss, index=None):
-        """Assess the forecast prediction of the test set
-
-        Args:
-            error: a newly instantiated compound_poisson.forecast.error.Error
-                object
-            index: optional, index of times
-        """
-        self.add_data_to_loss(loss, index)
-        return loss.get_bias_loss()
-
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
 

@@ -29,10 +29,11 @@ class Loss(object):
         self.n_time_points = 0
 
     def add_data(self, forecast, observed_data):
-        """Update member variables (eg losses) with new data
+        """Update member variables (eg losses) with new data (for a single
+            location). For multiple locations, see add_downscale_forecaster()
 
         Args:
-            forecast: forecaster object
+            forecast: forecaster.time_series.TimeSeries object
             observed_data: numpy array of observed precipitation, same time
                 length as forecast
         """
@@ -42,6 +43,24 @@ class Loss(object):
         for i_simulation in range(len(self.loss_array)):
             self.loss_array[i_simulation] += self.loss_function(
                 forecast.forecast_array[i_simulation], observed_data)
+
+    def add_downscale_forecaster(self, forecaster, index=None):
+        """Update member variables (eg losses) with new data for multiple
+            locations
+
+        Args:
+            forecaster: forecast.downscale.Downscale object
+            index: optional, index of times
+        """
+        downscale = forecaster.downscale
+        for time_series_i, observed_rain_i in (
+            zip(downscale.generate_unmask_time_series(),
+                forecaster.data.generate_unmask_rain())):
+            forecaster_i = time_series_i.forecaster
+            if not index is None:
+                forecaster_i = time_series_i.forecaster[index]
+                observed_rain_i = observed_rain_i[index]
+            self.add_data(forecaster_i, observed_rain_i)
 
     def get_bias_loss(self):
         """Return a SINGLE forecast (eg median over samples) with the obserbed

@@ -146,7 +146,8 @@ class Downscale(TimeSeries):
         #observed_rain unused
         #add data from this segmentation
         for i_loss, Loss in enumerate(LOSS_CLASSES):
-            forecast.add_data_to_loss(self.loss_all_array[i_loss], index)
+            self.loss_all_array[i_loss].add_downscale_forecaster(
+                forecast, index)
             loss_i = Loss(forecast.n_simulation)
-            forecast.add_data_to_loss(loss_i, index)
+            loss_i.add_downscale_forecaster(forecast, index)
             self.loss_segment_array[i_loss].append(loss_i)
