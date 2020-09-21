@@ -32,6 +32,7 @@ class Forecaster(forecast_abstract.Forecaster):
     def __init__(self, downscale, memmap_dir):
         self.downscale = downscale
         self.data = None
+        self.rng = None
         super().__init__(memmap_dir)
 
     def make_memmap_path(self):
@@ -46,6 +47,7 @@ class Forecaster(forecast_abstract.Forecaster):
         """
         self.data = data
         self.n_time = len(data)
+        self.rng = self.downscale.spawn_rng(1)
         self.time_array = data.time_array
         super().start_forecast(n_simulation)
 
@@ -54,31 +56,39 @@ class Forecaster(forecast_abstract.Forecaster):
             memmap_to_copy_i = memmap_to_copy[i]
             self.forecast_array[i, 0:len(memmap_to_copy_i)] = memmap_to_copy_i
 
-    def simulate_forecasts(self, index_range, is_print=True):
-        area_unmask = self.downscale.area_unmask
-        n_total_parameter = self.downscale.n_total_parameter
+    def simulate_forecasts(self, index_range, is_print=False):
+        #for each forecast, all time series set mcmc sample
+        for i_forecast in index_range:
 
-        forecast_message = []
-        for i_space, time_series in enumerate(
-            self.downscale.generate_unmask_time_series()):
+            #set parameters and model fields from a mcmc sample
+                #the setting of the parameters is done in the super class method
+            mcmc_index = self.rng.randint(
+                self.downscale.burn_in, self.downscale.n_sample)
+            self.downscale.set_mcmc_index(mcmc_index)
 
-            #extract model fields for each unmasked time_series
-            lat_i = time_series.id[0]
-            long_i = time_series.id[1]
-            x_i = self.data.get_model_field(lat_i, long_i)
+            #forecast each location in parallel
+            forecast_message = []
+            for i_space, time_series in enumerate(
+                self.downscale.generate_unmask_time_series()):
 
-            message = ForecastMessage(time_series,
-                                      x_i,
-                                      self.n_simulation,
-                                      self.memmap_path,
-                                      self.forecast_array.shape,
-                                      i_space,
-                                      is_print)
-            forecast_message.append(message)
+                #extract model fields for each unmasked time_series
+                lat_i = time_series.id[0]
+                long_i = time_series.id[1]
+                x_i = self.data.get_model_field(lat_i, long_i)
 
-        time_series_array = self.downscale.pool.map(
-            ForecastMessage.forecast, forecast_message)
-        self.downscale.replace_unmask_time_series(time_series_array)
+                message = ForecastMessage(time_series,
+                                          x_i,
+                                          i_forecast + 1,
+                                          self.memmap_path,
+                                          self.forecast_array.shape,
+                                          i_space,
+                                          is_print)
+                forecast_message.append(message)
+
+            time_series_array = self.downscale.pool.map(
+                ForecastMessage.forecast, forecast_message)
+            self.downscale.replace_unmask_time_series(time_series_array)
+            print("Predictive sample", i_forecast)
 
     def get_prob_rain(self, rain, index=None):
         """Get the probability if it will rain at least of a certian amount
