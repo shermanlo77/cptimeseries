@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-class Error(object):
+class Loss(object):
     """For evaluating the prediction performance when comparing the forecast
         with the observed precipitation
 
@@ -11,7 +11,7 @@ class Error(object):
     """
 
     def __init__(self):
-        self.error_array = []
+        self.loss_array = []
         self.bias_squared_sum = 0
 
     def add_data(self, forecast, observed_data):
@@ -26,7 +26,7 @@ class Error(object):
     def get_name():
         raise NotImplementedError
 
-class RootMeanSquareError(Error):
+class RootMeanSquareError(Loss):
 
     def __init__(self):
         super().__init__()
@@ -75,7 +75,7 @@ class RootMeanSquare10Error(RootMeanSquareError):
     def get_axis_label():
         return "rmse 10 (mm)"
 
-class MeanAbsoluteError(Error):
+class MeanAbsoluteError(Loss):
 
     def __init__(self):
         super().__init__()

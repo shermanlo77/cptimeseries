@@ -19,8 +19,8 @@ import pandas.plotting
 
 import compound_poisson
 from compound_poisson import roc
-from compound_poisson.forecast import error
-from compound_poisson.forecast import error_segmentation
+from compound_poisson.forecast import loss
+from compound_poisson.forecast import loss_segmentation
 from compound_poisson.forecast import residual_analysis
 from compound_poisson.forecast import time_segmentation
 import dataset
@@ -199,37 +199,37 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
-    error_segmentator = error_segmentation.TimeSeries()
+    loss_segmentator = loss_segmentation.TimeSeries()
     spring_segmentator = time_segmentation.SpringSegmentator(time_array)
     summer_segmentator = time_segmentation.SummerSegmentator(time_array)
     autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
     winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
-    error_segmentator.plot_error(forecast,
-                                 observed_rain,
-                                 year_segmentator,
-                                 directory,
-                                 prefix)
-    error_segmentator.plot_error(forecast,
-                                 observed_rain,
-                                 spring_segmentator,
-                                 directory,
-                                 prefix+"_spring")
-    error_segmentator.plot_error(forecast,
-                                 observed_rain,
-                                 summer_segmentator,
-                                 directory,
-                                 prefix+"_summer")
-    error_segmentator.plot_error(forecast,
-                                 observed_rain,
-                                 autumn_segmentator,
-                                 directory,
-                                 prefix+"_autumn")
-    error_segmentator.plot_error(forecast,
-                                 observed_rain,
-                                 winter_segmentator,
-                                 directory,
-                                 prefix+"_winter")
+    loss_segmentator.plot_loss(forecast,
+                               observed_rain,
+                               year_segmentator,
+                               directory,
+                               prefix)
+    loss_segmentator.plot_loss(forecast,
+                               observed_rain,
+                               spring_segmentator,
+                               directory,
+                               prefix+"_spring")
+    loss_segmentator.plot_loss(forecast,
+                               observed_rain,
+                               summer_segmentator,
+                               directory,
+                               prefix+"_summer")
+    loss_segmentator.plot_loss(forecast,
+                               observed_rain,
+                               autumn_segmentator,
+                               directory,
+                               prefix+"_autumn")
+    loss_segmentator.plot_loss(forecast,
+                               observed_rain,
+                               winter_segmentator,
+                               directory,
+                               prefix+"_winter")
 
     residual_plot = residual_analysis.ResidualBaPlotter()
     residual_plot.add_data(forecast, observed_rain)
@@ -287,7 +287,7 @@ def downscale(forecast_array, test_set, directory, pool):
         #precipitation for each point in space and time, 0th dimension is time,
         #remaining is space
     forecast_map = ma.empty_like(test_set.rain)
-    #errors, 2 dimension, for each point in space
+    #losses, 2 dimension, for each point in space
     rmse_map = ma.empty_like(test_set.rain[0])
     r10_map = ma.empty_like(test_set.rain[0])
     mae_map = ma.empty_like(test_set.rain[0])
@@ -315,11 +315,11 @@ def downscale(forecast_array, test_set, directory, pool):
         forecaster = time_series_i.forecaster
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
         rmse_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, error.RootMeanSquareError())
+            observed_rain_i, loss.RootMeanSquareError())
         r10_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, error.RootMeanSquare10Error())
+            observed_rain_i, loss.RootMeanSquare10Error())
         mae_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, error.MeanAbsoluteError())
+            observed_rain_i, loss.MeanAbsoluteError())
 
     #plot the spatial forecast for each time (in parallel)
     message_array = []
@@ -334,18 +334,18 @@ def downscale(forecast_array, test_set, directory, pool):
         message_array.append(message)
     pool.map(PrintForecastMapMessage.print, message_array)
 
-    #plot the errors
-    for error_name, error_map in zip(
+    #plot the losses
+    for loss_name, loss_map in zip(
         ["rmse", "r10", "mae"], [rmse_map, r10_map, mae_map]):
         plt.figure()
         ax = plt.axes(projection=crs.PlateCarree())
         im = ax.pcolor(longitude_grid,
                        latitude_grid,
-                       error_map)
+                       loss_map)
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
-        plt.savefig(path.join(directory, error_name+"_map.pdf"))
+        plt.savefig(path.join(directory, loss_name+"_map.pdf"))
         plt.close()
 
     #plot the forecast (time series) for each location (in parallel)
@@ -408,31 +408,31 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.savefig(path.join(directory, "test_roc_full.pdf"))
     plt.close()
 
-    error_segmentator = error_segmentation.Downscale()
+    loss_segmentator = loss_segmentation.Downscale()
     spring_segmentator = time_segmentation.SpringSegmentator(time_array)
     summer_segmentator = time_segmentation.SummerSegmentator(time_array)
     autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
     winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
-    error_segmentator.plot_error(forecast_array,
-                                 year_segmentator,
-                                 directory)
-    error_segmentator.plot_error(forecast_array,
-                                 spring_segmentator,
-                                 directory,
-                                 "spring")
-    error_segmentator.plot_error(forecast_array,
-                                 summer_segmentator,
-                                 directory,
-                                 "summer")
-    error_segmentator.plot_error(forecast_array,
-                                 autumn_segmentator,
-                                 directory,
-                                 "autumn")
-    error_segmentator.plot_error(forecast_array,
-                                 winter_segmentator,
-                                 directory,
-                                 "winter")
+    loss_segmentator.plot_loss(forecast_array,
+                               year_segmentator,
+                               directory)
+    loss_segmentator.plot_loss(forecast_array,
+                               spring_segmentator,
+                               directory,
+                               "spring")
+    loss_segmentator.plot_loss(forecast_array,
+                               summer_segmentator,
+                               directory,
+                               "summer")
+    loss_segmentator.plot_loss(forecast_array,
+                               autumn_segmentator,
+                               directory,
+                               "autumn")
+    loss_segmentator.plot_loss(forecast_array,
+                               winter_segmentator,
+                               directory,
+                               "winter")
 
 class PrintForecastMapMessage(object):
     """For printing forecast over space for a given time point (in parallel)
