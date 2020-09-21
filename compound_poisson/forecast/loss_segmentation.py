@@ -47,7 +47,7 @@ class TimeSeries(object):
 
         #init loss objects and variables
         for Loss in LOSS_CLASSES:
-            loss_all_array.append(Loss())
+            loss_all_array.append(Loss(forecast.n_simulation))
             loss_plot_array.append([])
 
         #for each segmentation
@@ -65,7 +65,7 @@ class TimeSeries(object):
         if time_array:
             #plot for each loss
             pandas.plotting.register_matplotlib_converters()
-            for i_loss, loss_class in enumerate(LOSS_CLASSES):
+            for i_loss, Loss in enumerate(LOSS_CLASSES):
                 plt.figure()
                 plt.plot(time_array, loss_plot_array[i_loss], '-o')
                 plt.hlines(loss_all_array[i_loss].get_root_bias_squared(),
@@ -73,28 +73,29 @@ class TimeSeries(object):
                            time_array[-1],
                            linestyles='dashed')
                 plt.xlabel("date")
-                plt.ylabel(loss_class.get_axis_label())
+                plt.ylabel(Loss.get_axis_label())
                 plt.savefig(
                     path.join(directory,
-                              (prefix + "_" + loss_class.get_short_name()
+                              (prefix + "_" + Loss.get_short_name()
                                   + ".pdf")))
                 plt.close()
 
     def evaluate_loss(self,
-                       forecast,
-                       observed_rain,
-                       index,
-                       loss_all_array,
-                       loss_plot_array):
+                      forecast,
+                      observed_rain,
+                      index,
+                      loss_all_array,
+                      loss_plot_array):
         #slice the data to capture this segmentation
         forecast_sliced = forecast[index]
         observed_rain_i = observed_rain[index]
         #add data from this segmentation
-        for i_error, loss_class in enumerate(LOSS_CLASSES):
+        for i_error, Loss in enumerate(LOSS_CLASSES):
             loss_all_array[i_error].add_data(
                 forecast_sliced, observed_rain_i)
             loss_plot_array[i_error].append(
-                forecast_sliced.get_error(observed_rain_i, loss_class()))
+                forecast_sliced.get_error(
+                    observed_rain_i, Loss(forecast_sliced.n_simulation)))
 
 class Downscale(TimeSeries):
 
@@ -114,7 +115,7 @@ class Downscale(TimeSeries):
                       loss_plot_array):
         #observed_rain unused
         #add data from this segmentation
-        for i_loss, loss_class in enumerate(LOSS_CLASSES):
+        for i_loss, Loss in enumerate(LOSS_CLASSES):
             forecast.add_data_to_loss(loss_all_array[i_loss], index)
             loss_plot_array[i_loss].append(
-                forecast.get_error(loss_class(), index))
+                forecast.get_error(Loss(forecast.n_simulation), index))

@@ -298,7 +298,6 @@ def downscale(forecast_array, test_set, directory, pool):
     for rain in RAIN_THRESHOLD_ARRAY:
         auc_array[rain] = []
 
-
     series_dir = path.join(directory, "series_forecast")
     if not path.isdir(series_dir):
         os.mkdir(series_dir)
@@ -307,6 +306,7 @@ def downscale(forecast_array, test_set, directory, pool):
         os.mkdir(map_dir)
 
     #get forecast (median) and rmse for the maps
+    forecast_array.load_locations_memmap("r")
     for time_series_i, observed_rain_i in (
         zip(downscale.generate_unmask_time_series(),
             test_set.generate_unmask_rain())):
@@ -315,11 +315,13 @@ def downscale(forecast_array, test_set, directory, pool):
         forecaster = time_series_i.forecaster
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
         rmse_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, loss.RootMeanSquareError())
+            observed_rain_i, loss.RootMeanSquareError(forecaster.n_simulation))
         r10_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, loss.RootMeanSquare10Error())
+            observed_rain_i, loss.RootMeanSquare10Error(
+                forecaster.n_simulation))
         mae_map[lat_i, long_i] = forecaster.get_error(
-            observed_rain_i, loss.MeanAbsoluteError())
+            observed_rain_i, loss.MeanAbsoluteError(forecaster.n_simulation))
+    forecast_array.del_locations_memmap()
 
     #plot the spatial forecast for each time (in parallel)
     message_array = []
@@ -414,6 +416,7 @@ def downscale(forecast_array, test_set, directory, pool):
     autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
     winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
+    forecast_array.load_locations_memmap("r")
     loss_segmentator.plot_loss(forecast_array,
                                year_segmentator,
                                directory)
@@ -433,6 +436,9 @@ def downscale(forecast_array, test_set, directory, pool):
                                winter_segmentator,
                                directory,
                                "winter")
+    forecast_array.del_locations_memmap()
+
+    forecast_array.del_memmap()
 
 class PrintForecastMapMessage(object):
     """For printing forecast over space for a given time point (in parallel)

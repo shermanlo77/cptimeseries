@@ -104,6 +104,14 @@ class Forecaster(forecast_abstract.Forecaster):
         super().load_memmap(
             mode, (self.downscale.area_unmask, self.n_simulation, self.n_time))
 
+    def load_locations_memmap(self, mode):
+        for time_series in self.downscale.generate_unmask_time_series():
+            time_series.forecaster.load_memmap(mode)
+
+    def del_locations_memmap(self):
+        for time_series in self.downscale.generate_unmask_time_series():
+            time_series.forecaster.del_memmap()
+
     def generate_time_series_forecaster(self):
         """Generate the forecaster for every unmasked time series
         """
