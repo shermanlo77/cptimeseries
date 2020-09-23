@@ -135,12 +135,24 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.set_parameter_vector(self.parameter_mcmc[index])
         self.z_array = self.z_mcmc[index]
 
+    def forecast_self(self, n_simulation):
+        #override
+        self.read_memmap()
+        super().forecast_self(n_simulation)
+        self.del_memmap()
+
     def instantiate_forecast_self(self):
         """Override - Set the parameter from the MCMC sample
         """
         self.set_parameter_from_sample(self.self_forecaster_rng)
         forecast = super().instantiate_forecast_self()
         return forecast
+
+    def forecast(self, x, n_simulation):
+        #override
+        self.read_memmap()
+        super().forecast(n_simulation)
+        self.del_memmap()
 
     def instantiate_forecast(self, x):
         """Override - Set the parameter from the MCMC sample

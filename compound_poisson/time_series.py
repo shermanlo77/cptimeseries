@@ -530,14 +530,12 @@ class TimeSeries(object):
         Args:
             n_simulation: number of Monte Carlo simulations
         """
-        self.read_memmap()
         if self.self_forecaster is None:
             self.self_forecaster = forecast.time_series.SelfForecaster(
                 self, self.forecaster_memmap_dir)
             self.self_forecaster.start_forecast(n_simulation)
         else:
             self.self_forecaster.resume_forecast(n_simulation)
-        self.del_memmap()
 
     def instantiate_forecast_self(self):
         """Instantiate TimeSeries for forecasting itself
@@ -569,14 +567,12 @@ class TimeSeries(object):
             x: model fields, np.array, each element for each time step
             n_simulation: number of Monte Carlo simulations
         """
-        self.read_memmap()
         if self.forecaster is None:
             self.forecaster = forecast.time_series.Forecaster(
                 self, self.forecaster_memmap_dir)
             self.forecaster.start_forecast(n_simulation, x)
         else:
             self.forecaster.resume_forecast(n_simulation)
-        self.del_memmap()
 
     def instantiate_forecast(self, x):
         """Instantiate TimeSeries for simulating the future given the current
