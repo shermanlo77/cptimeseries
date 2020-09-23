@@ -24,6 +24,9 @@ from dataset.data import LATITUDE_COARSE_ARRAY
 from dataset.data import LONGITUDE_COARSE_ARRAY
 from dataset.data import RADIUS_OF_EARTH
 from dataset.data import RESOLUTION
+import dataset.era5
+from dataset.era5 import Era5Cardiff
+from dataset.era5 import Era5Wales
 import dataset.isle_of_man
 from dataset.isle_of_man import IsleOfManTest
 from dataset.isle_of_man import IsleOfManTraining

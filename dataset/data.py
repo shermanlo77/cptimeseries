@@ -35,7 +35,7 @@ DERIVED_MODEL_FIELD = {
     "specific_humidity_rate": "m deg-1 s-1",
     "total_column_water_rate": "kg m-1 deg-1 s-1",
 }
-MAX_DATE = datetime.date(2019, 7, 31) #end point of data
+MAX_DATE = datetime.date(2019, 7, 31) #end point of data inclusive
 
 class Data(object):
     """Wrapper class for model fields, precipitation and topography
