@@ -13,6 +13,7 @@ import pupygrib
 
 from dataset import ana
 from dataset import data
+from dataset import isle_of_man
 from dataset import location
 from dataset import wales
 
@@ -89,7 +90,7 @@ class Era5(data.Data):
         """
         rain_data = netCDF4.Dataset(file_name, "r", format="NETCDF4")
         rain = rain_data.variables["rr"]
-        self.mask = rain[0].mask
+        self.mask = np.flip(rain[0].mask, 0)
 
     def crop(self, lat, long):
         #override, to only crop the rain, mask and topography
@@ -118,6 +119,15 @@ class Era5Wales(Era5Ana):
         super().load_data()
         self.crop(wales.LAT, wales.LONG)
 
+class Era5IsleOfMan(Era5):
+
+    def __init__(self, path_to_storage=None):
+        super().__init__(path_to_storage=None)
+
+    def load_data(self):
+        self.load_rain(ERA5_3_FILE)
+        self.load_mask(ana.RAIN_FILE)
+        self.crop(isle_of_man.LAT, isle_of_man.LONG)
 
 class Era5Cardiff(location.Location):
 

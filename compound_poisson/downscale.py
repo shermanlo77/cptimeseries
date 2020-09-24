@@ -62,17 +62,19 @@ class Downscale(object):
 
     def __init__(self, data, n_arma=(0,0), is_test=False):
         #is_test argument used by DownscaleForGp (see forecast/downscale.py)
+        #data is compatible with era5 as well by assuming data.model_field is
+            #None
         self.n_arma = n_arma
         self.time_series_array = []
         self.time_array = data.time_array
-        self.model_field_units = data.model_field_units
-        self.n_model_field = len(data.model_field)
+        self.model_field_units = None
+        self.n_model_field = None
         self.mask = data.mask
         self.parameter_mask_vector = []
         self.n_parameter = None
         self.n_total_parameter = None
         self.topography = data.topography
-        self.topography_normalise = data.topography_normalise
+        self.topography_normalise = None
         self.shape = self.mask.shape
         self.area = self.shape[0] * self.shape[1]
         self.area_unmask = np.sum(np.logical_not(self.mask))
@@ -93,43 +95,60 @@ class Downscale(object):
         self.memmap_dir = ""
         self.forecaster = None
 
-        #get the square error matrix used for GP
-        unmask = np.logical_not(self.mask).flatten()
-        for topo_i in self.topography_normalise.values():
-            topo_i = topo_i.flatten()
-            topo_i = topo_i[unmask]
-            for i in range(self.area_unmask):
-                for j in range(i+1, self.area_unmask):
-                    self.square_error[i,j] += math.pow(topo_i[i] - topo_i[j], 2)
-                    self.square_error[j,i] = self.square_error[i,j]
+        if not data.model_field is None:
+            self.model_field_units = data.model_field_units
+            self.n_model_field = len(data.model_field)
+            self.topography_normalise = data.topography_normalise
 
-        #get normalising info for model fields using mean and standard deviation
-            #over all space and time
-        for model_field in data.model_field.values():
-            self.model_field_shift.append(np.mean(model_field))
-            self.model_field_scale.append(np.std(model_field, ddof=1))
-        self.model_field_shift = np.asarray(self.model_field_shift)
-        self.model_field_scale = np.asarray(self.model_field_scale)
+            #get the square error matrix used for GP
+            unmask = np.logical_not(self.mask).flatten()
+            for topo_i in self.topography_normalise.values():
+                topo_i = topo_i.flatten()
+                topo_i = topo_i[unmask]
+                for i in range(self.area_unmask):
+                    for j in range(i+1, self.area_unmask):
+                        self.square_error[i,j] += math.pow(
+                            topo_i[i] - topo_i[j], 2)
+                        self.square_error[j,i] = self.square_error[i,j]
+
+            #get normalising info for model fields using mean and standard
+                #deviation over all space and time
+            for model_field in data.model_field.values():
+                self.model_field_shift.append(np.mean(model_field))
+                self.model_field_scale.append(np.std(model_field, ddof=1))
+            self.model_field_shift = np.asarray(self.model_field_shift)
+            self.model_field_scale = np.asarray(self.model_field_scale)
 
         #instantiate time series for every point in space
-        #unmasked points have rain, provide it to the constructor to TimeSeries
+        #unmasked points have rain, provide it to the constructor to
+            #TimeSeries
         #masked points do not have rain, cannot provide it
         time_series_array = self.time_series_array
         TimeSeries = self.get_time_series_class()
         for lat_i in range(self.shape[0]):
             time_series_array.append([])
             for long_i in range(self.shape[1]):
-                x_i, rain_i = data.get_data(lat_i, long_i)
-                is_mask = self.mask[lat_i, long_i]
-                if is_mask or is_test:
-                    #provide no rain if this space is masked
-                    #or the data provided is the test set
-                    time_series = TimeSeries(x_i,
-                                             poisson_rate_n_arma=n_arma,
-                                             gamma_mean_n_arma=n_arma)
+
+                if data.model_field is None:
+                    time_series = TimeSeries()
                 else:
-                    #provide rain
-                    time_series = TimeSeries(x_i, rain_i.data, n_arma, n_arma)
+
+                    x_i, rain_i = data.get_data(lat_i, long_i)
+                    is_mask = self.mask[lat_i, long_i]
+                    if is_mask or is_test:
+                        #provide no rain if this space is masked
+                        #or the data provided is the test set
+                        time_series = TimeSeries(x_i,
+                                                 poisson_rate_n_arma=n_arma,
+                                                 gamma_mean_n_arma=n_arma)
+                    else:
+                        #provide rain
+                        time_series = TimeSeries(
+                            x_i, rain_i.data, n_arma, n_arma)
+
+                    for i in range(time_series.n_parameter):
+                        self.parameter_mask_vector.append(is_mask)
+                    self.n_parameter = time_series.n_parameter
                 #provide information to time_series
                 time_series.id = [lat_i, long_i]
                 time_series.x_shift = self.model_field_shift
@@ -137,17 +156,15 @@ class Downscale(object):
                 time_series.time_array = self.time_array
                 time_series.memmap_dir = self.memmap_dir
                 time_series_array[lat_i].append(time_series)
-                for i in range(time_series.n_parameter):
-                    self.parameter_mask_vector.append(is_mask)
-                self.n_parameter = time_series.n_parameter
 
-        #set other member variables
-        self.set_seed_seq(random.SeedSequence())
-        self.set_time_series_rng()
-        self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
-        self.n_total_parameter = self.area_unmask * self.n_parameter
-        self.parameter_target = target_downscale.TargetParameter(self)
-        self.parameter_gp_target = target_downscale.TargetGp(self)
+        if not data.model_field is None:
+            #set other member variables
+            self.set_seed_seq(random.SeedSequence())
+            self.set_time_series_rng()
+            self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
+            self.n_total_parameter = self.area_unmask * self.n_parameter
+            self.parameter_target = target_downscale.TargetParameter(self)
+            self.parameter_gp_target = target_downscale.TargetGp(self)
 
     def get_time_series_class(self):
         return TimeSeriesDownscale
