@@ -12,7 +12,7 @@ def main():
     n_simulation = parser.parse_args().sample
     burn_in = parser.parse_args().burnin
     if burn_in is None:
-        burn_in = 2000
+        burn_in = 10000
 
     fitter = fit.time_series.FitterHyperSlice()
     fitter.forecast((dataset.Cardiff1Training(), dataset.CardiffTest()),
