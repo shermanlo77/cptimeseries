@@ -98,6 +98,19 @@ class ResidualBaPlotter(ResidualPlotter):
     def get_y_label(self):
         return "residual (mm)"
 
+    def plot_horizontal(self, linestyle):
+        ax = plt.gca()
+        x_max = ax.get_xlim()[1]
+        plt.plot([0, x_max], [0, 0], linestyle)
+
+    def plot_scatter(self):
+        super().plot_scatter()
+        self.plot_horizontal("k--")
+
+    def plot_heatmap(self):
+        super().plot_heatmap()
+        self.plot_horizontal("w--")
+
 class ResidualLnqqPlotter(ResidualPlotter):
     """Plots ln(forecast+1) vs ln(observed+1)
     Lnqq stands for log natural quantile-quantile
@@ -117,3 +130,17 @@ class ResidualLnqqPlotter(ResidualPlotter):
 
     def get_y_label(self):
         return "forecasted precipitation (ln mm)"
+
+    def plot_base(self, linestyle):
+        ax = plt.gca()
+        x_max = ax.get_xlim()[1]
+        y_max = ax.get_ylim()[1]
+        plt.plot([0, x_max], [0, y_max], linestyle)
+
+    def plot_scatter(self):
+        super().plot_scatter()
+        self.plot_base("k--")
+
+    def plot_heatmap(self):
+        super().plot_heatmap()
+        self.plot_base("w--")
