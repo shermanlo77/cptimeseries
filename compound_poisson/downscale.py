@@ -367,10 +367,6 @@ class Downscale(object):
     def instantiate_forecaster(self):
         return forecast.downscale.Forecaster(self, self.memmap_dir)
 
-    def set_mcmc_index(self, mcmc_index):
-        for time_series in self.generate_unmask_time_series():
-            time_series.mcmc_index = mcmc_index
-
     def print_mcmc(self, directory, pool):
         """Print the mcmc chains
         """
@@ -603,17 +599,6 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
                          gamma_mean_n_arma,
                          cp_parameter_array)
         self.z_mcmc = None
-        self.mcmc_index = None
-
-    def set_parameter_from_sample(self, rng):
-        #override to not generate random index
-        self.set_parameter_from_sample_i(None)
-        self.update_all_cp_parameters()
-
-    def set_parameter_from_sample_i(self, index):
-        #override
-        #to ensure all time series in this downscale use same mcmc sample
-        super().set_parameter_from_sample_i(self.mcmc_index)
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
