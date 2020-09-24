@@ -1,4 +1,5 @@
 from compound_poisson import downscale
+from compound_poisson import era5
 from compound_poisson.downscale import Downscale
 from compound_poisson.time_series import TimeSeries
 from compound_poisson.time_series_gradient import TimeSeriesGd

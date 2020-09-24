@@ -85,8 +85,12 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
-        forecast_lower_error = forecast_sliced.forecast_sigma[-1]
-        forecast_upper_error = forecast_sliced.forecast_sigma[1]
+        if forecast_sliced.forecast_sigma:
+            forecast_lower_error = forecast_sliced.forecast_sigma[-1]
+            forecast_upper_error = forecast_sliced.forecast_sigma[1]
+        else:
+            forecast_lower_error = forecast_median_i
+            forecast_upper_error = forecast_median_i
         time_array_i = forecast_sliced.time_array
 
         #plot forecast and observation time series
@@ -124,27 +128,11 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
         #plot residual
         plt.figure()
-        plt.plot(time_array_i, forecast_i - observed_rain_i)
+        plt.plot(time_array_i, forecast_median_i - observed_rain_i)
         plt.xlabel("time")
         plt.ylabel("residual (mm)")
         plt.savefig(
             path.join(directory, prefix + "_residual_" + str(year) + ".pdf"))
-        plt.close()
-
-        #plot residual as a distribution
-        residual = (forecast_sliced.forecast_array
-            - np.tile(observed_rain_i, [forecast_sliced.n_simulation, 1]))
-        upper_residual = np.quantile(residual, 0.95, 0)
-        lower_residual = np.quantile(residual, 0.05, 0)
-        plt.figure()
-        plt.fill_between(time_array_i,
-                         lower_residual,
-                         upper_residual)
-        plt.xlabel("time")
-        plt.ylabel("residual (mm)")
-        plt.savefig(
-            path.join(
-                directory, prefix + "_residual_dist_" + str(year) + ".pdf"))
         plt.close()
 
         #plot ROC curve, save AUC as well

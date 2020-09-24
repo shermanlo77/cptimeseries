@@ -116,4 +116,4 @@ class ResidualLnqqPlotter(ResidualPlotter):
         return "observed precipitation (ln mm)"
 
     def get_y_label(self):
-        return "residual (ln mm)"
+        return "forecasted precipitation (ln mm)"
