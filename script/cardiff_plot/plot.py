@@ -131,6 +131,9 @@ def main():
         data_frame.to_latex(path.join(directory, time_key+".txt"),
                             formatters=float_format_array)
 
+    for time_series_i in time_series_array:
+        time_series_i.forecaster.del_memmap()
+
 def number_of_decimial_places(
     time_series, observed_rain, Loss, n_bootstrap, rng):
     """Return the recommend number of decimial places by using the variance of
