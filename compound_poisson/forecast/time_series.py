@@ -114,6 +114,22 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_curve = None
         return roc_curve
 
+    def bootstrap(self, rng):
+        """Return a bootstrapped forecast array of itself
+
+        Should be used for plotting or sensitivity analysis only
+
+        sample_array may not guarantee to be a deep copy or memmap to my
+            knowledge, investigate further if you require modifying the
+            bootstrapped object.
+        """
+        bootstrap = Forecaster(self.time_series, self.memmap_dir)
+        bootstrap.time_array = self.time_array
+        bootstrap.forecast_array = self.forecast_array[
+            rng.randint(self.n_simulation, size=self.n_simulation), :]
+        bootstrap.get_forecast()
+        return bootstrap
+
     def __getitem__(self, index):
         #only to be used for plotting purposes
         #does not copy model fields

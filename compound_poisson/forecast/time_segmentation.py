@@ -21,6 +21,16 @@ class TimeSegmentator(object):
     def __iter__(self):
         raise NotImplementedError
 
+class AllInclusive(TimeSegmentator):
+    #returns the index of the entire test set
+
+    def __init__(self, time_array):
+        super().__init__(time_array)
+
+    def __iter__(self):
+        yield (None, slice(0, len(self.time_array)))
+
+
 class YearSegmentator(TimeSegmentator):
     #assumes the data always start on the 1st January
 

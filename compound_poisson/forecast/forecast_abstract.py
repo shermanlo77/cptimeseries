@@ -153,3 +153,8 @@ class Forecaster(object):
         """
         del self.forecast_array
         self.forecast_array = None
+
+    def bootstrap(self, rng):
+        """Return a clone of itself with bootstrapped forecast samples
+        """
+        raise NotImplementedError
