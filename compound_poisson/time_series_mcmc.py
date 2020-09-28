@@ -228,8 +228,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
 
         chain = []
         z_chain = np.asarray(self.z_mcmc[:])
-        for z in z_chain:
-            chain.append(np.mean(z))
+        chain = np.mean(z_chain, 1)
         plt.figure()
         plt.plot(chain)
         plt.ylabel("Mean of latent variables")

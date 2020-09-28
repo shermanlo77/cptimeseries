@@ -395,17 +395,6 @@ class Downscale(object):
             plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
             plt.close()
 
-        #plot each chain for each location
-        #note to developer: memory problem when parallelising
-            #only for Cardiff for now (19, 22)
-        message_array = []
-        for i_space, time_series in enumerate(
-            self.generate_unmask_time_series()):
-            message = PlotMcmcMessage(
-                self, chain, time_series, i_space, location_directory)
-            message_array.append(message)
-        pool.map(PlotMcmcMessage.print, message_array)
-
         chain = np.asarray(self.parameter_gp_mcmc[:])
         for i, key in enumerate(self.parameter_gp_target.state):
             chain_i = chain[:, i]
@@ -426,6 +415,17 @@ class Downscale(object):
         plt.ylabel("mean z")
         plt.savefig(path.join(directory, "z.pdf"))
         plt.close()
+
+        #plot each chain for each location
+        #note to developer: memory problem when parallelising
+            #only for Cardiff for now (19, 22)
+        message_array = []
+        for i_space, time_series in enumerate(
+            self.generate_unmask_time_series()):
+            message = PlotMcmcMessage(
+                self, chain, time_series, i_space, location_directory)
+            message_array.append(message)
+        pool.map(PlotMcmcMessage.print, message_array)
 
         self.del_memmap()
 
