@@ -20,6 +20,7 @@ LOSS_CLASSES = [
     loss.RootMeanSquareError,
     loss.RootMeanSquare10Error,
     loss.MeanAbsoluteError,
+    loss.MeanAbsolute10Error,
 ]
 
 class TimeSeries(object):

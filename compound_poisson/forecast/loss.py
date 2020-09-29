@@ -26,9 +26,10 @@ class Loss(object):
     def __init__(self, n_simulation):
         self.loss_array = np.zeros(n_simulation)
         self.bias_loss_sum = 0
+        self.bias_median_loss_sum = 0
         self.n_time_points = 0
 
-    def add_data(self, forecast, observed_data):
+    def add_data(self, forecast, observed_data, index=None):
         """Update member variables (eg losses) with new data (for a single
             location). For multiple locations, see add_downscale_forecaster()
 
@@ -36,13 +37,30 @@ class Loss(object):
             forecast: forecaster.time_series.TimeSeries object
             observed_data: numpy array of observed precipitation, same time
                 length as forecast
+            index: array of booleans, only consider data with True
         """
+
+        forecast_expectation = None
+        forecast_median = None
+        if index is None:
+            forecast_expectation = forecast.forecast
+            forecast_median = forecast.forecast_median
+        else:
+            observed_data = observed_data[index]
+            forecast_expectation = forecast.forecast[index]
+            forecast_median = forecast.forecast_median[index]
+
         self.n_time_points += len(observed_data)
         self.bias_loss_sum += self.loss_function(
-            forecast.forecast_median, observed_data)
+            forecast_expectation, observed_data)
+        self.bias_median_loss_sum += self.loss_function(
+            forecast_median, observed_data)
         for i_simulation in range(len(self.loss_array)):
+            forecast_i = forecast.forecast_array[i_simulation]
+            if not index is None:
+                forecast_i = forecast_i[index]
             self.loss_array[i_simulation] += self.loss_function(
-                forecast.forecast_array[i_simulation], observed_data)
+                forecast_i, observed_data)
 
     def add_downscale_forecaster(self, forecaster, index=None):
         """Update member variables (eg losses) with new data for multiple
@@ -63,23 +81,50 @@ class Loss(object):
             self.add_data(forecaster_i, observed_rain_i)
 
     def get_bias_loss(self):
+        """Return a SINGLE forecast (eg mean over samples) with the obserbed
+            metric, eg root mean bias squared
+        """
+        if self.n_time_points == 0:
+            return math.nan
+        else:
+            return self.set_to_orginial_units(
+                self.bias_loss_sum / self.n_time_points)
+
+    def get_bias_median_loss(self):
         """Return a SINGLE forecast (eg median over samples) with the obserbed
             metric, eg root mean bias squared
         """
-        raise NotImplementedError
+        if self.n_time_points == 0:
+            return math.nan
+        else:
+            return self.set_to_orginial_units(
+                self.bias_median_loss_sum / self.n_time_points)
 
     def get_risk(self):
         """Return the posterior expectation of the loss, aka the risk
         """
-        raise NotImplementedError
+        if self.n_time_points == 0:
+            return math.nan
+        else:
+            return self.set_to_orginial_units(
+                np.mean(self.loss_array) / self.n_time_points)
 
     def get_loss_quantile(self, quantile):
         """Return the quantiles of the posterior loss
         """
-        raise NotImplementedError
+        if self.n_time_points == 0:
+            return math.nan
+        else:
+            return self.set_to_orginial_units(
+                np.quantile(self.loss_array, quantile) / self.n_time_points)
 
     def loss_function(self, prediction, observe):
         """Return the sum of losses
+        """
+        raise NotImplementedError
+
+    def set_to_orginial_units(self, loss):
+        """Normalise the loss to the units of the orginial data
         """
         raise NotImplementedError
 
@@ -103,15 +148,8 @@ class RootMeanSquareError(Loss):
     def loss_function(self, prediction, observe):
         return np.sum(np.square(prediction - observe))
 
-    def get_bias_loss(self):
-        return math.sqrt(self.bias_loss_sum / self.n_time_points)
-
-    def get_risk(self):
-        return math.sqrt(np.mean(self.loss_array) / self.n_time_points)
-
-    def get_loss_quantile(self, quantile):
-        return np.sqrt(
-            np.quantile(self.loss_array, quantile) / self.n_time_points)
+    def set_to_orginial_units(self, loss):
+        return np.sqrt(loss)
 
     def get_short_name():
         return "rmse"
@@ -131,43 +169,15 @@ class RootMeanSquare10Error(RootMeanSquareError):
         super().__init__(n_simulation)
 
     def add_data(self, forecast, observed_data):
-        #override
         is_above_10 = observed_data >= 10
         if np.any(is_above_10):
-            observed_10 = observed_data[is_above_10]
-            self.n_time_points += len(observed_10)
-            self.bias_loss_sum += self.loss_function(
-                forecast.forecast_median[is_above_10], observed_10)
-            for i_simulation in range(len(self.loss_array)):
-                self.loss_array[i_simulation] += self.loss_function(
-                    forecast.forecast_array[i_simulation][is_above_10],
-                    observed_10)
-
-    def get_bias_loss(self):
-        #handle sistuations where it never rained more than 10 mm
-        if self.n_time_points == 0:
-            return math.nan
-        else:
-            return super().get_bias_loss()
-
-    def get_risk(self):
-        if self.n_time_points == 0:
-            return math.nan
-        else:
-            return math.sqrt(np.mean(self.loss_array) / self.n_time_points)
-
-    def get_loss_quantile(self, quantile):
-        if self.n_time_points == 0:
-            return math.nan
-        else:
-            return np.sqrt(
-                np.quantile(self.loss_array, quantile) / self.n_time_points)
+            super().add_data(forecast, observed_data, is_above_10)
 
     def get_short_name():
-        return "r10"
+        return "rmse10"
 
     def get_short_bias_name():
-        return "rb10"
+        return "rmsb10"
 
     def get_axis_label():
         return "root mean square error 10 (mm)"
@@ -183,14 +193,8 @@ class MeanAbsoluteError(Loss):
     def loss_function(self, prediction, observe):
         return np.sum(np.absolute(prediction - observe))
 
-    def get_bias_loss(self):
-        return self.bias_loss_sum / self.n_time_points
-
-    def get_risk(self):
-        return np.mean(self.loss_array) / self.n_time_points
-
-    def get_loss_quantile(self, quantile):
-        return np.quantile(self.loss_array, quantile) / self.n_time_points
+    def set_to_orginial_units(self, loss):
+        return loss
 
     def get_short_name():
         return "mae"
@@ -203,3 +207,25 @@ class MeanAbsoluteError(Loss):
 
     def get_axis_bias_label():
         return "mean absolute bias (mm)"
+
+class MeanAbsolute10Error(MeanAbsoluteError):
+
+    def __init__(self, n_simulation):
+        super().__init__(n_simulation)
+
+    def add_data(self, forecast, observed_data):
+        is_above_10 = observed_data >= 10
+        if np.any(is_above_10):
+            super().add_data(forecast, observed_data, is_above_10)
+
+    def get_short_name():
+        return "mae10"
+
+    def get_short_bias_name():
+        return "mab10"
+
+    def get_axis_label():
+        return "mean absolute error 10 (mm)"
+
+    def get_axis_bias_label():
+        return "mean absolute bias 10 (mm)"
