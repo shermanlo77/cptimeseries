@@ -26,6 +26,8 @@ class Forecaster(forecast_abstract.Forecaster):
         forecast_sigma: dictionary of sigma errors (quantiles) of all forecasts,
             keys are [-3, -2, -1, 0, 1, 2, 3] which correspond to the sigma
             level
+        forecast_quartile: 3 array, each containing array of 25%, 50%, 75%
+            quantile forecasts
     """
 
     def __init__(self, time_series, memmap_dir):
@@ -34,6 +36,7 @@ class Forecaster(forecast_abstract.Forecaster):
         self.forecast = None
         self.forecast_median = None
         self.forecast_sigma = {}
+        self.forecast_quartile = [[], [], []]
         super().__init__(memmap_dir)
 
     def make_memmap_path(self):
@@ -89,12 +92,15 @@ class Forecaster(forecast_abstract.Forecaster):
         """
         self.forecast = np.mean(self.forecast_array, 0)
         sigma_array = range(-3,4)
-        forecast_quantile = np.quantile(self.forecast_array,
-                                        stats.norm.cdf(sigma_array),
-                                        0)
+        #work out quantiles for forecast_sigma and forecast_quartile together
+        quantiles = np.concatenate((stats.norm.cdf(sigma_array), [0.25, 0.75]))
+        forecast_quantile = np.quantile(self.forecast_array, quantiles, 0)
         for i in range(len(sigma_array)):
             self.forecast_sigma[sigma_array[i]] = forecast_quantile[i]
         self.forecast_median = self.forecast_sigma[0]
+        self.forecast_quartile[0] = forecast_quantile[len(sigma_array)]
+        self.forecast_quartile[1] = self.forecast_median
+        self.forecast_quartile[2] = forecast_quantile[len(sigma_array)+1]
 
     def get_roc_curve(self, rain_warning, rain_true):
         """Return ROC curve, with area under curve as label
@@ -141,6 +147,9 @@ class Forecaster(forecast_abstract.Forecaster):
         slice_copy.forecast_sigma = {}
         for key, forecast_sigma_i in self.forecast_sigma.items():
             slice_copy.forecast_sigma[key] = forecast_sigma_i[index]
+        slice_copy.forecast_quartile = []
+        for quartile in self.forecast_quartile:
+            slice_copy.forecast_quartile.append(quartile[index])
         slice_copy.n_time = len(slice_copy.time_array)
         slice_copy.n_simulation = self.n_simulation
         slice_copy.memmap_path = self.memmap_path

@@ -34,6 +34,11 @@ class ForecasterTimeSeries(compound_poisson.forecast.time_series.Forecaster):
             self.forecast = forecast_future
 
         self.forecast_median = self.forecast
+        self.forecast_quartile = [
+            self.forecast,
+            self.forecast,
+            self.forecast,
+        ]
         self.forecast_array = np.asarray([self.forecast])
         self.n_simulation = 1
         self.n_time = len(self.time_array)
