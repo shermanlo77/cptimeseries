@@ -188,6 +188,30 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
+    #investigate distribution of precipitation over entire test set
+    #plot p(rain > x) vs x
+        #forecast distribution obtained from taking average probability over
+            #the test set
+        #observed distribution obtained from taking all instances over the
+            #test set
+    prob_forecast_array = []
+    prob_observed_array = []
+    rain_plot = np.linspace(0, 40, 200)
+    for rain in rain_plot:
+        prob_forecast_array.append(
+            np.mean(forecast.get_prob_rain(rain)))
+        prob_observed_array.append(np.mean(observed_rain > rain))
+
+    plt.figure()
+    plt.plot(rain_plot, prob_forecast_array, label="forecast")
+    plt.plot(rain_plot, prob_observed_array, label="observed")
+    plt.ylabel("probability of precipitation > x")
+    plt.xlabel("x (mm)")
+    plt.legend()
+    plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
+
+    #plot the bias loss
+
     loss_segmentator = loss_segmentation.TimeSeries()
     spring_segmentator = time_segmentation.SpringSegmentator(time_array)
     summer_segmentator = time_segmentation.SummerSegmentator(time_array)
