@@ -81,61 +81,38 @@ class TimeSeries(object):
 
                 #bias loss for each segment
                 bias_loss_plot = []
+                bias_median_loss_plot = []
                 for loss_i in self.loss_segment_array[i_loss]:
                     bias_loss_plot.append(loss_i.get_bias_loss())
+                    bias_median_loss_plot.append(loss_i.get_bias_median_loss())
 
-                #posterior loss quantiles
-                loss_lower_array = []
-                loss_array = []
-                loss_upper_array = []
-                quantile_array = stats.norm.cdf([-1, 0, 1])
-                for loss_i in self.loss_segment_array[i_loss]:
-                    loss_quantile = loss_i.get_loss_quantile(quantile_array)
-                    #it is possible for loss_quantile to be nan, this happens
-                        #if there is a time segment with no occurance of 10 mm >
-                        #of rain for r10 lost
-                    if np.any(np.isnan(loss_quantile)):
-                        loss_quantile = np.full_like(quantile_array, math.nan)
-                    loss_lower_array.append(loss_quantile[0])
-                    loss_array.append(loss_quantile[1])
-                    loss_upper_array.append(loss_quantile[2])
+                #bias of the mean
+                self.plot(bias_loss_plot,
+                          self.loss_all_array[i_loss].get_bias_loss(),
+                          Loss.get_axis_bias_label(),
+                          path.join(directory,
+                                    (prefix + "_" + Loss.get_short_bias_name()
+                                        + "_mean.pdf")))
 
-                #plot the bias loss
-                plt.figure()
-                plt.plot(self.time_array, bias_loss_plot, '-o')
-                plt.hlines(self.loss_all_array[i_loss].get_bias_loss(),
-                           self.time_array[0],
-                           self.time_array[-1],
-                           linestyles='dashed')
-                plt.xlabel("date")
-                plt.ylabel(Loss.get_axis_bias_label())
-                plt.savefig(
-                    path.join(directory,
-                              (prefix + "_" + Loss.get_short_bias_name()
-                                  + ".pdf")))
-                plt.close()
+                #bias of the median
+                self.plot(bias_median_loss_plot,
+                          self.loss_all_array[i_loss].get_bias_median_loss(),
+                          Loss.get_axis_bias_label(),
+                          path.join(directory,
+                                    (prefix + "_" + Loss.get_short_bias_name()
+                                        + "_median.pdf")))
 
-                #plot the posterior loss with credible interval
-                colours = matplotlib.rcParams['axes.prop_cycle'].by_key()
-                colours = colours['color']
-                plt.figure()
-                plt.fill_between(self.time_array,
-                                 loss_lower_array,
-                                 loss_upper_array,
-                                 alpha=0.25,
-                                 color=colours[0])
-                plt.plot(self.time_array, loss_array, '-o', color=colours[0])
-                plt.hlines(self.loss_all_array[i_loss].get_loss_quantile(0.5),
-                           self.time_array[0],
-                           self.time_array[-1],
-                           linestyles='dashed')
-                plt.xlabel("date")
-                plt.ylabel(Loss.get_axis_label())
-                plt.savefig(
-                    path.join(directory,
-                              (prefix + "_" + Loss.get_short_name()
-                                  + ".pdf")))
-                plt.close()
+    def plot(self, plot_array, h_line, label_axis, path_to_fig):
+        plt.figure()
+        plt.plot(self.time_array, plot_array, '-o')
+        plt.hlines(h_line,
+                   self.time_array[0],
+                   self.time_array[-1],
+                   linestyles='dashed')
+        plt.xlabel("date")
+        plt.ylabel(label_axis)
+        plt.savefig(path_to_fig)
+        plt.close()
 
 class Downscale(TimeSeries):
 
