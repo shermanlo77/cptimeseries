@@ -6,7 +6,7 @@ Plots AUC for different precipitation and different size training sets
     different lines for different size training sets
 
 Table of bias loss
-    Columns: RMSE, R10, MAE
+    Columns: RMSE, R10, MAE, MAE10
     Rows: Different size training sets and ERA5
 Tables for:
     the entire test set, spring, summer, autumn, winter
@@ -111,25 +111,31 @@ def main():
             time_series_array[1], observed_rain, Loss, 100, rng)
         float_format_array.append(("{:."+str(n_decimial)+"f}").format)
 
-    #plot the table
+    #plot the table (for mean, the median bias)
     for time_key, time_segmentator_k in time_segmentator_array.items():
         #table of losses
             #columns: for each loss
             #rows: for each time series
         loss_array = []
+        loss_median_array = []
         for i, time_series_i in enumerate(time_series_array):
             loss_array.append([])
+            loss_median_array.append([])
             forecaster_i = time_series_i.forecaster
             loss_i = loss_segmentation.TimeSeries()
             loss_i.evaluate_loss(
                 forecaster_i, observed_rain, time_segmentator_k)
             for loss_ij in loss_i.loss_all_array:
                 loss_array[i].append(loss_ij.get_bias_loss())
+                loss_median_array[i].append(loss_ij.get_bias_median_loss())
 
-        data_frame = pd.DataFrame(
-            loss_array, time_series_name_array, loss_name_array)
-        data_frame.to_latex(path.join(directory, time_key+".txt"),
-                            formatters=float_format_array)
+        for prefix, loss_table in zip(
+            ["mean", "median"], [loss_array, loss_median_array]):
+            data_frame = pd.DataFrame(
+                loss_table, time_series_name_array, loss_name_array)
+            path_to_table = path.join(directory, prefix+"_"+time_key+".txt")
+            data_frame.to_latex(path_to_table,
+                                formatters=float_format_array)
 
     for time_series_i in time_series_array:
         time_series_i.forecaster.del_memmap()
@@ -162,7 +168,7 @@ def number_of_decimial_places(
         loss_array.append(loss.get_bias_loss())
     loss_std = np.std(loss_array, ddof=1)
     #round to the nearest magnitiude
-    return -(round(math.log10(loss_std))-1)
+    return -round(math.log10(loss_std))
 
 if __name__ == "__main__":
     main()
