@@ -57,7 +57,7 @@ class Roc(object):
 
     def plot(self):
         label = (str(self.rain_warning)+" mm, AUC = "
-            +str(round(self.area_under_curve, 3)))
+            +"{:0.3f}".format(self.area_under_curve))
         plt.step(self.false_positive_array,
                  self.true_positive_array,
                  where="post",

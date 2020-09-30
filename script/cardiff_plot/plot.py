@@ -35,6 +35,9 @@ def main():
     if not path.isdir(directory):
         os.mkdir(directory)
 
+    seed = random.SeedSequence(301608752619507842997952162996242447135)
+    rng = random.RandomState(random.MT19937(seed))
+
     era5 = compound_poisson.era5.TimeSeries()
     era5.fit(dataset.Era5Cardiff())
 
@@ -47,7 +50,7 @@ def main():
         "cardiff_1_20",
         "cardiff_5_20",
         "cardiff_10_20",
-        "cardiff_20_20"
+        "cardiff_20_20",
     ]
     for i, dir_i in enumerate(script_dir_array):
         script_dir_array[i] = path.join("..", dir_i)
@@ -70,25 +73,55 @@ def main():
     #array of array:
         #for each training set, then for each value in rain_array
     auc_array = []
+    bootstrap_error_array = []
+    n_bootstrap = 32
     rain_array = [0, 5, 10, 15, 20, 25, 30]
     for i_training_size, size_i in enumerate(training_size_array):
         auc_array.append([])
+        bootstrap_error_array.append([])
         forecaster_i = time_series_array[i_training_size].forecaster
         for rain_i in rain_array:
             roc_i = forecaster_i.get_roc_curve(rain_i, observed_rain)
             auc_array[i_training_size].append(roc_i.area_under_curve)
 
+            bootstrap_i_array = []
+            for j_bootstrap in range(n_bootstrap):
+                bootstrap = forecaster_i.bootstrap(rng)
+                roc_ij = bootstrap.get_roc_curve(rain_i, observed_rain)
+                bootstrap_i_array.append(
+                    math.pow(
+                        roc_ij.area_under_curve - roc_i.area_under_curve, 2))
+            bootstrap_error_array[i_training_size].append(
+                math.sqrt(np.mean(bootstrap_i_array)))
+
+    #figure format
     plt.figure()
     for i_training_size, size_i in enumerate(training_size_array):
-        plt.plot(rain_array, auc_array[i_training_size],
+        plt.plot(rain_array,
+                 auc_array[i_training_size],
                  label=time_series_name_array[i_training_size])
-    plt.yscale('log')
     plt.ylim([0.5, 1])
     plt.xlabel("precipitation (mm)")
     plt.ylabel("Area under ROC curve")
     plt.legend()
     plt.savefig(path.join(directory, "auc.pdf"))
     plt.close()
+
+    #table format
+    rain_label_array = []
+    for rain in rain_array:
+        rain_label_array.append(str(rain)+" mm")
+    #table format with uncertainity values
+    auc_table = []
+    for auc_i, error_i in zip(auc_array, bootstrap_error_array):
+        auc_table.append([])
+        for auc_ij, error_ij in zip(auc_i, error_i):
+            auc_table[-1].append(
+                "${:0.4f}\pm {:0.4f}$".format(auc_ij, error_ij))
+
+    data_frame = pd.DataFrame(
+        np.asarray(auc_table).T, rain_label_array, time_series_name_array)
+    data_frame.to_latex(path.join(directory, "auc.txt"), escape=False)
 
     #add era5 (for loss evaluation)
     #roc unavailable for era5
@@ -155,8 +188,6 @@ def main():
     }
     loss_name_array = []
     float_format_array = [] #each column to have a certain decimial values
-    seed = random.SeedSequence(301608752619507842997952162996242447135)
-    rng = random.RandomState(random.MT19937(seed))
     for Loss in loss_segmentation.LOSS_CLASSES:
         #using training set size 5 years to get bootstrap variance, this is used
             #to guide the number of decimial places to use

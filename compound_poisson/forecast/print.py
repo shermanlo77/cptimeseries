@@ -58,7 +58,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #setting plotting properties (for both observed and prediction)
     colours = matplotlib.rcParams['axes.prop_cycle'].by_key()['color']
-    cycle_forecast = cycler.cycler(color=[colours[1], colours[0]],
+    cycle_forecast = cycler.cycler(color=[colours[0], colours[1]],
                                    linewidth=[1, 1],
                                    alpha=[1, 0.5])
 
@@ -86,8 +86,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
         if forecast_sliced.forecast_sigma:
-            forecast_lower_error = forecast_sliced.forecast_sigma[-1]
-            forecast_upper_error = forecast_sliced.forecast_sigma[1]
+            forecast_lower_error = forecast_sliced.forecast_quartile[0]
+            forecast_upper_error = forecast_sliced.forecast_quartile[2]
         else:
             forecast_lower_error = forecast_median_i
             forecast_upper_error = forecast_median_i
@@ -101,10 +101,11 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                          forecast_lower_error,
                          forecast_upper_error,
                          alpha=0.25)
-        plt.plot(time_array_i, forecast_i)
-        plt.plot(time_array_i, observed_rain_i)
+        plt.plot(time_array_i, forecast_i, label="forecast")
+        plt.plot(time_array_i, observed_rain_i, label="observed")
         plt.xlabel("time")
         plt.ylabel("precipitation (mm)")
+        plt.legend()
         plt.savefig(
             path.join(directory, prefix + "_forecast_" + str(year) + ".pdf"))
         plt.close()
@@ -117,10 +118,11 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                          forecast_lower_error,
                          forecast_upper_error,
                          alpha=0.25)
-        plt.plot(time_array_i, forecast_median_i)
-        plt.plot(time_array_i, observed_rain_i)
+        plt.plot(time_array_i, forecast_median_i, label="forecast")
+        plt.plot(time_array_i, observed_rain_i, label="observed")
         plt.xlabel("time")
         plt.ylabel("precipitation (mm)")
+        plt.legend()
         plt.savefig(
             path.join(directory,
                       prefix+"_forecast_median_"+str(year)+".pdf"))
