@@ -79,12 +79,8 @@ class TimeSeries(object):
             pandas.plotting.register_matplotlib_converters()
             for i_loss, Loss in enumerate(LOSS_CLASSES):
 
-                #bias loss for each segment
-                bias_loss_plot = []
-                bias_median_loss_plot = []
-                for loss_i in self.loss_segment_array[i_loss]:
-                    bias_loss_plot.append(loss_i.get_bias_loss())
-                    bias_median_loss_plot.append(loss_i.get_bias_median_loss())
+                bias_loss_plot, bias_median_loss_plot = self.get_bias_plot(
+                    i_loss)
 
                 #bias of the mean
                 self.plot(bias_loss_plot,
@@ -101,6 +97,15 @@ class TimeSeries(object):
                           path.join(directory,
                                     (prefix + "_" + Loss.get_short_bias_name()
                                         + "_median.pdf")))
+
+    def get_bias_plot(self, i_loss):
+        #bias loss for each segment
+        bias_loss_plot = []
+        bias_median_loss_plot = []
+        for loss_i in self.loss_segment_array[i_loss]:
+            bias_loss_plot.append(loss_i.get_bias_loss())
+            bias_median_loss_plot.append(loss_i.get_bias_median_loss())
+        return (bias_loss_plot, bias_median_loss_plot)
 
     def plot(self, plot_array, h_line, label_axis, path_to_fig):
         plt.figure()
