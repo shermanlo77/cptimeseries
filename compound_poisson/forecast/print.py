@@ -27,7 +27,7 @@ from compound_poisson.forecast import time_segmentation
 import dataset
 
 RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]
-RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 10, 15]
+RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 10, 15, 20, 25, 30]
 
 def time_series(forecast, observed_rain, directory, prefix=""):
     """For plotting compound_poisson.forecast.time_series.Forecaster objects
@@ -173,6 +173,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         date_array_plot = np.array(date_array)[is_number]
         plt.plot(date_array_plot, auc[is_number], '-o', label=label)
     plt.legend()
+    plt.ylim([0.5, 1])
     plt.xlabel("year")
     plt.ylabel("area under curve")
     plt.savefig(path.join(directory, prefix + "_auc.pdf"))
@@ -413,6 +414,7 @@ def downscale(forecast_array, test_set, directory, pool):
         date_array_plot = np.array(date_array)
         plt.plot(date_array_plot[is_number], auc[is_number], '-o', label=label)
     plt.legend()
+    plt.ylim([0.5, 1])
     plt.xlabel("year")
     plt.ylabel("area under curve")
     plt.savefig(path.join(directory, "auc.pdf"))
