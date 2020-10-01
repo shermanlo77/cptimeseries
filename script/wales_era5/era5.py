@@ -12,7 +12,7 @@ def main():
         os.mkdir(directory)
     pool = multiprocess.Pool()
 
-    observed_data = dataset.CardiffTest()
+    observed_data = dataset.WalesTest()
 
     era5 = dataset.Era5Wales()
     downscale = compound_poisson.era5.Downscale(era5)
