@@ -203,6 +203,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.xlabel("observed precipitation (mm)")
     plt.ylabel("forecasted precipitation (mm)")
     plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
+    plt.close()
 
     #plot the bias loss
 
@@ -286,6 +287,7 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.xlabel("observed precipitation (mm)")
     plt.ylabel("forecasted precipitation (mm)")
     plt.savefig(path.join(directory, "distribution.pdf"))
+    plt.close()
 
     #forecast map, 3 dimensions, same as test set rain, prediction of
         #precipitation for each point in space and time, 0th dimension is time,
@@ -348,7 +350,7 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.close()
 
     residual_plot.plot_scatter()
-    plt.savefig(path.join(directory, "residual_scatter.pdf"))
+    plt.savefig(path.join(directory, "residual_scatter.png"))
     plt.close()
 
     residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
@@ -357,7 +359,7 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.close()
 
     residual_plot.plot_scatter()
-    plt.savefig(path.join(directory, "residual_qq_scatter.pdf"))
+    plt.savefig(path.join(directory, "residual_qq_scatter.png"))
     plt.close()
 
     #plot the losses
