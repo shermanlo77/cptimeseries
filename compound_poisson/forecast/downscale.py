@@ -159,6 +159,33 @@ class Forecaster(forecast_abstract.Forecaster):
                 roc_array.append(None)
         return roc_array
 
+    def compare_dist_with_observed(self, n_linspace):
+        """Return values for a qq plot, comparing distribution of precipitation
+            of the forecast with the observed
+
+        Args:
+            n_linspace: number of points to evaluate between 0 mm and max
+                observed rain
+
+        Return:
+            x-axis numpy array and x-axis numpy array, x is observed, y is
+                forecasted
+        """
+        #range of observed precipitation to plot in the qq plot
+        observed_array = np.linspace(0, self.data.rain.max(), n_linspace)
+
+        prob_forecast_array = []
+        prob_observed_array = []
+        for rain in observed_array:
+            prob_forecast_array_i = []
+            for forecaster in self.downscale.generate_unmask_time_series():
+                prob_forecast_array_i.append(np.mean(self.get_prob_rain(rain)))
+            prob_forecast_array.append(np.mean(prob_forecast_array_i))
+            prob_observed_array.append(np.mean(self.data.rain > rain))
+
+        return self.get_qq_plot(
+            observed_array, prob_observed_array, prob_forecast_array)
+
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
 

@@ -275,6 +275,18 @@ def downscale(forecast_array, test_set, directory, pool):
     latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
     rain_units = test_set.rain_units
 
+    #qq plot of forecast vs observed
+    qq_observe, qq_forecast = forecast_array.compare_dist_with_observed(500)
+    plt.figure()
+    ax = plt.gca()
+    plt.plot(qq_observe, qq_forecast)
+    axis_lim = np.array([ax.get_xlim()[1], ax.get_ylim()[1]])
+    axis_lim = axis_lim.min()
+    plt.plot([0, axis_lim], [0, axis_lim], 'k--')
+    plt.xlabel("observed precipitation (mm)")
+    plt.ylabel("forecasted precipitation (mm)")
+    plt.savefig(path.join(directory, "distribution.pdf"))
+
     #forecast map, 3 dimensions, same as test set rain, prediction of
         #precipitation for each point in space and time, 0th dimension is time,
         #remaining is space
