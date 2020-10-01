@@ -135,7 +135,8 @@ class ResidualLnqqPlotter(ResidualPlotter):
         ax = plt.gca()
         x_max = ax.get_xlim()[1]
         y_max = ax.get_ylim()[1]
-        plt.plot([0, x_max], [0, y_max], linestyle)
+        ax_lim = np.asarray([x_max, y_max]).min()
+        plt.plot([0, ax_lim], [0, ax_lim], linestyle)
 
     def plot_scatter(self):
         super().plot_scatter()
