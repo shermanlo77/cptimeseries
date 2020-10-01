@@ -317,6 +317,8 @@ def downscale(forecast_array, test_set, directory, pool):
     if not path.isdir(map_dir):
         os.mkdir(map_dir)
 
+    residual_plot = residual_analysis.ResidualBaPlotter()
+
     #get forecast (median) and rmse for the maps
     forecast_array.load_locations_memmap("r")
     for time_series_i, observed_rain_i in (
@@ -326,6 +328,9 @@ def downscale(forecast_array, test_set, directory, pool):
         long_i = time_series_i.id[1]
         forecaster = time_series_i.forecaster
         forecast_map[:, lat_i, long_i] = forecaster.forecast_median
+
+        #add residuals data
+        residual_plot.add_data(forecaster, observed_rain_i)
 
         #get the value for each loss
         for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
@@ -344,6 +349,24 @@ def downscale(forecast_array, test_set, directory, pool):
                 loss_i_quantile[2])
 
     forecast_array.del_locations_memmap()
+
+    #plot residual data
+    residual_plot.plot_heatmap()
+    plt.savefig(path.join(directory, "residual_hist.pdf"))
+    plt.close()
+
+    residual_plot.plot_scatter()
+    plt.savefig(path.join(directory, "residual_scatter.pdf"))
+    plt.close()
+
+    residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
+    residual_plot.plot_heatmap()
+    plt.savefig(path.join(directory, "residual_qq_hist.pdf"))
+    plt.close()
+
+    residual_plot.plot_scatter()
+    plt.savefig(path.join(directory, "residual_qq_scatter.pdf"))
+    plt.close()
 
     #plot the losses
     for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
