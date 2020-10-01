@@ -297,10 +297,8 @@ def downscale(forecast_array, test_set, directory, pool):
     quantile_array = stats.norm.cdf([-1, 0, 1])
     for i_loss in range(len(loss_segmentation.LOSS_CLASSES)):
         dic = {}
-        dic["bias"] = ma.empty_like(test_set.rain[0])
-        dic["lower_loss"] = ma.empty_like(test_set.rain[0])
-        dic["loss"] = ma.empty_like(test_set.rain[0])
-        dic["upper_loss"] = ma.empty_like(test_set.rain[0])
+        dic["bias_mean"] = ma.empty_like(test_set.rain[0])
+        dic["bias_median"] = ma.empty_like(test_set.rain[0])
         loss_map_array.append(dic)
 
     #area under curve, dictionary, keys: for each precipitation in
@@ -337,16 +335,10 @@ def downscale(forecast_array, test_set, directory, pool):
             loss_i = Loss(forecaster.n_simulation)
             loss_i.add_data(forecaster, observed_rain_i)
 
-            loss_map_array[i_loss]["bias"][lat_i, long_i] = (
+            loss_map_array[i_loss]["bias_mean"][lat_i, long_i] = (
                 loss_i.get_bias_loss())
-
-            loss_i_quantile = loss_i.get_loss_quantile(quantile_array)
-            loss_map_array[i_loss]["lower_loss"][lat_i, long_i] = (
-                loss_i_quantile[0])
-            loss_map_array[i_loss]["loss"][lat_i, long_i] = (
-                loss_i_quantile[1])
-            loss_map_array[i_loss]["upper_loss"][lat_i, long_i] = (
-                loss_i_quantile[2])
+            loss_map_array[i_loss]["bias_median"][lat_i, long_i] = (
+                loss_i.get_bias_median_loss())
 
     forecast_array.del_locations_memmap()
 
