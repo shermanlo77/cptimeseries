@@ -191,26 +191,17 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
     plt.close()
 
-    #investigate distribution of precipitation over entire test set
-    #plot p(rain > x) vs x
-        #forecast distribution obtained from taking average probability over
-            #the test set
-        #observed distribution obtained from taking all instances over the
-            #test set
-    prob_forecast_array = []
-    prob_observed_array = []
-    rain_plot = np.linspace(0, 40, 200)
-    for rain in rain_plot:
-        prob_forecast_array.append(
-            np.mean(forecast.get_prob_rain(rain)))
-        prob_observed_array.append(np.mean(observed_rain > rain))
-
+    #qq plot of forecast vs observed
+    qq_observe, qq_forecast = forecast.compare_dist_with_observed(
+        observed_rain, 500)
     plt.figure()
-    plt.plot(rain_plot, prob_forecast_array, label="forecast")
-    plt.plot(rain_plot, prob_observed_array, label="observed")
-    plt.ylabel("probability of precipitation > x")
-    plt.xlabel("x (mm)")
-    plt.legend()
+    ax = plt.gca()
+    plt.plot(qq_observe, qq_forecast)
+    axis_lim = np.array([ax.get_xlim()[1], ax.get_ylim()[1]])
+    axis_lim = axis_lim.min()
+    plt.plot([0, axis_lim], [0, axis_lim], 'k--')
+    plt.xlabel("observed precipitation (mm)")
+    plt.ylabel("forecasted precipitation (mm)")
     plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
 
     #plot the bias loss

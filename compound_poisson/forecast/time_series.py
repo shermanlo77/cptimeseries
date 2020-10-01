@@ -6,6 +6,7 @@ from os import path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
+from scipy import interpolate
 
 from compound_poisson.forecast import forecast_abstract
 from compound_poisson import roc
@@ -119,6 +120,62 @@ class Forecaster(forecast_abstract.Forecaster):
         else:
             roc_curve = None
         return roc_curve
+
+    def compare_dist_with_observed(self, observed_rain, n_linspace):
+        """Return values for a qq plot, comparing distribution of precipitation
+            of the forecast with the observed
+
+        Args:
+            observed_rain: numpy array of observed precipitation
+            n_linspace: number of points to evaluate between 0 mm and max
+                observed rain
+
+        Return:
+            x-axis numpy array and x-axis numpy array, x is observed, y is
+                forecasted
+        """
+        #range of observed precipitation to plot in the qq plot
+        observed_array = np.linspace(0, observed_rain.max(), n_linspace)
+
+        #get prob(precipitation > rain) for each rain in observed_array
+        prob_forecast_array = []
+        prob_observed_array = []
+        for rain in observed_array:
+            prob_forecast_array.append(np.mean(self.get_prob_rain(rain)))
+            prob_observed_array.append(np.mean(observed_rain > rain))
+
+        #inverse of the probability using interpolation (switch x and y)
+        prob_forecast_inverse = interpolate.interp1d(
+            prob_forecast_array, observed_array)
+
+        #for each probability in prob_observed_array, evaluate the inverse of
+            #prob_forecast_array using prob_forecast_invers
+        #caution when handling 0 mm
+        #return nan when ValueError caught, eg when outside the interpolation
+            #zone
+        forecast_array = []
+        for prob_observed in prob_observed_array:
+            forecast_i = None
+            if prob_observed > prob_forecast_array[0]:
+                forecast_i = 0
+            else:
+                if prob_observed > 0:
+                    try:
+                        forecast_i = (
+                            prob_forecast_inverse(prob_observed).tolist())
+                    except ValueError:
+                        forecast_i = math.nan
+                else:
+                    forecast_i = math.nan
+            forecast_array.append(forecast_i)
+
+        forecast_array = np.asarray(forecast_array)
+
+        is_finite = np.isfinite(forecast_array)
+        forecast_array = forecast_array[is_finite]
+        observed_array = observed_array[is_finite]
+
+        return (observed_array, np.asarray(forecast_array))
 
     def bootstrap(self, rng):
         """Return a bootstrapped forecast array of itself
