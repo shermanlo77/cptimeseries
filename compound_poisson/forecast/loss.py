@@ -55,12 +55,6 @@ class Loss(object):
             forecast_expectation, observed_data)
         self.bias_median_loss_sum += self.loss_function(
             forecast_median, observed_data)
-        for i_simulation in range(len(self.loss_array)):
-            forecast_i = forecast.forecast_array[i_simulation]
-            if not index is None:
-                forecast_i = forecast_i[index]
-            self.loss_array[i_simulation] += self.loss_function(
-                forecast_i, observed_data)
 
     def add_downscale_forecaster(self, forecaster, index=None):
         """Update member variables (eg losses) with new data for multiple
