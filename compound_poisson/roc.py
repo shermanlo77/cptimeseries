@@ -66,29 +66,16 @@ class Roc(object):
             if i < len(self.true_positive_array)-1:
                 height = (self.false_positive_array[i+1]
                     - self.false_positive_array[i])
-                #trapezium if approximate
-                if self.is_approximate:
-                    length_a = true_positive
-                    length_b = self.true_positive_array[i+1]
-
-                    area_i = 0.5 * height * (length_a + length_b)
-                #step function is exact
-                else:
-                    area_i = height * true_positive
+                area_i = height * true_positive
                 area_under_curve.append(area_i)
         self.area_under_curve = np.sum(area_under_curve)
 
     def plot(self):
         label = (str(self.rain_warning)+" mm, AUC = "
             +"{:0.3f}".format(self.area_under_curve))
-        if self.is_approximate:
-            plt.plot(self.false_positive_array,
-                     self.true_positive_array,
-                     label=label)
-        else:
-            plt.step(self.false_positive_array,
-                     self.true_positive_array,
-                     where="post",
-                     label=label)
+        plt.step(self.false_positive_array,
+                 self.true_positive_array,
+                 where="post",
+                 label=label)
         plt.xlabel("false positive rate")
         plt.ylabel("true positive rate")
