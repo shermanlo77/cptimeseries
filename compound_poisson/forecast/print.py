@@ -415,7 +415,7 @@ def downscale(forecast_array, test_set, directory, pool):
 
         plt.figure()
         roc_curve_array = forecast_array.get_roc_curve_array(
-            RAIN_THRESHOLD_ARRAY, test_set, index)
+            RAIN_THRESHOLD_ARRAY, test_set, index, pool=pool)
         for i_rain, roc_curve in enumerate(roc_curve_array):
             if not roc_curve is None:
                 roc_curve.plot()
@@ -445,7 +445,7 @@ def downscale(forecast_array, test_set, directory, pool):
     #plot roc curve over the entire test set
     plt.figure()
     roc_curve_array = forecast_array.get_roc_curve_array(
-        RAIN_THRESHOLD_EXTREME_ARRAY, test_set)
+        RAIN_THRESHOLD_EXTREME_ARRAY, test_set, pool=pool)
     for roc_curve in roc_curve_array:
         roc_curve.plot()
     plt.legend(loc="lower right")
