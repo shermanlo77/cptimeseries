@@ -121,7 +121,7 @@ class Forecaster(forecast_abstract.Forecaster):
             yield time_series.forecaster
 
     def get_roc_curve_array(
-        self, rain_warning_array, test_set, time_index=None):
+        self, rain_warning_array, test_set, time_index=None, pool=None):
         """Get ROC curves for range of rain warnings
 
         Args:
@@ -153,7 +153,7 @@ class Forecaster(forecast_abstract.Forecaster):
         for rain_warning in rain_warning_array:
             if np.any(rain_warning < observed_rain):
                 p_rain = self.get_prob_rain(rain_warning, time_index).flatten()
-                roc_curve = roc.Roc(rain_warning, p_rain, observed_rain)
+                roc_curve = roc.Roc(rain_warning, p_rain, observed_rain, pool)
                 roc_array.append(roc_curve)
             else:
                 roc_array.append(None)
@@ -177,7 +177,6 @@ class Forecaster(forecast_abstract.Forecaster):
         prob_forecast_array = []
         prob_observed_array = []
         for rain in observed_array:
-            prob_forecast_array_i = []
             prob_forecast_array.append(np.mean(self.get_prob_rain(rain)))
             prob_observed_array.append(np.mean(self.data.rain > rain))
 
