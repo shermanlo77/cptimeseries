@@ -10,11 +10,14 @@ class Roc(object):
             p_rain_warning: forecasted probability of precipitation more than
                 rain_warning, array, for each time point
             rain_true: actual observed precipitation, array, for each time point
+            is_approximate: True is all thresholds are considered (so that the
+                ROC curve is a step function)
         """
         self.rain_warning = rain_warning
         self.true_positive_array = None
         self.false_positive_array = None
         self.area_under_curve = None
+        self.is_approximate = None
 
         #for each positive probability, sort them (highest to lowest) and they
             #will be used for thresholds. Highest to lowest so start with lowest
@@ -33,6 +36,17 @@ class Roc(object):
         self.true_positive_array = [0.0]
         self.false_positive_array = [0.0]
 
+        #do not evaluate all thresholds as it is too slow
+        #pick out max_n_threshold thresholds
+        max_n_threshold = 10000
+        if len(threshold_array) > max_n_threshold:
+            thin_index = np.linspace(0, len(threshold_array)-1, max_n_threshold)
+            thin_index = np.asarray(np.round(thin_index), dtype=np.int32)
+            threshold_array = threshold_array[thin_index]
+            self.is_approximate = True
+        else:
+            self.is_approximate = False
+
         #for each threshold, get true and false positive
         for threshold in threshold_array:
             positive = p_rain_warning >= threshold
@@ -50,17 +64,31 @@ class Roc(object):
         area_under_curve = []
         for i, true_positive in enumerate(self.true_positive_array):
             if i < len(self.true_positive_array)-1:
-                area_under_curve.append(
-                    (self.false_positive_array[i+1]
-                        - self.false_positive_array[i]) * true_positive)
+                height = (self.false_positive_array[i+1]
+                    - self.false_positive_array[i])
+                #trapezium if approximate
+                if self.is_approximate:
+                    length_a = true_positive
+                    length_b = self.true_positive_array[i+1]
+
+                    area_i = 0.5 * height * (length_a + length_b)
+                #step function is exact
+                else:
+                    area_i = height * true_positive
+                area_under_curve.append(area_i)
         self.area_under_curve = np.sum(area_under_curve)
 
     def plot(self):
         label = (str(self.rain_warning)+" mm, AUC = "
             +"{:0.3f}".format(self.area_under_curve))
-        plt.step(self.false_positive_array,
-                 self.true_positive_array,
-                 where="post",
-                 label=label)
+        if self.is_approximate:
+            plt.plot(self.false_positive_array,
+                     self.true_positive_array,
+                     label=label)
+        else:
+            plt.step(self.false_positive_array,
+                     self.true_positive_array,
+                     where="post",
+                     label=label)
         plt.xlabel("false positive rate")
         plt.ylabel("true positive rate")
