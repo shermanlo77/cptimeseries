@@ -178,9 +178,7 @@ class Forecaster(forecast_abstract.Forecaster):
         prob_observed_array = []
         for rain in observed_array:
             prob_forecast_array_i = []
-            for forecaster in self.downscale.generate_unmask_time_series():
-                prob_forecast_array_i.append(np.mean(self.get_prob_rain(rain)))
-            prob_forecast_array.append(np.mean(prob_forecast_array_i))
+            prob_forecast_array.append(np.mean(self.get_prob_rain(rain)))
             prob_observed_array.append(np.mean(self.data.rain > rain))
 
         return self.get_qq_plot(
