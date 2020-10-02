@@ -29,7 +29,7 @@ class Roc(object):
             #will be used for thresholds. Highest to lowest so start with lowest
             #false positive, i.e. left to right on ROC curve
         threshold_array = p_rain_warning[is_warning]
-        threshold_array = np.flip(np.sort(p_rain_warning))
+        threshold_array = np.flip(np.sort(threshold_array))
         threshold_array = threshold_array[threshold_array > 0]
 
         #array to store true and false positives, used for plotting
