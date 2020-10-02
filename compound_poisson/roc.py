@@ -16,18 +16,19 @@ class Roc(object):
         self.false_positive_array = None
         self.area_under_curve = None
 
-        #for each positive probability, sort them (highest to lowest) and they
-            #will be used for thresholds. Highest to lowest so start with lowest
-            #false positive, i.e. left to right on ROC curve
-        threshold_array = np.flip(np.sort(p_rain_warning))
-        threshold_array = threshold_array[threshold_array > 0]
-
         #get the times it rained more than rain_warning
         is_warning = rain_true > self.rain_warning
         #number of times the event happened
         n_is_warning = np.sum(is_warning)
         #number of times event did not happaned
         n_is_not_warning = len(is_warning) - n_is_warning
+
+        #for each positive probability, sort them (highest to lowest) and they
+            #will be used for thresholds. Highest to lowest so start with lowest
+            #false positive, i.e. left to right on ROC curve
+        threshold_array = p_rain_warning[is_warning]
+        threshold_array = np.flip(np.sort(p_rain_warning))
+        threshold_array = threshold_array[threshold_array > 0]
 
         #array to store true and false positives, used for plotting
         self.true_positive_array = [0.0]
