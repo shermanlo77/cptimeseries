@@ -10,14 +10,11 @@ class Roc(object):
             p_rain_warning: forecasted probability of precipitation more than
                 rain_warning, array, for each time point
             rain_true: actual observed precipitation, array, for each time point
-            is_approximate: True is all thresholds are considered (so that the
-                ROC curve is a step function)
         """
         self.rain_warning = rain_warning
         self.true_positive_array = None
         self.false_positive_array = None
         self.area_under_curve = None
-        self.is_approximate = None
 
         #for each positive probability, sort them (highest to lowest) and they
             #will be used for thresholds. Highest to lowest so start with lowest
@@ -35,17 +32,6 @@ class Roc(object):
         #array to store true and false positives, used for plotting
         self.true_positive_array = [0.0]
         self.false_positive_array = [0.0]
-
-        #do not evaluate all thresholds as it is too slow
-        #pick out max_n_threshold thresholds
-        max_n_threshold = 10000
-        if len(threshold_array) > max_n_threshold:
-            thin_index = np.linspace(0, len(threshold_array)-1, max_n_threshold)
-            thin_index = np.asarray(np.round(thin_index), dtype=np.int32)
-            threshold_array = threshold_array[thin_index]
-            self.is_approximate = True
-        else:
-            self.is_approximate = False
 
         #for each threshold, get true and false positive
         for threshold in threshold_array:
