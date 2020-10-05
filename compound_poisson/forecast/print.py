@@ -192,8 +192,9 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.close()
 
     #qq plot of forecast vs observed
-    qq_observe, qq_forecast = forecast.compare_dist_with_observed(
-        observed_rain, 500)
+    (observed_array, prob_forecast_array, prob_observed_array, qq_observe,
+        qq_forecast) = forecast.compare_dist_with_observed(observed_rain, 500)
+
     plt.figure()
     ax = plt.gca()
     plt.plot(qq_observe, qq_forecast)
@@ -202,6 +203,16 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.plot([0, axis_lim], [0, axis_lim], 'k--')
     plt.xlabel("observed precipitation (mm)")
     plt.ylabel("forecasted precipitation (mm)")
+    plt.savefig(path.join(directory, prefix + "_distribution_qq.pdf"))
+    plt.close()
+
+    plt.figure()
+    plt.plot(observed_array, prob_forecast_array, label="forecast")
+    plt.plot(observed_array, prob_observed_array, label="observe")
+    plt.xlim([0, axis_lim])
+    plt.xlabel("observed precipitation (mm)")
+    plt.ylabel("forecasted precipitation (mm)")
+    plt.legend()
     plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
     plt.close()
 
@@ -277,7 +288,9 @@ def downscale(forecast_array, test_set, directory, pool):
     rain_units = test_set.rain_units
 
     #qq plot of forecast vs observed
-    qq_observe, qq_forecast = forecast_array.compare_dist_with_observed(500)
+    (observed_array, prob_forecast_array, prob_observed_array, qq_observe,
+        qq_forecast) = forecast_array.compare_dist_with_observed(100)
+
     plt.figure()
     ax = plt.gca()
     plt.plot(qq_observe, qq_forecast)
@@ -286,6 +299,16 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.plot([0, axis_lim], [0, axis_lim], 'k--')
     plt.xlabel("observed precipitation (mm)")
     plt.ylabel("forecasted precipitation (mm)")
+    plt.savefig(path.join(directory, "distribution_qq.pdf"))
+    plt.close()
+
+    plt.figure()
+    plt.plot(observed_array, prob_forecast_array, label="forecast")
+    plt.plot(observed_array, prob_observed_array, label="observe")
+    plt.xlim([0, axis_lim])
+    plt.xlabel("observed precipitation (mm)")
+    plt.ylabel("forecasted precipitation (mm)")
+    plt.legend()
     plt.savefig(path.join(directory, "distribution.pdf"))
     plt.close()
 

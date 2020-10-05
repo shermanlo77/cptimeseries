@@ -119,8 +119,9 @@ class Forecaster(forecast_abstract.Forecaster):
         return roc_curve
 
     def compare_dist_with_observed(self, observed_rain, n_linspace):
-        """Return values for a qq plot, comparing distribution of precipitation
-            of the forecast with the observed
+        """Return values for plotting the survival function of precipitation
+            of the forecast and the observed and also a qq plot, comparing the
+            two distributions
 
         Args:
             observed_rain: numpy array of observed precipitation
@@ -128,8 +129,16 @@ class Forecaster(forecast_abstract.Forecaster):
                 observed rain
 
         Return:
-            x-axis numpy array and x-axis numpy array, x is observed, y is
-                forecasted
+            observed_array: array of precipitation the survival functions were
+                evaluated (x-axis for survival function)
+            prob_forecast_array: array of survival functions evaluated at
+                observed_array for the forecast (y-axis for survival function)
+            prob_observed_array: array of survival functions evaluated at
+                observed_array for the observed (y-axis for survival function)
+            qq_observe: array of observed precipitation (same quantiles
+                element-wise with qq_forecast) (x-axis for qq plot)
+            qq_forecast: array of forecasted precipitation (same quantiles
+                element-wise with qq_observe) (y-axis for qq plot)
         """
         #range of observed precipitation to plot in the qq plot
         observed_array = np.linspace(0, observed_rain.max(), n_linspace)
@@ -141,8 +150,13 @@ class Forecaster(forecast_abstract.Forecaster):
             prob_forecast_array.append(np.mean(self.get_prob_rain(rain)))
             prob_observed_array.append(np.mean(observed_rain > rain))
 
-        return self.get_qq_plot(
+        qq_observe, qq_forecast = self.get_qq_plot(
             observed_array, prob_observed_array, prob_forecast_array)
+        return (observed_array,
+                prob_forecast_array,
+                prob_observed_array,
+                qq_observe,
+                qq_forecast)
 
     def bootstrap(self, rng):
         """Return a bootstrapped forecast array of itself

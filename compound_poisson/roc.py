@@ -20,10 +20,6 @@ class Roc(object):
 
         #get the times it rained more than rain_warning
         is_warning = rain_true > self.rain_warning
-        #number of times the event happened
-        n_is_warning = np.sum(is_warning)
-        #number of times event did not happaned
-        n_is_not_warning = len(is_warning) - n_is_warning
 
         #for each positive probability, sort them (highest to lowest) and they
             #will be used for thresholds. Highest to lowest so start with lowest
