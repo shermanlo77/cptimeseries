@@ -5,15 +5,18 @@ import math
 import os
 from os import path
 
+from cartopy import crs
 import joblib
 from matplotlib import pyplot as plt
 import numpy as np
+from numpy import ma
 from numpy import random
 import pandas as pd
 import pandas.plotting
 
 import compound_poisson
 from compound_poisson.forecast import loss_segmentation
+from compound_poisson.forecast import residual_analysis
 from compound_poisson.forecast import time_segmentation
 import dataset
 
@@ -44,9 +47,9 @@ def main():
     downscale.forecaster.load_memmap("r")
     downscale.forecaster.load_locations_memmap("r")
     downscale_array.append(downscale)
-    downscale_name_array.append("Compound-Poisson")
+    downscale_name_array.append("CP-MCMC")
 
-    era5 = dataset.Era5IsleOfMan()
+    era5 = dataset.Era5Wales()
     downscale = compound_poisson.era5.Downscale(era5)
     downscale.fit(era5, observed_data)
     downscale_array.append(downscale)
@@ -56,7 +59,6 @@ def main():
     time_segmentator = time_segmentation.YearSegmentator(time_array)
     loss_segmentator_array = []
     for downscale in downscale_array:
-        print(downscale)
         loss_segmentator_i = loss_segmentation.Downscale()
         loss_segmentator_i.evaluate_loss(
             downscale.forecaster, time_segmentator)
@@ -87,7 +89,7 @@ def main():
         plt.ylabel(Loss.get_axis_bias_label())
         plt.xlabel("year")
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+" _mean.pdf"))
+            path.join(directory, Loss.get_short_bias_name()+"_mean.pdf"))
         plt.close()
 
         plt.figure()
@@ -100,7 +102,7 @@ def main():
         plt.ylabel(Loss.get_axis_bias_label())
         plt.xlabel("year")
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+" _median.pdf"))
+            path.join(directory, Loss.get_short_bias_name()+"_median.pdf"))
         plt.close()
 
     #plot table of test set bias loss
@@ -147,6 +149,74 @@ def main():
             path_to_table = path.join(directory, prefix+"_"+time_key+".txt")
             data_frame.to_latex(path_to_table,
                                 formatters=float_format_array)
+
+    loss_map_array = []
+    loss_min = math.inf
+    loss_max = 0
+    for downscale in downscale_array:
+        loss_map = ma.empty_like(observed_data.rain[0])
+        for time_series_i, observed_rain_i in (
+            zip(downscale.generate_unmask_time_series(),
+                observed_data.generate_unmask_rain())):
+            lat_i = time_series_i.id[0]
+            long_i = time_series_i.id[1]
+            forecaster = time_series_i.forecaster
+
+            loss_i = compound_poisson.forecast.loss.MeanAbsoluteError(
+                forecaster.n_simulation)
+            loss_i.add_data(forecaster, observed_rain_i)
+            loss_bias_i = loss_i.get_bias_median_loss()
+            loss_map[lat_i, long_i] = loss_bias_i
+
+            if loss_bias_i < loss_min:
+                loss_min = loss_bias_i
+            if loss_bias_i > loss_max:
+                loss_max = loss_bias_i
+
+        loss_map_array.append(loss_map)
+
+    angle_resolution = dataset.ANGLE_RESOLUTION
+    longitude_grid = (
+        observed_data.topography["longitude"] - angle_resolution / 2)
+    latitude_grid = (
+        observed_data.topography["latitude"] + angle_resolution / 2)
+
+    #plot the losses
+    for loss_map, downscale_name in zip(loss_map_array, downscale_name_array):
+        plt.figure()
+        ax = plt.axes(projection=crs.PlateCarree())
+        im = ax.pcolor(longitude_grid,
+                       latitude_grid,
+                       loss_map,
+                       vmin=loss_min,
+                       vmax=loss_max)
+        ax.coastlines(resolution="50m")
+        plt.colorbar(im)
+        ax.set_aspect("auto", adjustable=None)
+        plt.savefig(
+            path.join(
+                directory, downscale_name+"_mae_map.pdf"))
+        plt.close()
+
+    for i, downscale_i in enumerate(downscale_array):
+        residual_plot = residual_analysis.ResidualLnqqPlotter()
+
+        for time_series_i, observed_rain_i in (
+            zip(downscale_i.generate_unmask_time_series(),
+                observed_data.generate_unmask_rain())):
+            lat_i = time_series_i.id[0]
+            long_i = time_series_i.id[1]
+            forecaster = time_series_i.forecaster
+
+            #add residuals data
+            residual_plot.add_data(forecaster, observed_rain_i)
+
+        #plot residual data
+        residual_plot.plot_heatmap([[0, 4.3], [0, 4.3]], 1.8, 7.2)
+        plt.savefig(
+            path.join(directory,
+                      downscale_name_array[i]+"_residual_qq_hist.pdf"))
+        plt.close()
 
     for downscale_i in downscale_array:
         downscale.forecaster.del_memmap()
