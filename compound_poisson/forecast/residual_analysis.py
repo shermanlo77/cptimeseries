@@ -62,7 +62,7 @@ class ResidualPlotter(object):
         plt.xlabel(self.get_x_label())
         plt.ylabel(self.get_y_label())
 
-    def plot_heatmap(self):
+    def plot_heatmap(self, range=None, vmin=None, vmax=None):
         """Log frequency density plot
         """
         #area x 10^colour = count (aka frequency)
@@ -70,10 +70,10 @@ class ResidualPlotter(object):
         y_data = self.get_y_data()
         plt.figure()
         [hist, x_edges, y_edges] = np.histogram2d(
-            x_data, y_data, HIST_BINS, density=True)
+            x_data, y_data, HIST_BINS, range, density=True)
         hist[hist==0] = hist[hist>0].min()
         hist *= len(x_data)
-        plt.pcolormesh(x_edges, y_edges, np.log10(hist).T)
+        plt.pcolormesh(x_edges, y_edges, np.log10(hist).T, vmin=vmin, vmax=vmax)
         plt.xlabel(self.get_x_label())
         plt.ylabel(self.get_y_label())
         plt.colorbar()
@@ -107,8 +107,8 @@ class ResidualBaPlotter(ResidualPlotter):
         super().plot_scatter()
         self.plot_horizontal("k--")
 
-    def plot_heatmap(self):
-        super().plot_heatmap()
+    def plot_heatmap(self, range=None, vmin=None, vmax=None):
+        super().plot_heatmap(range, vmin, vmax)
         self.plot_horizontal("w--")
 
 class ResidualLnqqPlotter(ResidualPlotter):
@@ -142,6 +142,6 @@ class ResidualLnqqPlotter(ResidualPlotter):
         super().plot_scatter()
         self.plot_base("k--")
 
-    def plot_heatmap(self):
-        super().plot_heatmap()
+    def plot_heatmap(self, range=None, vmin=None, vmax=None):
+        super().plot_heatmap(range, vmin, vmax)
         self.plot_base("w--")
