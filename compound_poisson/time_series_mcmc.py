@@ -151,7 +151,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     def forecast(self, x, n_simulation):
         #override
         self.read_memmap()
-        super().forecast(n_simulation)
+        super().forecast(x, n_simulation)
         self.del_memmap()
 
     def instantiate_forecast(self, x):
