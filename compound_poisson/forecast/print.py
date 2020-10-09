@@ -86,8 +86,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
         if forecast_sliced.forecast_sigma:
-            forecast_lower_error = forecast_sliced.forecast_quartile[0]
-            forecast_upper_error = forecast_sliced.forecast_quartile[2]
+            forecast_lower_error = forecast_sliced.forecast_sigma[-1]
+            forecast_upper_error = forecast_sliced.forecast_sigma[1]
         else:
             forecast_lower_error = forecast_median_i
             forecast_upper_error = forecast_median_i
@@ -126,6 +126,27 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         plt.savefig(
             path.join(directory,
                       prefix+"_forecast_median_"+str(year)+".pdf"))
+        plt.close()
+
+        #plot forecast using median, observed as points
+        #get oberved outside error bound
+        is_plot = np.logical_or(observed_rain_i > forecast_upper_error,
+                                observed_rain_i < forecast_lower_error)
+        plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(cycle_forecast)
+        plt.fill_between(time_array_i,
+                         forecast_lower_error,
+                         forecast_upper_error,
+                         alpha=0.25)
+        plt.plot(time_array_i, forecast_median_i, label="forecast")
+        plt.scatter(np.asarray(time_array_i)[is_plot], observed_rain_i[is_plot], 4, label="observed")
+        plt.xlabel("time")
+        plt.ylabel("precipitation (mm)")
+        plt.legend()
+        plt.savefig(
+            path.join(directory,
+                      prefix+"_forecast_median_ob_"+str(year)+".pdf"))
         plt.close()
 
         #plot residual
