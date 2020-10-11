@@ -5,6 +5,7 @@ from os import path
 import numpy as np
 from scipy import stats
 
+from compound_poisson.forecast import distribution_compare
 from compound_poisson.forecast import forecast_abstract
 from compound_poisson import roc
 
@@ -118,7 +119,7 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_curve = None
         return roc_curve
 
-    def compare_dist_with_observed(self, observed_rain, n_linspace):
+    def compare_dist_with_observed(self, observed_rain, n_linspace=500):
         """Return values for plotting the survival function of precipitation
             of the forecast and the observed and also a qq plot, comparing the
             two distributions
@@ -127,36 +128,10 @@ class Forecaster(forecast_abstract.Forecaster):
             observed_rain: numpy array of observed precipitation
             n_linspace: number of points to evaluate between 0 mm and max
                 observed rain
-
-        Return:
-            observed_array: array of precipitation the survival functions were
-                evaluated (x-axis for survival function)
-            prob_forecast_array: array of survival functions evaluated at
-                observed_array for the forecast (y-axis for survival function)
-            prob_observed_array: array of survival functions evaluated at
-                observed_array for the observed (y-axis for survival function)
-            qq_observe: array of observed precipitation (same quantiles
-                element-wise with qq_forecast) (x-axis for qq plot)
-            qq_forecast: array of forecasted precipitation (same quantiles
-                element-wise with qq_observe) (y-axis for qq plot)
         """
-        #range of observed precipitation to plot in the qq plot
-        observed_array = np.linspace(0, observed_rain.max(), n_linspace)
-
-        #get prob(precipitation > rain) for each rain in observed_array
-        prob_forecast_array = []
-        prob_observed_array = []
-        for rain in observed_array:
-            prob_forecast_array.append(np.mean(self.get_prob_rain(rain)))
-            prob_observed_array.append(np.mean(observed_rain > rain))
-
-        qq_observe, qq_forecast = self.get_qq_plot(
-            observed_array, prob_observed_array, prob_forecast_array)
-        return (observed_array,
-                prob_forecast_array,
-                prob_observed_array,
-                qq_observe,
-                qq_forecast)
+        comparer = distribution_compare.TimeSeries()
+        comparer.compare(self, observed_rain, n_linspace)
+        return comparer
 
     def bootstrap(self, rng):
         """Return a bootstrapped forecast array of itself

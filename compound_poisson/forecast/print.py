@@ -229,31 +229,31 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.close()
 
     #qq plot of forecast vs observed
-    (observed_array, prob_forecast_array, prob_observed_array, qq_observe,
-        qq_forecast) = forecast.compare_dist_with_observed(observed_rain, 500)
+    comparer = forecast.compare_dist_with_observed(observed_rain)
 
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(monochrome)
-    plt.plot(qq_observe, qq_forecast)
-    axis_lim = np.array([ax.get_xlim()[1], ax.get_ylim()[1]])
-    axis_lim = axis_lim.min()
-    plt.plot([0, axis_lim], [0, axis_lim], 'k--')
-    plt.xlabel("observed precipitation (mm)")
-    plt.ylabel("forecasted precipitation (mm)")
-    plt.savefig(path.join(directory, prefix + "_distribution_qq.pdf"))
+    comparer.plot_survival()
+    comparer.adjust_survival_plot()
+    plt.legend()
+    plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
     plt.close()
 
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(monochrome)
-    plt.plot(observed_array, prob_forecast_array, label="forecast")
-    plt.plot(observed_array, prob_observed_array, label="observe")
-    plt.xlim([0, axis_lim])
-    plt.xlabel("x (mm)")
-    plt.ylabel("probability of precipitation > x")
-    plt.legend()
-    plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
+    comparer.plot_pp()
+    comparer.adjust_pp_plot()
+    plt.savefig(path.join(directory, prefix + "_distribution_pp.pdf"))
+    plt.close()
+
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    comparer.plot_qq()
+    comparer.adjust_qq_plot()
+    plt.savefig(path.join(directory, prefix + "_distribution_qq.pdf"))
     plt.close()
 
     #plot the bias loss
@@ -341,31 +341,6 @@ def downscale(forecast_array, test_set, directory, pool):
     monochrome = (cycler.cycler('color', ['k'])
         * cycler.cycler('linestyle', LINESTYLE))
 
-    #qq plot of forecast vs observed
-    (observed_array, prob_forecast_array, prob_observed_array, qq_observe,
-        qq_forecast) = forecast_array.compare_dist_with_observed(100)
-
-    plt.figure()
-    ax = plt.gca()
-    plt.plot(qq_observe, qq_forecast)
-    axis_lim = np.array([ax.get_xlim()[1], ax.get_ylim()[1]])
-    axis_lim = axis_lim.min()
-    plt.plot([0, axis_lim], [0, axis_lim], 'k--')
-    plt.xlabel("observed precipitation (mm)")
-    plt.ylabel("forecasted precipitation (mm)")
-    plt.savefig(path.join(directory, "distribution_qq.pdf"))
-    plt.close()
-
-    plt.figure()
-    plt.plot(observed_array, prob_forecast_array, label="forecast")
-    plt.plot(observed_array, prob_observed_array, label="observe")
-    plt.xlim([0, axis_lim])
-    plt.xlabel("x (mm)")
-    plt.ylabel("probability of precipitation > x")
-    plt.legend()
-    plt.savefig(path.join(directory, "distribution.pdf"))
-    plt.close()
-
     #forecast map, 3 dimensions, same as test set rain, prediction of
         #precipitation for each point in space and time, 0th dimension is time,
         #remaining is space
@@ -394,10 +369,38 @@ def downscale(forecast_array, test_set, directory, pool):
     if not path.isdir(map_dir):
         os.mkdir(map_dir)
 
-    residual_plot = residual_analysis.ResidualBaPlotter()
+    forecast_array.load_locations_memmap("r")
+
+    #qq plot of forecast vs observed
+    comparer = forecast_array.compare_dist_with_observed()
+
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    comparer.plot_survival()
+    comparer.adjust_survival_plot()
+    plt.legend()
+    plt.savefig(path.join(directory, "distribution.pdf"))
+    plt.close()
+
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    comparer.plot_pp()
+    comparer.adjust_pp_plot()
+    plt.savefig(path.join(directory, "distribution_pp.pdf"))
+    plt.close()
+
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    comparer.plot_qq()
+    comparer.adjust_qq_plot()
+    plt.savefig(path.join(directory, "distribution_qq.pdf"))
+    plt.close()
 
     #get forecast (median) and rmse for the maps
-    forecast_array.load_locations_memmap("r")
+    residual_plot = residual_analysis.ResidualBaPlotter()
     for time_series_i, observed_rain_i in (
         zip(downscale.generate_unmask_time_series(),
             test_set.generate_unmask_rain())):
