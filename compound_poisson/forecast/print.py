@@ -20,6 +20,7 @@ from scipy import stats
 
 import compound_poisson
 from compound_poisson import roc
+from compound_poisson.forecast import coverage_analysis
 from compound_poisson.forecast import loss
 from compound_poisson.forecast import loss_segmentation
 from compound_poisson.forecast import residual_analysis
@@ -27,7 +28,8 @@ from compound_poisson.forecast import time_segmentation
 import dataset
 
 RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]
-RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 10, 15, 20, 25, 30]
+RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 10, 15]
+LINESTYLE = ['-', '--', '-.', ':']
 
 def time_series(forecast, observed_rain, directory, prefix=""):
     """For plotting compound_poisson.forecast.time_series.Forecaster objects
@@ -61,10 +63,16 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     cycle_forecast = cycler.cycler(color=[colours[0], colours[1]],
                                    linewidth=[1, 1],
                                    alpha=[1, 0.5])
+    monochrome = (cycler.cycler('color', ['k'])
+        * cycler.cycler('linestyle', LINESTYLE))
 
     #split time_array into different years
     time_array = forecast.time_array
     year_segmentator = time_segmentation.YearSegmentator(time_array)
+    spring_segmentator = time_segmentation.SpringSegmentator(time_array)
+    summer_segmentator = time_segmentation.SummerSegmentator(time_array)
+    autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
+    winter_segmentator = time_segmentation.WinterSegmentator(time_array)
     date_array = []
 
     #dictionary of AUC for different thresholds, key is amount of rain, value is
@@ -86,8 +94,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
         if forecast_sliced.forecast_sigma:
-            forecast_lower_error = forecast_sliced.forecast_sigma[-1]
-            forecast_upper_error = forecast_sliced.forecast_sigma[1]
+            forecast_lower_error = forecast_sliced.forecast_sigma[-2]
+            forecast_upper_error = forecast_sliced.forecast_sigma[2]
         else:
             forecast_lower_error = forecast_median_i
             forecast_upper_error = forecast_median_i
@@ -151,6 +159,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
         #plot residual
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         plt.plot(time_array_i, forecast_median_i - observed_rain_i)
         plt.xlabel("time")
         plt.ylabel("residual (mm)")
@@ -160,6 +170,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
         #plot ROC curve, save AUC as well
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         for rain in RAIN_THRESHOLD_ARRAY:
             roc_curve = forecast_sliced.get_roc_curve(rain, observed_rain_i)
             if not roc_curve is None:
@@ -189,12 +201,14 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #plot auc for each year
     plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     for rain in RAIN_THRESHOLD_ARRAY:
         label = str(rain) + " mm"
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
         date_array_plot = np.array(date_array)[is_number]
-        plt.plot(date_array_plot, auc[is_number], '-o', label=label)
+        plt.plot(date_array_plot, auc[is_number], label=label)
     plt.legend()
     plt.ylim([0.5, 1])
     plt.xlabel("year")
@@ -204,6 +218,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #plot roc curve for the entire test set
     plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     for rain in RAIN_THRESHOLD_EXTREME_ARRAY:
         roc_curve = forecast.get_roc_curve(rain, observed_rain)
         if not roc_curve is None:
@@ -218,6 +234,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     plt.figure()
     ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     plt.plot(qq_observe, qq_forecast)
     axis_lim = np.array([ax.get_xlim()[1], ax.get_ylim()[1]])
     axis_lim = axis_lim.min()
@@ -228,6 +245,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.close()
 
     plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     plt.plot(observed_array, prob_forecast_array, label="forecast")
     plt.plot(observed_array, prob_observed_array, label="observe")
     plt.xlim([0, axis_lim])
@@ -238,12 +257,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.close()
 
     #plot the bias loss
-
     loss_segmentator = loss_segmentation.TimeSeries()
-    spring_segmentator = time_segmentation.SpringSegmentator(time_array)
-    summer_segmentator = time_segmentation.SummerSegmentator(time_array)
-    autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
-    winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
     loss_segmentator.evaluate_loss(forecast, observed_rain, year_segmentator)
     loss_segmentator.plot_loss(directory, prefix)
@@ -273,6 +287,20 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     residual_plot.plot_scatter()
     plt.savefig(path.join(directory, prefix + "_residual_qq_scatter.pdf"))
+    plt.close()
+
+    coverage = coverage_analysis.TimeSeries(year_segmentator)
+    coverage.add_data(forecast, observed_rain)
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    for i, credible_level in enumerate(coverage.credible_level_array):
+        plt.plot(coverage.time_array,
+                 coverage.coverage_array[i],
+                 label=str(credible_level))
+    plt.legend()
+    plt.plot()
+    plt.savefig(path.join(directory, prefix + "_coverage.pdf"))
     plt.close()
 
     #memmap of forecasts no longer needed
@@ -307,6 +335,9 @@ def downscale(forecast_array, test_set, directory, pool):
     longitude_grid = test_set.topography["longitude"] - angle_resolution / 2
     latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
     rain_units = test_set.rain_units
+
+    monochrome = (cycler.cycler('color', ['k'])
+        * cycler.cycler('linestyle', LINESTYLE))
 
     #qq plot of forecast vs observed
     (observed_array, prob_forecast_array, prob_observed_array, qq_observe,
@@ -513,6 +544,20 @@ def downscale(forecast_array, test_set, directory, pool):
     loss_segmentator.plot_loss(directory, "autumn")
     loss_segmentator.evaluate_loss(forecast_array, winter_segmentator)
     loss_segmentator.plot_loss(directory, "winter")
+
+    coverage = coverage_analysis.Downscale(year_segmentator)
+    coverage.add_data(forecast_array, test_set)
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    for i, credible_level in enumerate(coverage.credible_level_array):
+        plt.plot(coverage.time_array,
+                 coverage.coverage_array[i],
+                 label=str(credible_level))
+    plt.legend()
+    plt.plot()
+    plt.savefig(path.join(directory, "coverage.pdf"))
+    plt.close()
 
     forecast_array.del_locations_memmap()
 
