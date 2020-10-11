@@ -298,6 +298,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         plt.plot(coverage.time_array,
                  coverage.coverage_array[i],
                  label=str(credible_level))
+    plt.xlabel("year")
+    plt.ylabel("coverage")
     plt.legend()
     plt.plot()
     plt.savefig(path.join(directory, prefix + "_coverage.pdf"))
@@ -554,6 +556,8 @@ def downscale(forecast_array, test_set, directory, pool):
         plt.plot(coverage.time_array,
                  coverage.coverage_array[i],
                  label=str(credible_level))
+    plt.xlabel("year")
+    plt.ylabel("coverage")
     plt.legend()
     plt.plot()
     plt.savefig(path.join(directory, "coverage.pdf"))
