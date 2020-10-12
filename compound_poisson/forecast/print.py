@@ -54,6 +54,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     #required to load forecast samples
     forecast.load_memmap("r")
+    plt.rcParams.update({'font.size': 14})
 
     #required for plotting dates
     pandas.plotting.register_matplotlib_converters()
@@ -111,11 +112,13 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                          alpha=0.25)
         plt.plot(time_array_i, forecast_i, label="forecast")
         plt.plot(time_array_i, observed_rain_i, label="observed")
+        plt.xticks(rotation=45)
         plt.xlabel("time")
         plt.ylabel("precipitation (mm)")
         plt.legend()
         plt.savefig(
-            path.join(directory, prefix + "_forecast_" + str(year) + ".pdf"))
+            path.join(directory, prefix + "_forecast_" + str(year) + ".pdf"),
+            bbox_inches="tight")
         plt.close()
 
         #plot forecast using median instead
@@ -128,12 +131,14 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                          alpha=0.25)
         plt.plot(time_array_i, forecast_median_i, label="forecast")
         plt.plot(time_array_i, observed_rain_i, label="observed")
+        plt.xticks(rotation=45)
         plt.xlabel("time")
         plt.ylabel("precipitation (mm)")
         plt.legend()
         plt.savefig(
             path.join(directory,
-                      prefix+"_forecast_median_"+str(year)+".pdf"))
+                      prefix+"_forecast_median_"+str(year)+".pdf"),
+            bbox_inches="tight")
         plt.close()
 
         #plot forecast using median, observed as points
@@ -148,13 +153,18 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                          forecast_upper_error,
                          alpha=0.25)
         plt.plot(time_array_i, forecast_median_i, label="forecast")
-        plt.scatter(np.asarray(time_array_i)[is_plot], observed_rain_i[is_plot], 4, label="observed")
+        plt.scatter(np.asarray(time_array_i)[is_plot],
+                    observed_rain_i[is_plot],
+                    4,
+                    label="observed")
+        plt.xticks(rotation=45)
         plt.xlabel("time")
         plt.ylabel("precipitation (mm)")
         plt.legend()
         plt.savefig(
             path.join(directory,
-                      prefix+"_forecast_median_ob_"+str(year)+".pdf"))
+                      prefix+"_forecast_median_ob_"+str(year)+".pdf"),
+            bbox_inches="tight")
         plt.close()
 
         #plot residual
@@ -162,10 +172,12 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
         plt.plot(time_array_i, forecast_median_i - observed_rain_i)
+        plt.xticks(rotation=45)
         plt.xlabel("time")
         plt.ylabel("residual (mm)")
         plt.savefig(
-            path.join(directory, prefix + "_residual_" + str(year) + ".pdf"))
+            path.join(directory, prefix + "_residual_" + str(year) + ".pdf"),
+            bbox_inches="tight")
         plt.close()
 
         #plot ROC curve, save AUC as well
@@ -181,22 +193,24 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                 auc = np.nan
             auc_array[rain].append(auc)
         plt.legend(loc="lower right")
-        plt.savefig(path.join(directory, prefix + "_roc_" + str(year) + ".pdf"))
+        plt.savefig(path.join(directory, prefix + "_roc_" + str(year) + ".pdf"),
+            bbox_inches="tight")
         plt.close()
 
         #plot probability of more than rain precipitation
         #plot vertical red line to show when that even actually happened
         for rain in RAIN_THRESHOLD_ARRAY:
             plt.figure()
+            ax = plt.gca()
+            ax.set_prop_cycle(monochrome)
             plt.plot(time_array_i, forecast_sliced.get_prob_rain(rain))
-            for i, date_i in enumerate(time_array_i):
-                if observed_rain_i[i] > rain:
-                    plt.axvline(x=date_i, color="r", linestyle=":")
+            plt.xticks(rotation=45)
             plt.xlabel("time")
             plt.ylabel("forecasted probability of > "+str(rain)+" mm")
             plt.savefig(
                 path.join(directory,
-                          prefix+"_prob_"+str(rain)+"_"+str(year)+".pdf"))
+                          prefix+"_prob_"+str(rain)+"_"+str(year)+".pdf"),
+                bbox_inches="tight")
             plt.close()
 
     #plot auc for each year
@@ -212,8 +226,9 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.legend()
     plt.ylim([0.5, 1])
     plt.xlabel("year")
+    plt.xticks(rotation=45)
     plt.ylabel("area under curve")
-    plt.savefig(path.join(directory, prefix + "_auc.pdf"))
+    plt.savefig(path.join(directory, prefix + "_auc.pdf"), bbox_inches="tight")
     plt.close()
 
     #plot roc curve for the entire test set
@@ -225,7 +240,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         if not roc_curve is None:
             roc_curve.plot()
     plt.legend(loc="lower right")
-    plt.savefig(path.join(directory, prefix + "_roc_all.pdf"))
+    plt.savefig(path.join(directory, prefix + "_roc_all.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     #qq plot of forecast vs observed
@@ -237,7 +253,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     comparer.plot_survival()
     comparer.adjust_survival_plot()
     plt.legend()
-    plt.savefig(path.join(directory, prefix + "_distribution.pdf"))
+    plt.savefig(path.join(directory, prefix + "_distribution.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     plt.figure()
@@ -245,7 +262,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     ax.set_prop_cycle(monochrome)
     comparer.plot_pp()
     comparer.adjust_pp_plot()
-    plt.savefig(path.join(directory, prefix + "_distribution_pp.pdf"))
+    plt.savefig(path.join(directory, prefix + "_distribution_pp.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     plt.figure()
@@ -253,40 +271,45 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     ax.set_prop_cycle(monochrome)
     comparer.plot_qq()
     comparer.adjust_qq_plot()
-    plt.savefig(path.join(directory, prefix + "_distribution_qq.pdf"))
+    plt.savefig(path.join(directory, prefix + "_distribution_qq.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     #plot the bias loss
     loss_segmentator = loss_segmentation.TimeSeries()
 
     loss_segmentator.evaluate_loss(forecast, observed_rain, year_segmentator)
-    loss_segmentator.plot_loss(directory, prefix)
+    loss_segmentator.plot_loss(directory, prefix, monochrome)
     loss_segmentator.evaluate_loss(forecast, observed_rain, spring_segmentator)
-    loss_segmentator.plot_loss(directory, prefix+"_spring")
+    loss_segmentator.plot_loss(directory, prefix+"_spring", monochrome)
     loss_segmentator.evaluate_loss(forecast, observed_rain, summer_segmentator)
-    loss_segmentator.plot_loss(directory, prefix+"_summer")
+    loss_segmentator.plot_loss(directory, prefix+"_summer", monochrome)
     loss_segmentator.evaluate_loss(forecast, observed_rain, autumn_segmentator)
-    loss_segmentator.plot_loss(directory, prefix+"_autumn")
+    loss_segmentator.plot_loss(directory, prefix+"_autumn", monochrome)
     loss_segmentator.evaluate_loss(forecast, observed_rain, winter_segmentator)
-    loss_segmentator.plot_loss(directory, prefix+"_winter")
+    loss_segmentator.plot_loss(directory, prefix+"_winter", monochrome)
 
     residual_plot = residual_analysis.ResidualBaPlotter()
     residual_plot.add_data(forecast, observed_rain)
     residual_plot.plot_heatmap()
-    plt.savefig(path.join(directory, prefix + "_residual_hist.pdf"))
+    plt.savefig(path.join(directory, prefix + "_residual_hist.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     residual_plot.plot_scatter()
-    plt.savefig(path.join(directory, prefix + "_residual_scatter.pdf"))
+    plt.savefig(path.join(directory, prefix + "_residual_scatter.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
     residual_plot.plot_heatmap()
-    plt.savefig(path.join(directory, prefix + "_residual_qq_hist.pdf"))
+    plt.savefig(path.join(directory, prefix + "_residual_qq_hist.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     residual_plot.plot_scatter()
-    plt.savefig(path.join(directory, prefix + "_residual_qq_scatter.pdf"))
+    plt.savefig(path.join(directory, prefix + "_residual_qq_scatter.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     coverage = coverage_analysis.TimeSeries(year_segmentator)
@@ -299,10 +322,12 @@ def time_series(forecast, observed_rain, directory, prefix=""):
                  coverage.coverage_array[i],
                  label=str(credible_level))
     plt.xlabel("year")
+    plt.xticks(rotation=45)
     plt.ylabel("coverage")
     plt.legend()
     plt.plot()
-    plt.savefig(path.join(directory, prefix + "_coverage.pdf"))
+    plt.savefig(path.join(directory, prefix + "_coverage.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     #memmap of forecasts no longer needed
@@ -330,6 +355,8 @@ def downscale(forecast_array, test_set, directory, pool):
 
     #required to load memmap containing forecasts
     forecast_array.load_memmap("r")
+    monochrome = (cycler.cycler('color', ['k'])
+        * cycler.cycler('linestyle', LINESTYLE))
 
     downscale = forecast_array.downscale
 
@@ -337,9 +364,6 @@ def downscale(forecast_array, test_set, directory, pool):
     longitude_grid = test_set.topography["longitude"] - angle_resolution / 2
     latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
     rain_units = test_set.rain_units
-
-    monochrome = (cycler.cycler('color', ['k'])
-        * cycler.cycler('linestyle', LINESTYLE))
 
     #forecast map, 3 dimensions, same as test set rain, prediction of
         #precipitation for each point in space and time, 0th dimension is time,
@@ -494,6 +518,8 @@ def downscale(forecast_array, test_set, directory, pool):
         date_array.append(date)
 
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         roc_curve_array = forecast_array.get_roc_curve_array(
             RAIN_THRESHOLD_ARRAY, test_set, index, pool=pool)
         for i_rain, roc_curve in enumerate(roc_curve_array):
@@ -509,12 +535,14 @@ def downscale(forecast_array, test_set, directory, pool):
 
     #plot auc for each year
     plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     for rain in RAIN_THRESHOLD_ARRAY:
         label = str(rain) + " " + rain_units
         auc = np.asarray(auc_array[rain])
         is_number = np.logical_not(np.isnan(auc))
         date_array_plot = np.array(date_array)
-        plt.plot(date_array_plot[is_number], auc[is_number], '-o', label=label)
+        plt.plot(date_array_plot[is_number], auc[is_number], label=label)
     plt.legend()
     plt.ylim([0.5, 1])
     plt.xlabel("year")
@@ -524,6 +552,8 @@ def downscale(forecast_array, test_set, directory, pool):
 
     #plot roc curve over the entire test set
     plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     roc_curve_array = forecast_array.get_roc_curve_array(
         RAIN_THRESHOLD_EXTREME_ARRAY, test_set, pool=pool)
     for roc_curve in roc_curve_array:

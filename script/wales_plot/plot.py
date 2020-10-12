@@ -1,16 +1,26 @@
-"""Figures and tables for Isle of Man
+"""Figures and tables for comparing CP-MCMC with ERA5 for Wales
+
+Plots:
+    -bias loss for each year
+    -bias loss for each location (with CP-MCMC and ERA5 to have the same colour
+        bar scale)
+    -log residuals plots (with CP-MCMC and ERA5 to have the same colour
+        bar scale and same histogram binnings)
+
+Tables:
+    -bias loss for the total years and seasons
 """
 
 import math
 import os
 from os import path
 
+import cycler
 from cartopy import crs
 import joblib
 from matplotlib import pyplot as plt
 import numpy as np
 from numpy import ma
-from numpy import random
 import pandas as pd
 import pandas.plotting
 
@@ -20,12 +30,18 @@ from compound_poisson.forecast import residual_analysis
 from compound_poisson.forecast import time_segmentation
 import dataset
 
+LINESTYLE = ['-', '--', '-.', ':']
+
 def main():
 
     #where to save the figures
     directory = "figure"
     if not path.isdir(directory):
         os.mkdir(directory)
+    monochrome = (cycler.cycler('color', ['k'])
+        * cycler.cycler('linestyle', LINESTYLE))
+    plt.rcParams.update({'font.size': 14})
+    pandas.plotting.register_matplotlib_converters()
 
     observed_data = dataset.WalesTest()
     time_array = observed_data.time_array
@@ -47,13 +63,13 @@ def main():
     downscale.forecaster.load_memmap("r")
     downscale.forecaster.load_locations_memmap("r")
     downscale_array.append(downscale)
-    downscale_name_array.append("CP-MCMC")
+    downscale_name_array.append("CP-MCMC (5)")
 
     era5 = dataset.Era5Wales()
     downscale = compound_poisson.era5.Downscale(era5)
     downscale.fit(era5, observed_data)
     downscale_array.append(downscale)
-    downscale_name_array.append("ERA5")
+    downscale_name_array.append("IFS")
 
     #yearly plot of the bias losses
     time_segmentator = time_segmentation.YearSegmentator(time_array)
@@ -64,7 +80,6 @@ def main():
             downscale.forecaster, time_segmentator)
         loss_segmentator_array.append(loss_segmentator_i)
 
-    pandas.plotting.register_matplotlib_converters()
     for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
 
         #array of arrays, one for each time_series in time_series_array
@@ -80,6 +95,8 @@ def main():
             bias_median_loss_plot_array.append(bias_median_loss_plot)
 
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         for downscale_label, bias_plot_array in zip(downscale_name_array,
             bias_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
@@ -88,11 +105,15 @@ def main():
         plt.legend()
         plt.ylabel(Loss.get_axis_bias_label())
         plt.xlabel("year")
+        plt.xticks(rotation=45)
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+"_mean.pdf"))
+            path.join(directory, Loss.get_short_bias_name()+"_mean.pdf"),
+            bbox_inches="tight")
         plt.close()
 
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         for downscale_label, bias_plot_array in zip(downscale_name_array,
             bias_median_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
@@ -101,8 +122,10 @@ def main():
         plt.legend()
         plt.ylabel(Loss.get_axis_bias_label())
         plt.xlabel("year")
+        plt.xticks(rotation=45)
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+"_median.pdf"))
+            path.join(directory, Loss.get_short_bias_name()+"_median.pdf"),
+            bbox_inches="tight")
         plt.close()
 
     #plot table of test set bias loss
@@ -195,7 +218,8 @@ def main():
         ax.set_aspect("auto", adjustable=None)
         plt.savefig(
             path.join(
-                directory, downscale_name+"_mae_map.pdf"))
+                directory, downscale_name+"_mae_map.pdf"),
+            bbox_inches="tight")
         plt.close()
 
     for i, downscale_i in enumerate(downscale_array):
@@ -215,7 +239,8 @@ def main():
         residual_plot.plot_heatmap([[0, 4.3], [0, 4.3]], 1.8, 7.2)
         plt.savefig(
             path.join(directory,
-                      downscale_name_array[i]+"_residual_qq_hist.pdf"))
+                      downscale_name_array[i]+"_residual_qq_hist.pdf"),
+            bbox_inches="tight")
         plt.close()
 
     for downscale_i in downscale_array:

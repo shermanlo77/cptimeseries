@@ -71,7 +71,7 @@ class TimeSeries(object):
             loss_i.add_data(forecast_sliced, observed_rain_i)
             self.loss_segment_array[i_error].append(loss_i)
 
-    def plot_loss(self, directory, prefix=""):
+    def plot_loss(self, directory, prefix="", cycler=None):
         #it is possible for the time_array to be empty, for example, r10 would
             #be empty is it never rained more than 10 mm
         if self.time_array:
@@ -88,7 +88,8 @@ class TimeSeries(object):
                           Loss.get_axis_bias_label(),
                           path.join(directory,
                                     (prefix + "_" + Loss.get_short_bias_name()
-                                        + "_mean.pdf")))
+                                        + "_mean.pdf")),
+                          cycler)
 
                 #bias of the median
                 self.plot(bias_median_loss_plot,
@@ -96,7 +97,8 @@ class TimeSeries(object):
                           Loss.get_axis_bias_label(),
                           path.join(directory,
                                     (prefix + "_" + Loss.get_short_bias_name()
-                                        + "_median.pdf")))
+                                        + "_median.pdf")),
+                          cycler)
 
     def get_bias_plot(self, i_loss):
         #bias loss for each segment
@@ -107,16 +109,20 @@ class TimeSeries(object):
             bias_median_loss_plot.append(loss_i.get_bias_median_loss())
         return (bias_loss_plot, bias_median_loss_plot)
 
-    def plot(self, plot_array, h_line, label_axis, path_to_fig):
+    def plot(self, plot_array, h_line, label_axis, path_to_fig, cycler=None):
         plt.figure()
-        plt.plot(self.time_array, plot_array, '-o')
+        if not cycler is None:
+            ax = plt.gca()
+            ax.set_prop_cycle(cycler)
+        plt.plot(self.time_array, plot_array)
         plt.hlines(h_line,
                    self.time_array[0],
                    self.time_array[-1],
                    linestyles='dashed')
         plt.xlabel("date")
+        plt.xticks(rotation=45)
         plt.ylabel(label_axis)
-        plt.savefig(path_to_fig)
+        plt.savefig(path_to_fig, bbox_inches="tight")
         plt.close()
 
 class Downscale(TimeSeries):

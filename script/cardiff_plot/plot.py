@@ -16,6 +16,7 @@ import math
 import os
 from os import path
 
+import cycler
 import joblib
 from matplotlib import pyplot as plt
 import numpy as np
@@ -28,7 +29,13 @@ from compound_poisson.forecast import loss_segmentation
 from compound_poisson.forecast import time_segmentation
 import dataset
 
+LINESTYLE = ['-', '--', '-.', ':']
+
 def main():
+
+    monochrome = (cycler.cycler('color', ['k'])
+        * cycler.cycler('linestyle', LINESTYLE))
+    plt.rcParams.update({'font.size': 14})
 
     #where to save the figures
     directory = "figure"
@@ -45,12 +52,10 @@ def main():
     observed_rain = observed_data.rain
     time_array = observed_data.time_array
 
-    training_size_array = [1, 5, 10, 20]
+    training_size_array = [1, 5]
     script_dir_array = [
         "cardiff_1_20",
         "cardiff_5_20",
-        "cardiff_10_20",
-        "cardiff_20_20",
     ]
     for i, dir_i in enumerate(script_dir_array):
         script_dir_array[i] = path.join("..", dir_i)
@@ -66,7 +71,8 @@ def main():
         time_series.forecaster.memmap_path = path.join(dir_i, old_dir)
         time_series.forecaster.load_memmap("r")
         time_series_array.append(time_series)
-        time_series_name_array.append(str(training_size_array[i]) + " year(s)")
+        time_series_name_array.append(
+            "CP-MCMC ("+str(training_size_array[i])+")")
 
     #plot auc for varying precipitation
 
@@ -75,7 +81,7 @@ def main():
     auc_array = []
     bootstrap_error_array = []
     n_bootstrap = 32
-    rain_array = [0, 5, 10, 15, 20, 25, 30]
+    rain_array = [0, 5, 10, 15]
     for i_training_size, size_i in enumerate(training_size_array):
         auc_array.append([])
         bootstrap_error_array.append([])
@@ -96,6 +102,8 @@ def main():
 
     #figure format
     plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
     for i_training_size, size_i in enumerate(training_size_array):
         plt.plot(rain_array,
                  auc_array[i_training_size],
@@ -104,7 +112,7 @@ def main():
     plt.xlabel("precipitation (mm)")
     plt.ylabel("Area under ROC curve")
     plt.legend()
-    plt.savefig(path.join(directory, "auc.pdf"))
+    plt.savefig(path.join(directory, "auc.pdf"), bbox_inches="tight")
     plt.close()
 
     #table format
@@ -126,7 +134,7 @@ def main():
     #add era5 (for loss evaluation)
     #roc unavailable for era5
     time_series_array.append(era5)
-    time_series_name_array.append("ERA5")
+    time_series_name_array.append("IFS")
 
     #yearly plot of the bias losses
     time_segmentator = time_segmentation.YearSegmentator(time_array)
@@ -153,6 +161,8 @@ def main():
             bias_median_loss_plot_array.append(bias_median_loss_plot)
 
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         for time_series_label, bias_plot_array in zip(time_series_name_array,
             bias_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
@@ -161,11 +171,15 @@ def main():
         plt.legend()
         plt.ylabel(Loss.get_axis_bias_label())
         plt.xlabel("year")
+        plt.xticks(rotation=45)
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+" _mean.pdf"))
+            path.join(directory, Loss.get_short_bias_name()+" _mean.pdf"),
+            bbox_inches="tight")
         plt.close()
 
         plt.figure()
+        ax = plt.gca()
+        ax.set_prop_cycle(monochrome)
         for time_series_label, bias_plot_array in zip(time_series_name_array,
             bias_median_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
@@ -174,8 +188,10 @@ def main():
         plt.legend()
         plt.ylabel(Loss.get_axis_bias_label())
         plt.xlabel("year")
+        plt.xticks(rotation=45)
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+" _median.pdf"))
+            path.join(directory, Loss.get_short_bias_name()+" _median.pdf"),
+            bbox_inches="tight")
         plt.close()
 
     #plot table of test set bias loss
