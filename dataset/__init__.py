@@ -31,8 +31,6 @@ from dataset.era5 import Era5Wales
 import dataset.isle_of_man
 from dataset.isle_of_man import IsleOfManTest
 from dataset.isle_of_man import IsleOfManTraining
-from dataset.isle_of_man import IsleOfManWeekTest
-from dataset.isle_of_man import IsleOfManWeekTraining
 import dataset.location
 import dataset.london
 from dataset.london import LondonTest
