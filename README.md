@@ -1,21 +1,16 @@
-# Downscale using Compound Poisson
+# Precipitation Forecasting using Compound Poisson Time Series
 * Copyright (c) 2020 Sherman Lo
 * MIT LICENSE
 
-Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle.
+Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle. A Bayesian inference was used to quantify uncertainity in the forecasting.
 
-The modification of code is required to use your own data. This is because the code is designed for `.grib` and `.nc` files with specific grids. Please see LICENCE for further information on how you can use this code for your purpose.
+Please see LICENCE for further information on how you can use and modify this repository for your own purpose.
 
-Keywords:
+![A time series forecast in bold with 1 sigma error as a shaded area](frontcover.png)
 
-* Downscaling
-* Compound Poisson
-* Gaussian Process
-* Markov Chain Monte Carlo
-* Time series
-* Spatial–temporal
+Keywords: *Compound Poisson, MCMC sampling, downscale, time series, Gaussian process, downscaling, precipitation, weather forecasting*
 
-## Requirements (Python 3 and Linux)
+## Requirements (Python 3, Linux Recommended)
 * At least 16 GB of RAM
 * `numpy`
 * `pandas`
@@ -41,8 +36,11 @@ Keywords:
 * `script/london`
     * Training set: 1980-1989 inclusive
     * Test set: 1990-1999 inclusive
-* `script/cardiff_20_20`
-    * Training set: 1979-1999 inclusive
+* `script/cardiff_1_20`
+    * Training set: 1999
+    * Test set: 2000-2019 inclusive
+* `script/cardiff_5_20`
+    * Training set: 1995-1999 inclusive
     * Test set: 2000-2019 inclusive
 
 Run the script `hyper_slice.py` to run 10 000 MCMC samples. Afterwards, run `hyper_slice_forecast.py` to sample 1 000 forecast samples. Figures are plotted and saved in the `figure` directory.
@@ -70,21 +68,17 @@ Results are saved in the `result` directory. Delete it if you wish to restart th
 
 ## Multiple Locations Scripts
 * `script/isle_of_man`
-    * Training set: 1980-1989 inclusive
-    * Test set: 1990-1999 inclusive
-* `script/wales_10`
-    * Training set: 1980-1989 inclusive
-    * Test set: 1990-1999 inclusive
-* `script/wales_10_20`
     * Training set: 1990-1999 inclusive
+    * Test set: 2000-2009 inclusive
+    * Uses [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) for parallel computation by default
+* `script/wales_5_20`
+    * Training set: 1995-1999 inclusive
     * Test set: 2000-2019 inclusive
-* `script/wales_20_20`
-    * Training set: 1979-1999 inclusive
-    * Test set: 2000-2019 inclusive
+    * Uses [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) for parallel computation by default
 
-For the Wales dataset, use `mpiexec -n 8 python3 -m mpi4py.futures downscale.py` to use 8 threads for example.
+Run the script `downscale.py` to do MCMC sampling. Afterwards, run the script `downscale_forecast.py` to do forecast.
 
-Run the script `downscale.py` and `dual.py` to do MCMC sampling without/with model field sampling respectively. Afterwards, run the script `downscale_forecast.py` and/or `dual_forecast.py` to do forecast sampling without/with model field sampling respectively.
+Both scripts use parallel computation. For the the Isle of Man, the use of `python3` on its own is fine. For the Wales dataset which uses [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html), use `mpiexec -n 8 python3 -m mpi4py.futures downscale.py` to use 8 threads for example.
 
 The options may be provided which may be useful for development or debugging purposes. The following examples are provided:
 
@@ -107,10 +101,15 @@ The options may be provided which may be useful for development or debugging pur
 * `python3 downscale_forecast.py --noprint`
     * Does not print forecast figures
 
-The code uses multiple threads so using a multi-core processor(s) is recommended.
+The code uses multiple threads so using a multi-core processor(s) is recommended. Changing what parallel computation package to use can be done by modifying the code. For example, one can modify
+```
+pool = multiprocess.MPIPoolExecutor()
+```
+to
+```
+pool = multiprocess.Pool()
+```
+so that [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) is used instead of [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html).
 
 ## Notes for Developers
-* Please see the package `compound_poisson` for under the hood code and documentations.
-* There is a bug for `dual_forecast.py` scripts for large datasets and large MCMC samples. RAM usage increase rapidly which may be fixed by careful memory management.
-* The options are there for debugging purposes and/or to cater for limited resources such as time.
-* A note on reproducibility. Results store many random number generators and their states which are used MCMC sampling and forecasting, therefore figures are reproducible. However, obtaining more MCMC samples after forecasting will cause future forecasts to use a different set of random numbers. Making a backup of the results before any forecasting is recommended.
+* Please see the packages [`compound_poisson`](./compound_poisson/) and [`dataset`](./dataset/) for further documentations.
