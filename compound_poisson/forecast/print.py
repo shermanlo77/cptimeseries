@@ -95,8 +95,8 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         forecast_i = forecast_sliced.forecast
         forecast_median_i = forecast_sliced.forecast_median
         if forecast_sliced.forecast_sigma:
-            forecast_lower_error = forecast_sliced.forecast_sigma[-2]
-            forecast_upper_error = forecast_sliced.forecast_sigma[2]
+            forecast_lower_error = forecast_sliced.forecast_sigma[-1]
+            forecast_upper_error = forecast_sliced.forecast_sigma[1]
         else:
             forecast_lower_error = forecast_median_i
             forecast_upper_error = forecast_median_i
@@ -138,32 +138,6 @@ def time_series(forecast, observed_rain, directory, prefix=""):
         plt.savefig(
             path.join(directory,
                       prefix+"_forecast_median_"+str(year)+".pdf"),
-            bbox_inches="tight")
-        plt.close()
-
-        #plot forecast using median, observed as points
-        #get oberved outside error bound
-        is_plot = np.logical_or(observed_rain_i > forecast_upper_error,
-                                observed_rain_i < forecast_lower_error)
-        plt.figure()
-        ax = plt.gca()
-        ax.set_prop_cycle(cycle_forecast)
-        plt.fill_between(time_array_i,
-                         forecast_lower_error,
-                         forecast_upper_error,
-                         alpha=0.25)
-        plt.plot(time_array_i, forecast_median_i, label="forecast")
-        plt.scatter(np.asarray(time_array_i)[is_plot],
-                    observed_rain_i[is_plot],
-                    4,
-                    label="observed")
-        plt.xticks(rotation=45)
-        plt.xlabel("time")
-        plt.ylabel("precipitation (mm)")
-        plt.legend()
-        plt.savefig(
-            path.join(directory,
-                      prefix+"_forecast_median_ob_"+str(year)+".pdf"),
             bbox_inches="tight")
         plt.close()
 
@@ -291,7 +265,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
 
     residual_plot = residual_analysis.ResidualBaPlotter()
     residual_plot.add_data(forecast, observed_rain)
-    residual_plot.plot_heatmap()
+    residual_plot.plot_heatmap(cmap="Greys")
     plt.savefig(path.join(directory, prefix + "_residual_hist.pdf"),
                 bbox_inches="tight")
     plt.close()
@@ -302,7 +276,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     plt.close()
 
     residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
-    residual_plot.plot_heatmap()
+    residual_plot.plot_heatmap(cmap="Greys")
     plt.savefig(path.join(directory, prefix + "_residual_qq_hist.pdf"),
                 bbox_inches="tight")
     plt.close()
@@ -357,6 +331,7 @@ def downscale(forecast_array, test_set, directory, pool):
     forecast_array.load_memmap("r")
     monochrome = (cycler.cycler('color', ['k'])
         * cycler.cycler('linestyle', LINESTYLE))
+    plt.rcParams.update({'font.size': 14})
 
     downscale = forecast_array.downscale
 
@@ -404,7 +379,7 @@ def downscale(forecast_array, test_set, directory, pool):
     comparer.plot_survival()
     comparer.adjust_survival_plot()
     plt.legend()
-    plt.savefig(path.join(directory, "distribution.pdf"))
+    plt.savefig(path.join(directory, "distribution.pdf"), bbox_inches="tight")
     plt.close()
 
     plt.figure()
@@ -412,7 +387,8 @@ def downscale(forecast_array, test_set, directory, pool):
     ax.set_prop_cycle(monochrome)
     comparer.plot_pp()
     comparer.adjust_pp_plot()
-    plt.savefig(path.join(directory, "distribution_pp.pdf"))
+    plt.savefig(
+        path.join(directory, "distribution_pp.pdf"), bbox_inches="tight")
     plt.close()
 
     plt.figure()
@@ -420,7 +396,8 @@ def downscale(forecast_array, test_set, directory, pool):
     ax.set_prop_cycle(monochrome)
     comparer.plot_qq()
     comparer.adjust_qq_plot()
-    plt.savefig(path.join(directory, "distribution_qq.pdf"))
+    plt.savefig(
+        path.join(directory, "distribution_qq.pdf"), bbox_inches="tight")
     plt.close()
 
     #get forecast (median) and rmse for the maps
@@ -449,21 +426,24 @@ def downscale(forecast_array, test_set, directory, pool):
     forecast_array.del_locations_memmap()
 
     #plot residual data
-    residual_plot.plot_heatmap()
-    plt.savefig(path.join(directory, "residual_hist.pdf"))
+    residual_plot.plot_heatmap(cmap="Greys")
+    plt.savefig(path.join(directory, "residual_hist.pdf"), bbox_inches="tight")
     plt.close()
 
     residual_plot.plot_scatter()
-    plt.savefig(path.join(directory, "residual_scatter.png"))
+    plt.savefig(
+        path.join(directory, "residual_scatter.png"), bbox_inches="tight")
     plt.close()
 
     residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
-    residual_plot.plot_heatmap()
-    plt.savefig(path.join(directory, "residual_qq_hist.pdf"))
+    residual_plot.plot_heatmap(cmap="Greys")
+    plt.savefig(
+        path.join(directory, "residual_qq_hist.pdf"), bbox_inches="tight")
     plt.close()
 
     residual_plot.plot_scatter()
-    plt.savefig(path.join(directory, "residual_qq_scatter.png"))
+    plt.savefig(
+        path.join(directory, "residual_qq_scatter.png"), bbox_inches="tight")
     plt.close()
 
     #plot the losses
@@ -473,13 +453,15 @@ def downscale(forecast_array, test_set, directory, pool):
             ax = plt.axes(projection=crs.PlateCarree())
             im = ax.pcolor(longitude_grid,
                            latitude_grid,
-                           loss_map)
+                           loss_map,
+                           cmap='Greys')
             ax.coastlines(resolution="50m")
             plt.colorbar(im)
             ax.set_aspect("auto", adjustable=None)
             plt.savefig(
                 path.join(
-                    directory, Loss.get_short_name()+"_"+metric+"_map.pdf"))
+                    directory, Loss.get_short_name()+"_"+metric+"_map.pdf"),
+                bbox_inches="tight")
             plt.close()
 
     #plot the spatial forecast for each time (in parallel)
@@ -530,7 +512,8 @@ def downscale(forecast_array, test_set, directory, pool):
                 auc = np.nan
             auc_array[RAIN_THRESHOLD_ARRAY[i_rain]].append(auc)
         plt.legend(loc="lower right")
-        plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"))
+        plt.savefig(path.join(directory, "test_roc_"+str(year)+".pdf"),
+                    bbox_inches="tight")
         plt.close()
 
     #plot auc for each year
@@ -546,8 +529,9 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.legend()
     plt.ylim([0.5, 1])
     plt.xlabel("year")
+    plt.xticks(rotation=45)
     plt.ylabel("area under curve")
-    plt.savefig(path.join(directory, "auc.pdf"))
+    plt.savefig(path.join(directory, "auc.pdf"), bbox_inches="tight")
     plt.close()
 
     #plot roc curve over the entire test set
@@ -559,7 +543,7 @@ def downscale(forecast_array, test_set, directory, pool):
     for roc_curve in roc_curve_array:
         roc_curve.plot()
     plt.legend(loc="lower right")
-    plt.savefig(path.join(directory, "test_roc_full.pdf"))
+    plt.savefig(path.join(directory, "test_roc_full.pdf"), bbox_inches="tight")
     plt.close()
 
     loss_segmentator = loss_segmentation.Downscale()
@@ -570,15 +554,15 @@ def downscale(forecast_array, test_set, directory, pool):
 
     forecast_array.load_locations_memmap("r")
     loss_segmentator.evaluate_loss(forecast_array, year_segmentator)
-    loss_segmentator.plot_loss(directory)
+    loss_segmentator.plot_loss(directory, "yearly", monochrome)
     loss_segmentator.evaluate_loss(forecast_array, spring_segmentator)
-    loss_segmentator.plot_loss(directory, "spring")
+    loss_segmentator.plot_loss(directory, "spring", monochrome)
     loss_segmentator.evaluate_loss(forecast_array, summer_segmentator)
-    loss_segmentator.plot_loss(directory, "summer")
+    loss_segmentator.plot_loss(directory, "summer", monochrome)
     loss_segmentator.evaluate_loss(forecast_array, autumn_segmentator)
-    loss_segmentator.plot_loss(directory, "autumn")
+    loss_segmentator.plot_loss(directory, "autumn", monochrome)
     loss_segmentator.evaluate_loss(forecast_array, winter_segmentator)
-    loss_segmentator.plot_loss(directory, "winter")
+    loss_segmentator.plot_loss(directory, "winter", monochrome)
 
     coverage = coverage_analysis.Downscale(year_segmentator)
     coverage.add_data(forecast_array, test_set)
@@ -593,7 +577,7 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.ylabel("coverage")
     plt.legend()
     plt.plot()
-    plt.savefig(path.join(directory, "coverage.pdf"))
+    plt.savefig(path.join(directory, "coverage.pdf"), bbox_inches="tight")
     plt.close()
 
     forecast_array.del_locations_memmap()
@@ -630,7 +614,7 @@ class PrintForecastMapMessage(object):
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
         plt.title(self.title)
-        plt.savefig(self.file_path)
+        plt.savefig(self.file_path, bbox_inches="tight")
         plt.close()
 
 class PrintForecastSeriesMessage(object):

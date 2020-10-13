@@ -212,7 +212,8 @@ def main():
                        latitude_grid,
                        loss_map,
                        vmin=loss_min,
-                       vmax=loss_max)
+                       vmax=loss_max,
+                       cmap='Greys')
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
@@ -236,7 +237,7 @@ def main():
             residual_plot.add_data(forecaster, observed_rain_i)
 
         #plot residual data
-        residual_plot.plot_heatmap([[0, 4.3], [0, 4.3]], 1.8, 7.2)
+        residual_plot.plot_heatmap([[0, 4.3], [0, 4.3]], 1.8, 7.2, 'Greys')
         plt.savefig(
             path.join(directory,
                       downscale_name_array[i]+"_residual_qq_hist.pdf"),

@@ -26,15 +26,19 @@ import pandas.plotting
 
 import compound_poisson
 from compound_poisson.forecast import loss_segmentation
+from compound_poisson.forecast import residual_analysis
 from compound_poisson.forecast import time_segmentation
 import dataset
 
 LINESTYLE = ['-', '--', '-.', ':']
+LINESTYLE2 = ['--', '-.', '-', ':']
 
 def main():
 
     monochrome = (cycler.cycler('color', ['k'])
         * cycler.cycler('linestyle', LINESTYLE))
+    monochrome2 = (cycler.cycler('color', ['k'])
+        * cycler.cycler('linestyle', LINESTYLE2))
     plt.rcParams.update({'font.size': 14})
 
     #where to save the figures
@@ -162,7 +166,7 @@ def main():
 
         plt.figure()
         ax = plt.gca()
-        ax.set_prop_cycle(monochrome)
+        ax.set_prop_cycle(monochrome2)
         for time_series_label, bias_plot_array in zip(time_series_name_array,
             bias_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
@@ -173,13 +177,13 @@ def main():
         plt.xlabel("year")
         plt.xticks(rotation=45)
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+" _mean.pdf"),
+            path.join(directory, Loss.get_short_bias_name()+"_mean.pdf"),
             bbox_inches="tight")
         plt.close()
 
         plt.figure()
         ax = plt.gca()
-        ax.set_prop_cycle(monochrome)
+        ax.set_prop_cycle(monochrome2)
         for time_series_label, bias_plot_array in zip(time_series_name_array,
             bias_median_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
@@ -190,7 +194,7 @@ def main():
         plt.xlabel("year")
         plt.xticks(rotation=45)
         plt.savefig(
-            path.join(directory, Loss.get_short_bias_name()+" _median.pdf"),
+            path.join(directory, Loss.get_short_bias_name()+"_median.pdf"),
             bbox_inches="tight")
         plt.close()
 
@@ -237,6 +241,20 @@ def main():
             path_to_table = path.join(directory, prefix+"_"+time_key+".txt")
             data_frame.to_latex(path_to_table,
                                 formatters=float_format_array)
+
+    for i, time_series_i in enumerate(time_series_array):
+        residual_plot = residual_analysis.ResidualLnqqPlotter()
+
+        #add residuals data
+        residual_plot.add_data(time_series_i.forecaster, observed_rain)
+
+        #plot residual data
+        residual_plot.plot_heatmap([[0, 3.8], [0, 3.8]], 1.8, 5.3, 'Greys')
+        plt.savefig(
+            path.join(directory,
+                      time_series_name_array[i]+"_residual_qq_hist.pdf"),
+            bbox_inches="tight")
+        plt.close()
 
     for time_series_i in time_series_array:
         time_series_i.forecaster.del_memmap()

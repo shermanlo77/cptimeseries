@@ -58,11 +58,11 @@ class ResidualPlotter(object):
         x_data = self.get_x_data()
         y_data = self.get_y_data()
         plt.figure()
-        plt.scatter(x_data, y_data, 2)
+        plt.scatter(x_data, y_data, 2, 'k')
         plt.xlabel(self.get_x_label())
         plt.ylabel(self.get_y_label())
 
-    def plot_heatmap(self, range=None, vmin=None, vmax=None):
+    def plot_heatmap(self, range=None, vmin=None, vmax=None, cmap=None):
         """Log frequency density plot
         """
         #area x 10^colour = count (aka frequency)
@@ -73,7 +73,8 @@ class ResidualPlotter(object):
             x_data, y_data, HIST_BINS, range, density=True)
         hist[hist==0] = hist[hist>0].min()
         hist *= len(x_data)
-        plt.pcolormesh(x_edges, y_edges, np.log10(hist).T, vmin=vmin, vmax=vmax)
+        plt.pcolormesh(
+            x_edges, y_edges, np.log10(hist).T, vmin=vmin, vmax=vmax, cmap=cmap)
         plt.xlabel(self.get_x_label())
         plt.ylabel(self.get_y_label())
         plt.colorbar()
@@ -107,9 +108,10 @@ class ResidualBaPlotter(ResidualPlotter):
         super().plot_scatter()
         self.plot_horizontal("k--")
 
-    def plot_heatmap(self, range=None, vmin=None, vmax=None):
-        super().plot_heatmap(range, vmin, vmax)
-        self.plot_horizontal("w--")
+    def plot_heatmap(
+        self, range=None, vmin=None, vmax=None, cmap=None, base_style="k--"):
+        super().plot_heatmap(range, vmin, vmax, cmap)
+        self.plot_horizontal(base_style)
 
 class ResidualLnqqPlotter(ResidualPlotter):
     """Plots ln(forecast+1) vs ln(observed+1)
@@ -142,6 +144,7 @@ class ResidualLnqqPlotter(ResidualPlotter):
         super().plot_scatter()
         self.plot_base("k--")
 
-    def plot_heatmap(self, range=None, vmin=None, vmax=None):
-        super().plot_heatmap(range, vmin, vmax)
-        self.plot_base("w--")
+    def plot_heatmap(self, range=None, vmin=None, vmax=None, cmap=None,
+        base_style="k--"):
+        super().plot_heatmap(range, vmin, vmax, cmap)
+        self.plot_base(base_style)
