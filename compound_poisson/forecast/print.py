@@ -27,8 +27,8 @@ from compound_poisson.forecast import residual_analysis
 from compound_poisson.forecast import time_segmentation
 import dataset
 
-RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]
-RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 10, 15]
+RAIN_THRESHOLD_ARRAY = [5, 10, 15, 25]
+RAIN_THRESHOLD_EXTREME_ARRAY = [5, 15, 25]
 LINESTYLE = ['-', '--', '-.', ':']
 
 def time_series(forecast, observed_rain, directory, prefix=""):
@@ -74,6 +74,7 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     summer_segmentator = time_segmentation.SummerSegmentator(time_array)
     autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
     winter_segmentator = time_segmentation.WinterSegmentator(time_array)
+    all_inclusive = time_segmentation.AllInclusive(time_array)
     date_array = []
 
     #dictionary of AUC for different thresholds, key is amount of rain, value is
@@ -294,13 +295,27 @@ def time_series(forecast, observed_rain, directory, prefix=""):
     for i, credible_level in enumerate(coverage.credible_level_array):
         plt.plot(coverage.time_array,
                  coverage.coverage_array[i],
-                 label=str(credible_level))
+                 label=r"$\alpha = $" + str(credible_level))
     plt.xlabel("year")
     plt.xticks(rotation=45)
-    plt.ylabel("coverage")
+    plt.ylabel("coverage of HDI")
     plt.legend()
     plt.plot()
     plt.savefig(path.join(directory, prefix + "_coverage.pdf"),
+                bbox_inches="tight")
+    plt.close()
+
+    coverage = coverage_analysis.TimeSeries(all_inclusive)
+    coverage.credible_level_array = np.linspace(0.01, 0.99, 50)
+    coverage.add_data(forecast, observed_rain)
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    plt.plot(coverage.coverage_array.flatten(), coverage.spread_array.flatten())
+    plt.xlabel("coverage of HDI")
+    plt.ylabel("mean spread of HDI (mm)")
+    plt.plot()
+    plt.savefig(path.join(directory, prefix + "_spread.pdf"),
                 bbox_inches="tight")
     plt.close()
 
@@ -339,6 +354,13 @@ def downscale(forecast_array, test_set, directory, pool):
     longitude_grid = test_set.topography["longitude"] - angle_resolution / 2
     latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
     rain_units = test_set.rain_units
+
+    time_array = forecast_array.time_array
+    spring_segmentator = time_segmentation.SpringSegmentator(time_array)
+    summer_segmentator = time_segmentation.SummerSegmentator(time_array)
+    autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
+    winter_segmentator = time_segmentation.WinterSegmentator(time_array)
+    all_inclusive = time_segmentation.AllInclusive(time_array)
 
     #forecast map, 3 dimensions, same as test set rain, prediction of
         #precipitation for each point in space and time, 0th dimension is time,
@@ -490,7 +512,6 @@ def downscale(forecast_array, test_set, directory, pool):
     #for each year, plot roc curve, get rmse
     #current implementation makes parallelising this too RAM intensive
     #split time_array into different years
-    time_array = forecast_array.time_array
     year_segmentator = time_segmentation.YearSegmentator(time_array)
     date_array = []
 
@@ -547,10 +568,6 @@ def downscale(forecast_array, test_set, directory, pool):
     plt.close()
 
     loss_segmentator = loss_segmentation.Downscale()
-    spring_segmentator = time_segmentation.SpringSegmentator(time_array)
-    summer_segmentator = time_segmentation.SummerSegmentator(time_array)
-    autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
-    winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
     forecast_array.load_locations_memmap("r")
     loss_segmentator.evaluate_loss(forecast_array, year_segmentator)
@@ -572,12 +589,27 @@ def downscale(forecast_array, test_set, directory, pool):
     for i, credible_level in enumerate(coverage.credible_level_array):
         plt.plot(coverage.time_array,
                  coverage.coverage_array[i],
-                 label=str(credible_level))
+                 label=r"$\alpha = $" + str(credible_level))
     plt.xlabel("year")
+    plt.xticks(rotation=45)
     plt.ylabel("coverage")
     plt.legend()
     plt.plot()
     plt.savefig(path.join(directory, "coverage.pdf"), bbox_inches="tight")
+    plt.close()
+
+    coverage = coverage_analysis.Downscale(all_inclusive)
+    coverage.credible_level_array = np.linspace(0.01, 0.99, 50)
+    coverage.add_data(forecast_array, test_set)
+    plt.figure()
+    ax = plt.gca()
+    ax.set_prop_cycle(monochrome)
+    plt.plot(coverage.coverage_array.flatten(), coverage.spread_array.flatten())
+    plt.xlabel("coverage of HDI")
+    plt.ylabel("mean spread of HDI (mm)")
+    plt.plot()
+    plt.savefig(path.join(directory, "spread.pdf"),
+                bbox_inches="tight")
     plt.close()
 
     forecast_array.del_locations_memmap()
