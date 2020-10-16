@@ -357,6 +357,7 @@ class TimeSeries(Printer):
         super().__init__(forecaster, directory, prefix)
         self.observed_rain = observed_rain
 
+    #implemented
     def print_forecast(self):
         """Print figures for the forecasts
 
@@ -468,21 +469,26 @@ class TimeSeries(Printer):
                     bbox_inches="tight")
                 plt.close()
 
+    #implemented
     def get_roc_curve_array(self, rain_warning_array, index=None):
         return self.forecaster.get_roc_curve_array(
             rain_warning_array, self.observed_rain, index)
 
+    #implemented
     def get_distribution_comparer(self):
         return self.forecaster.compare_dist_with_observed(self.observed_rain)
 
+    #implemented
     def get_loss_segmentator(self):
         return loss_segmentation.TimeSeries(self.forecaster, self.observed_rain)
 
+    #implemented
     def get_residual_analyser(self):
         residual_plot = residual_analysis.ResidualBaPlotter()
         residual_plot.add_data(self.forecaster, self.observed_rain)
         return residual_plot
 
+    #implemented
     def get_coverage_analyser(self):
         year_segmentator = time_segmentation.YearSegmentator(
             self.forecaster.time_array)
@@ -490,6 +496,7 @@ class TimeSeries(Printer):
         coverage.add_data(self.forecaster, self.observed_rain)
         return coverage
 
+    #implemented
     def get_spread_analyser(self):
         all_inclusive = time_segmentation.AllInclusive(
             self.forecaster.time_array)
@@ -516,6 +523,7 @@ class Downscale(Printer):
         self.pool = pool
         super().__init__(forecaster, directory, prefix)
 
+    #implemented
     def print_forecast(self):
         """Print figures for the forecasts
 
@@ -614,20 +622,25 @@ class Downscale(Printer):
             message_array.append(message)
         self.pool.map(PrintForecastSeriesMessage.print, message_array)
 
+    #implemented
     def get_roc_curve_array(self, rain_warning_array, index=None):
         return self.forecaster.get_roc_curve_array(rain_warning_array, index)
 
+    #implemented
     def get_distribution_comparer(self):
         return self.forecaster.compare_dist_with_observed()
 
+    #implemented
     def get_loss_segmentator(self):
         return loss_segmentation.Downscale(self.forecaster)
 
+    #implemented
     def get_residual_analyser(self):
         residual_plot = residual_analysis.ResidualBaPlotter()
         residual_plot.add_downscale(self.forecaster)
         return residual_plot
 
+    #implemented
     def get_coverage_analyser(self):
         year_segmentator = time_segmentation.YearSegmentator(
             self.forecaster.time_array)
@@ -635,6 +648,7 @@ class Downscale(Printer):
         coverage.add_data(self.forecaster)
         return coverage
 
+    #implemented
     def get_spread_analyser(self):
         all_inclusive = time_segmentation.AllInclusive(
             self.forecaster.time_array)
