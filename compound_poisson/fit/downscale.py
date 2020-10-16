@@ -30,8 +30,9 @@ class Fitter(fitter.Fitter):
 
     def print_forecast(self, downscale, dataset, pool):
         #dataset is Data object (see dataset module)
-        forecast.print.downscale(
-            downscale.forecaster, dataset, self.figure_dir, pool)
+        printer = forecast.print.Downscale(
+            downscale.forecaster, self.figure_dir, pool)
+        printer.print()
 
 class FitterDownscale(Fitter):
 

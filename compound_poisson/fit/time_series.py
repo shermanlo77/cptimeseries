@@ -51,12 +51,14 @@ class Fitter(fitter.Fitter):
     def print_forecast(self, time_series, dataset, pool=None):
         #dataset contains (training set, test set)
         rain = dataset[0].get_rain()
-        forecast.print.time_series(
-            time_series.self_forecaster, rain, self.figure_dir, "training")
+        printer = forecast.print.TimeSeries(
+            time_series.self_forecaster, rain, self.figure_dir, "training_")
+        printer.print()
 
         rain = dataset[1].get_rain()
-        forecast.print.time_series(
-            time_series.forecaster, rain, self.figure_dir, "test")
+        printer = forecast.print.TimeSeries(
+            time_series.forecaster, rain, self.figure_dir, "test_")
+        printer.print()
 
 class FitterMcmc(Fitter):
 

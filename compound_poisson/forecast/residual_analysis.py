@@ -40,6 +40,12 @@ class ResidualPlotter(object):
         self.observed_data = np.concatenate(
             (self.observed_data, observed_data))
 
+    def add_downscale(self, forecaster):
+        for forecaster_i, observed_rain_i in (
+            zip(forecaster.generate_forecaster_no_memmap(),
+                forecaster.data.generate_unmask_rain())):
+            self.add_data(forecaster_i, observed_rain_i)
+
     def get_x_data(self):
         raise NotImplementedError
 

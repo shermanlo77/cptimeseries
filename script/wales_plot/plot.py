@@ -55,13 +55,11 @@ def main():
     old_dir = downscale.forecaster.memmap_path
     downscale.forecaster.memmap_path = path.join(dir_i, old_dir)
 
-    for time_series in downscale.generate_unmask_time_series():
-        forecaster = time_series.forecaster
+    for forecaster in downscale.forecaster.generate_forecaster_no_memmap():
         old_dir = forecaster.memmap_path
         forecaster.memmap_path = path.join(dir_i, old_dir)
 
     downscale.forecaster.load_memmap("r")
-    downscale.forecaster.load_locations_memmap("r")
     downscale_array.append(downscale)
     downscale_name_array.append("CP-MCMC (5)")
 
@@ -75,9 +73,8 @@ def main():
     time_segmentator = time_segmentation.YearSegmentator(time_array)
     loss_segmentator_array = []
     for downscale in downscale_array:
-        loss_segmentator_i = loss_segmentation.Downscale()
-        loss_segmentator_i.evaluate_loss(
-            downscale.forecaster, time_segmentator)
+        loss_segmentator_i = loss_segmentation.Downscale(downscale.forecaster)
+        loss_segmentator_i.evaluate_loss(time_segmentator)
         loss_segmentator_array.append(loss_segmentator_i)
 
     for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
@@ -159,8 +156,8 @@ def main():
             loss_array.append([])
             loss_median_array.append([])
             forecaster_i = downscale_i.forecaster
-            loss_i = loss_segmentation.Downscale()
-            loss_i.evaluate_loss(forecaster_i, time_segmentator_k)
+            loss_i = loss_segmentation.Downscale(forecaster_i)
+            loss_i.evaluate_loss(time_segmentator_k)
             for loss_ij in loss_i.loss_all_array:
                 loss_array[i].append(loss_ij.get_bias_loss())
                 loss_median_array[i].append(loss_ij.get_bias_median_loss())
@@ -178,16 +175,15 @@ def main():
     loss_max = 0
     for downscale in downscale_array:
         loss_map = ma.empty_like(observed_data.rain[0])
-        for time_series_i, observed_rain_i in (
-            zip(downscale.generate_unmask_time_series(),
+        for forecaster_i, observed_rain_i in (
+            zip(downscale.forecaster.generate_forecaster_no_memmap(),
                 observed_data.generate_unmask_rain())):
-            lat_i = time_series_i.id[0]
-            long_i = time_series_i.id[1]
-            forecaster = time_series_i.forecaster
+            lat_i = forecaster_i.time_series.id[0]
+            long_i = forecaster_i.time_series.id[1]
 
             loss_i = compound_poisson.forecast.loss.MeanAbsoluteError(
                 forecaster.n_simulation)
-            loss_i.add_data(forecaster, observed_rain_i)
+            loss_i.add_data(forecaster_i, observed_rain_i)
             loss_bias_i = loss_i.get_bias_median_loss()
             loss_map[lat_i, long_i] = loss_bias_i
 
@@ -226,15 +222,7 @@ def main():
     for i, downscale_i in enumerate(downscale_array):
         residual_plot = residual_analysis.ResidualLnqqPlotter()
 
-        for time_series_i, observed_rain_i in (
-            zip(downscale_i.generate_unmask_time_series(),
-                observed_data.generate_unmask_rain())):
-            lat_i = time_series_i.id[0]
-            long_i = time_series_i.id[1]
-            forecaster = time_series_i.forecaster
-
-            #add residuals data
-            residual_plot.add_data(forecaster, observed_rain_i)
+        residual_plot.add_downscale(downscale_i.forecaster)
 
         #plot residual data
         residual_plot.plot_heatmap([[0, 4.3], [0, 4.3]], 1.8, 7.2, 'Greys')
@@ -246,7 +234,6 @@ def main():
 
     for downscale_i in downscale_array:
         downscale.forecaster.del_memmap()
-        downscale.forecaster.del_locations_memmap()
 
 if __name__ == "__main__":
     main()

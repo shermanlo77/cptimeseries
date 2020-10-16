@@ -144,9 +144,9 @@ def main():
     time_segmentator = time_segmentation.YearSegmentator(time_array)
     loss_segmentator_array = []
     for time_series_i in time_series_array:
-        loss_segmentator_i = loss_segmentation.TimeSeries()
-        loss_segmentator_i.evaluate_loss(
-            time_series_i.forecaster, observed_rain, time_segmentator)
+        loss_segmentator_i = loss_segmentation.TimeSeries(
+            time_series_i.forecaster, observed_rain)
+        loss_segmentator_i.evaluate_loss(time_segmentator)
         loss_segmentator_array.append(loss_segmentator_i)
 
     pandas.plotting.register_matplotlib_converters()
@@ -227,9 +227,8 @@ def main():
             loss_array.append([])
             loss_median_array.append([])
             forecaster_i = time_series_i.forecaster
-            loss_i = loss_segmentation.TimeSeries()
-            loss_i.evaluate_loss(
-                forecaster_i, observed_rain, time_segmentator_k)
+            loss_i = loss_segmentation.TimeSeries(forecaster_i, observed_rain)
+            loss_i.evaluate_loss(time_segmentator_k)
             for loss_ij in loss_i.loss_all_array:
                 loss_array[i].append(loss_ij.get_bias_loss())
                 loss_median_array[i].append(loss_ij.get_bias_median_loss())

@@ -121,14 +121,22 @@ class Forecaster(forecast_abstract.Forecaster):
             forecaster.load_memmap("r")
             yield time_series.forecaster
 
+    def generate_forecaster_no_memmap(self):
+        """Generate the forecaster for every unmasked time series, do not load
+            memmap, used for parallel computation by delaying the calling of
+            load_memap() at a later stage
+        """
+        for time_series in self.downscale.generate_unmask_time_series():
+            forecaster = time_series.forecaster
+            yield time_series.forecaster
+
     def get_roc_curve_array(
-        self, rain_warning_array, test_set, time_index=None, pool=None):
+        self, rain_warning_array, time_index=None, pool=None):
         """Get ROC curves for range of rain warnings
 
         Args:
             rain_warning_array: array, containing amount of precipitation to
                 detect
-            test_set: dataset.Data object
             time_index: optional, a pointer (eg slice or array of indices) for
                 time points to take ROC curve of
 
@@ -137,9 +145,9 @@ class Forecaster(forecast_abstract.Forecaster):
                 precipitation in rain_warning_array was never observed
         """
         if time_index is None:
-            time_index = slice(len(test_set))
-        mask = test_set.mask
-        observed_rain = test_set.rain[time_index, np.logical_not(mask)]
+            time_index = slice(len(self.data))
+        mask = self.data.mask
+        observed_rain = self.data.rain[time_index, np.logical_not(mask)]
         #swap axes so that...
             #dim 0: for each location
             #dim 1: for each time point

@@ -60,20 +60,21 @@ class Downscale(TimeSeries):
     def __init__(self, time_segmentator):
         super().__init__(time_segmentator)
 
-    def add_data(self, forecaster, observed_data):
+    def add_data(self, forecaster):
         #coverage array:
             #dim 0: for each location
             #dim 1: for each credible interval
             #dim 2: for each time
         self.coverage_array = []
         self.spread_array = []
-        iter_rain = zip(forecaster.downscale.generate_unmask_time_series(),
-                        observed_data.generate_unmask_rain())
-        for time_series_i, observed_rain_i in iter_rain:
+        iter_rain = zip(forecaster.generate_time_series_forecaster(),
+                        forecaster.data.generate_unmask_rain())
+        for forecaster_i, observed_rain_i in iter_rain:
             coverage_i, spread_i = self.get_coverage_time_series(
-                time_series_i.forecaster, observed_rain_i)
+                forecaster_i, observed_rain_i)
             self.coverage_array.append(coverage_i)
             self.spread_array.append(spread_i)
+            forecaster_i.del_memmap()
         #average over locations
         self.coverage_array = np.asarray(self.coverage_array)
         self.spread_array = np.asarray(self.spread_array)

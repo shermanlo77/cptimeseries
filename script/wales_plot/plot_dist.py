@@ -45,13 +45,11 @@ def main():
     old_dir = downscale.forecaster.memmap_path
     downscale.forecaster.memmap_path = path.join(dir, old_dir)
 
-    for time_series in downscale.generate_unmask_time_series():
-        forecaster = time_series.forecaster
-        old_dir = forecaster.memmap_path
-        forecaster.memmap_path = path.join(dir, old_dir)
+    for forecaster_i in downscale.forecaster.generate_forecaster_no_memmap():
+        old_dir = forecaster_i.memmap_path
+        forecaster_i.memmap_path = path.join(dir, old_dir)
 
     downscale.forecaster.load_memmap("r")
-    downscale.forecaster.load_locations_memmap("r")
 
     cp_comparer = downscale.forecaster.compare_dist_with_observed()
     era5_comparer = era5.forecaster.compare_dist_with_observed()
@@ -90,7 +88,6 @@ def main():
     plt.savefig(path.join(directory, "qq.pdf"), bbox_inches="tight")
     plt.close()
 
-    downscale.forecaster.del_locations_memmap()
     downscale.forecaster.del_memmap()
 
 if __name__ == "__main__":

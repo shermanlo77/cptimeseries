@@ -18,6 +18,12 @@ class TimeSegmentator(object):
     def __init__(self, time_array):
         self.time_array = time_array
 
+    def get_time_array(self):
+        time_array = []
+        for date, index in self:
+            time_array.append(date)
+        return time_array
+
     def __iter__(self):
         raise NotImplementedError
 

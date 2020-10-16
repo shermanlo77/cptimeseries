@@ -101,7 +101,7 @@ class Forecaster(forecast_abstract.Forecaster):
         self.forecast_quartile[1] = self.forecast_median
         self.forecast_quartile[2] = forecast_quantile[len(sigma_array)+1]
 
-    def get_roc_curve(self, rain_warning, rain_true):
+    def get_roc_curve(self, rain_warning, rain_true, time_index=None):
         """Return ROC curve, with area under curve as label
 
         Args:
@@ -112,12 +112,25 @@ class Forecaster(forecast_abstract.Forecaster):
             roc.Roc object, other None is returned if rain larger than
                 rain_warning was never observed
         """
+
         if np.any(rain_true > rain_warning):
             p_rain_warning = self.get_prob_rain(rain_warning)
+            if not time_index is None:
+                p_rain_warning = p_rain_warning[time_index]
+                rain_true = rain_true[time_index]
             roc_curve = roc.Roc(rain_warning, p_rain_warning, rain_true)
         else:
             roc_curve = None
         return roc_curve
+
+    def get_roc_curve_array(
+        self, rain_warning_array, rain_observed, time_index=None):
+        roc_array = []
+        for rain_warning in rain_warning_array:
+            roc_curve = self.get_roc_curve(
+                rain_warning, rain_observed, time_index)
+            roc_array.append(roc_curve)
+        return roc_array
 
     def compare_dist_with_observed(self, observed_rain, n_linspace=500):
         """Return values for plotting the survival function of precipitation
@@ -154,7 +167,10 @@ class Forecaster(forecast_abstract.Forecaster):
         #does not copy model fields
         slice_copy = Forecaster(self.time_series, self.memmap_dir)
         slice_copy.time_array = self.time_array[index]
-        slice_copy.forecast_array = self.forecast_array[:, index]
+        if self.forecast_array is None:
+            slice_copy.forecast_array = None
+        else:
+            slice_copy.forecast_array = self.forecast_array[:, index]
         slice_copy.forecast = self.forecast[index]
         slice_copy.forecast_median = self.forecast_median[index]
         slice_copy.forecast_sigma = {}

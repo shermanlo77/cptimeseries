@@ -32,19 +32,16 @@ class TimeSeries(object):
             array of loss objects for each segmentation
     """
 
-    def __init__(self):
+    def __init__(self, forecaster, observed_rain):
+        self.forecaster = forecaster
+        self.observed_rain = observed_rain
         self.time_array = None
         self.loss_all_array = None
         self.loss_segment_array = None
 
-    def evaluate_loss(self,
-                      forecast,
-                      observed_rain,
-                      time_segmentator):
+    def evaluate_loss(self, time_segmentator):
         """
         Args:
-            forecast: Forecaster object
-            observed_rain: numpy array of observed precipitation
             time_segmentator: TimeSegmenator object
         """
         self.time_array = []
@@ -52,23 +49,23 @@ class TimeSeries(object):
         self.loss_segment_array = []
         #init loss objects and variables
         for Loss in LOSS_CLASSES:
-            self.loss_all_array.append(Loss(forecast.n_simulation))
+            self.loss_all_array.append(Loss(self.forecaster.n_simulation))
             self.loss_segment_array.append([])
         #for each segmentation
         for date, index in time_segmentator:
             self.time_array.append(date) #get the date of this segmentation
-            self.evaluate_loss_segment(forecast, observed_rain, index)
+            self.evaluate_loss_segment(index)
 
-    def evaluate_loss_segment(self, forecast, observed_rain, index):
+    def evaluate_loss_segment(self, index):
         #slice the data to capture this segmentation
-        forecast_sliced = forecast[index]
-        observed_rain_i = observed_rain[index]
+        forecaster_slice = self.forecaster[index]
+        observed_rain_slice = self.observed_rain[index]
         #add data from this segmentation
         for i_error, Loss in enumerate(LOSS_CLASSES):
             self.loss_all_array[i_error].add_data(
-                forecast_sliced, observed_rain_i)
-            loss_i = Loss(forecast_sliced.n_simulation)
-            loss_i.add_data(forecast_sliced, observed_rain_i)
+                forecaster_slice, observed_rain_slice)
+            loss_i = Loss(forecaster_slice.n_simulation)
+            loss_i.add_data(forecaster_slice, observed_rain_slice)
             self.loss_segment_array[i_error].append(loss_i)
 
     def plot_loss(self, directory, prefix="", cycler=None):
@@ -87,7 +84,7 @@ class TimeSeries(object):
                           self.loss_all_array[i_loss].get_bias_loss(),
                           Loss.get_axis_bias_label(),
                           path.join(directory,
-                                    (prefix + "_" + Loss.get_short_bias_name()
+                                    (prefix + Loss.get_short_bias_name()
                                         + "_mean.pdf")),
                           cycler)
 
@@ -96,7 +93,7 @@ class TimeSeries(object):
                           self.loss_all_array[i_loss].get_bias_median_loss(),
                           Loss.get_axis_bias_label(),
                           path.join(directory,
-                                    (prefix + "_" + Loss.get_short_bias_name()
+                                    (prefix + Loss.get_short_bias_name()
                                         + "_median.pdf")),
                           cycler)
 
@@ -127,16 +124,16 @@ class TimeSeries(object):
 
 class Downscale(TimeSeries):
 
-    def evaluate_loss(self, forecast, time_segmentator):
-        #the forecaster object for downscale already has the test set
-        super().evaluate_loss(forecast, None, time_segmentator)
+    def __init__(self, forecaster):
+        #test set already lives in forecaster
+        super().__init__(forecaster, None)
 
-    def evaluate_loss_segment(self, forecast, observed_rain, index):
+    def evaluate_loss_segment(self, index):
         #observed_rain unused
         #add data from this segmentation
         for i_loss, Loss in enumerate(LOSS_CLASSES):
             self.loss_all_array[i_loss].add_downscale_forecaster(
-                forecast, index)
-            loss_i = Loss(forecast.n_simulation)
-            loss_i.add_downscale_forecaster(forecast, index)
+                self.forecaster, index)
+            loss_i = Loss(self.forecaster.n_simulation)
+            loss_i.add_downscale_forecaster(self.forecaster, index)
             self.loss_segment_array[i_loss].append(loss_i)

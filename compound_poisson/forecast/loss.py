@@ -64,13 +64,12 @@ class Loss(object):
             forecaster: forecast.downscale.Downscale object
             index: optional, index of times
         """
-        downscale = forecaster.downscale
-        for time_series_i, observed_rain_i in (
-            zip(downscale.generate_unmask_time_series(),
+        for forecaster_i, observed_rain_i in (
+            zip(forecaster.generate_forecaster_no_memmap(),
                 forecaster.data.generate_unmask_rain())):
-            forecaster_i = time_series_i.forecaster
+            forecaster_i_og = forecaster_i
             if not index is None:
-                forecaster_i = time_series_i.forecaster[index]
+                forecaster_i = forecaster_i[index]
                 observed_rain_i = observed_rain_i[index]
             self.add_data(forecaster_i, observed_rain_i)
 
