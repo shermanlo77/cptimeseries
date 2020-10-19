@@ -25,9 +25,9 @@ class Loss(object):
             the bias is considered here.
 
     How to implement:
-        Implement the methods loss_function(), set_to_orginial_units(),
-            get_short_name(), get_short_bias_name(), get_axis_label(),
-            get_axis_bias_label()
+        Implement the methods loss_function(), set_to_orginial_units().
+        Implement the functions get_short_name(), get_short_bias_name(),
+            get_axis_label(), get_axis_bias_label().
 
     Attributes:
         loss_array: array of losses, one for each forecast sample/simulation
