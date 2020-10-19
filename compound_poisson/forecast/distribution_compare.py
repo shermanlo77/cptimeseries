@@ -1,3 +1,19 @@
+"""For comparing the distribution of the forecast with the observed.
+
+The distribution of the forecast is obtained by evaluating get_prob_rain(x) for
+    each time point and taking the average over time. This is the same with the
+    observed (each time point would either give 0.0 or 1.0). This would work for
+    ERA5 as well.
+There are methods for plotting the survival functions, pp plots and qq plots.
+
+How to use:
+    -Instantiate either a TimeSeries or Downscale object
+    -Call the method compare(), this would modify the member variables
+    -Call methods to plot results
+
+TimeSeries <- Downscale
+"""
+
 import math
 
 from matplotlib import pyplot as plt
@@ -29,7 +45,7 @@ class TimeSeries(object):
     def compare(self, forecaster, observed_rain, n_linspace):
         """
         Args:
-            forecaster:
+            forecaster: compound_poisson.forecast.time_series.Forecaster object
             observed_rain: numpy array of observed precipitation
             n_linspace: number of points to evaluate between 0 mm and max
                 observed rain
@@ -88,8 +104,9 @@ class TimeSeries(object):
         plt.ylabel("forecasted precipitation (mm)")
 
     def get_qq_plot(self):
-        """Return values for a qq plot, comparing distribution of precipitation
-            of the forecast with the observed
+        """Set the member variables qq_forecast and qq_observe, used to plot qq
+            plot for comparing distribution of precipitation of the forecast
+            with the observed
         """
         #inverse of the probability using interpolation (switch x and y)
         prob_forecast_inverse = interpolate.interp1d(
@@ -127,8 +144,14 @@ class Downscale(TimeSeries):
     def __init__(self):
         super().__init__()
 
+    #override
     def compare(self, forecaster, n_linspace):
-        #range of observed precipitation to plot in the qq plot
+        """
+        Args:
+            forecaster: compound_poisson.forecast.downscale.Forecaster object
+            n_linspace: number of points to evaluate between 0 mm and max
+                observed rain
+        """
         self.observed_array = np.linspace(
             0, forecaster.data.rain.max(), n_linspace)
 
