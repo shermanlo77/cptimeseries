@@ -277,9 +277,9 @@ class Printer(object):
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
         plt.plot(
-            coverage.coverage_array.flatten(), coverage.spread_array.flatten())
-        plt.xlabel("coverage of HDI")
-        plt.ylabel("mean spread of HDI (mm)")
+            coverage.spread_array.flatten(), coverage.coverage_array.flatten())
+        plt.xlabel("mean width of HDI (mm)")
+        plt.ylabel("coverage of HDI")
         plt.plot()
         plt.savefig(path.join(self.directory, self.prefix + "spread.pdf"),
                     bbox_inches="tight")
