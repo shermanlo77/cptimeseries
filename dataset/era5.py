@@ -26,7 +26,7 @@ ERA5_2_FILE = path.join(PATH_TO_ERA5, "tp_sum_2.grib")
 ERA5_3_FILE = path.join(PATH_TO_ERA5, "tp_sum_3.grib")
 ERA5_4_FILE = path.join(PATH_TO_ERA5, "tp_sum_4.grib")
 
-class Era5(data.Data):
+class Era5(data.DataDualGrid):
     """Base class for only loading precipitation from a .grib file
     """
     #only designed to load rain
