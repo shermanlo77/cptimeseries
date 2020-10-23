@@ -154,7 +154,7 @@ class TargetGp(target.Target):
         self.square_error = downscale.square_error
 
         self.prior = target.get_precision_prior()
-        self.prior["gp_precision"] = target.get_gp_precision_prior()
+        self.prior["gp_variance"] = target.get_gp_variance_prior()
         #initalise using the mean of the prior distributions
         for key, prior in self.prior.items():
             self.state[key] = prior.mean()
@@ -209,8 +209,8 @@ class TargetGp(target.Target):
     def save_cov_chol(self):
         """Calculate the kernel matrix
         """
-        cov_chol = self.square_error.copy()
-        cov_chol *= -self.state["gp_precision"] / 2
+        cov_chol = -self.square_error.copy()
+        cov_chol /= 2 * self.state["gp_variance"]
         cov_chol = np.exp(cov_chol)
         cov_chol = linalg.cholesky(cov_chol, True)
         self.cov_chol = cov_chol

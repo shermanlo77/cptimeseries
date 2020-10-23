@@ -113,8 +113,8 @@ def get_precision_prior():
     }
     return prior
 
-def get_gp_precision_prior():
-    return stats.gamma(a=0.72, loc=2.27, scale=8.1)
+def get_gp_variance_prior():
+    return stats.expon(scale=0.0018)
 
 def get_arma_index(parameter_name_array):
     """Check with parameters are ARMA terms
