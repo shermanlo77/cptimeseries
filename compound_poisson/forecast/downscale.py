@@ -1,25 +1,38 @@
-import datetime
-import math
-import os
+"""Implementation of Forecaster for Downscale
+
+Contain the classes compound_poisson.forecast.downscale.Forecaster
+
+Note to future developers: only forecasting of the test set (future) has been
+    implemented. Implementation of forecasting the training set should handle
+    rng like time_series, a rng(s) for forecasting training set, another rng(s)
+    for test set
+
+compound_poisson.forecast.forecast_abstract.Forecaster
+    <- compound_poisson.forecast.downscale.Forecaster
+
+compound_poisson.forecast.time_series.Forecaster
+    <- compound_poisson.forecast.downscale.TimeSeriesForecaster
+because
+compound_poisson.downscale.TimeSeriesDownscale
+    <>1- compound_poisson.forecast.downscale.TimeSeriesForecaster
+"""
+
 from os import path
 
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy import stats
 
-import compound_poisson
 from compound_poisson import roc
 from compound_poisson.forecast import distribution_compare
-from compound_poisson.forecast import time_series
 from compound_poisson.forecast import forecast_abstract
-
-#note to future developer: only forecasting of the test set (future) has been
-    #implemented. Implementation of forecasting the training set should handle
-    #rng like time_series, a rng(s) for forecasting training set, another rng(s)
-    #for test set
+from compound_poisson.forecast import time_series
 
 class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts for Downscale
+
+    Notes:
+        self.data contains the test set, this includes the model fields AND the
+            precipitation. This means the test set precipitation does not need
+            to be passed when assessing the performance of the forecast
 
     Attributes:
         downscale: Downscale object, to forecast from
@@ -35,9 +48,12 @@ class Forecaster(forecast_abstract.Forecaster):
         self.data = None
         super().__init__(memmap_dir)
 
+    #override
     def make_memmap_path(self):
         super().make_memmap_path(type(self.downscale).__name__)
 
+    #override
+        #additional parameter data
     def start_forecast(self, n_simulation, data):
         """Start forecast simulations, to be called initially
 
@@ -50,11 +66,13 @@ class Forecaster(forecast_abstract.Forecaster):
         self.time_array = data.time_array
         super().start_forecast(n_simulation)
 
+    #implemented
     def copy_to_memmap(self, memmap_to_copy):
         for i in range(len(self.forecast_array)):
             memmap_to_copy_i = memmap_to_copy[i]
             self.forecast_array[i, 0:len(memmap_to_copy_i)] = memmap_to_copy_i
 
+    #implemented
     def simulate_forecasts(self, index_range, is_print=True):
         area_unmask = self.downscale.area_unmask
         n_total_parameter = self.downscale.n_total_parameter
@@ -81,6 +99,7 @@ class Forecaster(forecast_abstract.Forecaster):
             ForecastMessage.forecast, forecast_message)
         self.downscale.replace_unmask_time_series(time_series_array)
 
+    #implemented
     def get_prob_rain(self, rain, index=None):
         """Get the probability if it will rain at least of a certian amount
 
@@ -101,20 +120,28 @@ class Forecaster(forecast_abstract.Forecaster):
         p_rain = np.mean(self.forecast_array[:, :, index] > rain, 1)
         return p_rain
 
+    #override
+        #to provide the shape of the memmap
     def load_memmap(self, mode):
         super().load_memmap(
             mode, (self.downscale.area_unmask, self.n_simulation, self.n_time))
 
     def load_locations_memmap(self, mode):
+        """Call load_memmap() for each forecaster in self.downscale
+        """
         for time_series in self.downscale.generate_unmask_time_series():
             time_series.forecaster.load_memmap(mode)
 
     def del_locations_memmap(self):
+        """Call del_memmap() for each forecaster in self.downscale
+        """
         for time_series in self.downscale.generate_unmask_time_series():
             time_series.forecaster.del_memmap()
 
     def generate_time_series_forecaster(self):
-        """Generate the forecaster for every unmasked time series
+        """Generate the forecaster for every unmasked time series. Also load the
+            memmap. Caution: ensure to call del_memmap() for each of the
+            forecaster after use
         """
         for time_series in self.downscale.generate_unmask_time_series():
             forecaster = time_series.forecaster
@@ -130,15 +157,18 @@ class Forecaster(forecast_abstract.Forecaster):
             forecaster = time_series.forecaster
             yield time_series.forecaster
 
+    #implemented
     def get_roc_curve_array(
         self, rain_warning_array, time_index=None, pool=None):
-        """Get ROC curves for range of rain warnings
+        """Get array of ROC curves
+
+        Evaluate the ROC curve for different amounts of precipitation
 
         Args:
-            rain_warning_array: array, containing amount of precipitation to
-                detect
+            rain_warning_array: array of amount of precipitation to be detected
             time_index: optional, a pointer (eg slice or array of indices) for
                 time points to take ROC curve of
+            pool: optional, used for parallel computing
 
         Return:
             array of roc.Roc objects which can be None if a value of
@@ -168,13 +198,17 @@ class Forecaster(forecast_abstract.Forecaster):
                 roc_array.append(None)
         return roc_array
 
+    #implemented
     def compare_dist_with_observed(self, n_linspace=100):
-        """Return values for a qq plot, comparing distribution of precipitation
-            of the forecast with the observed
+        """Return an object from distribution_compare, used to compare the
+            distribution of the precipitation of the forecast and the observed
 
         Args:
+            observed_rain: numpy array of observed precipitation
             n_linspace: number of points to evaluate between 0 mm and max
                 observed rain
+
+        Return: distribution_compare.Downscale object
         """
         comparer = distribution_compare.Downscale()
         comparer.compare(self, n_linspace)
@@ -199,6 +233,7 @@ class TimeSeriesForecaster(time_series.Forecaster):
         self.memmap_path = memmap_path
         self.memmap_shape = None
 
+    #override
     def start_forecast(self, n_simulation, model_field, memmap_shape):
         """Start forecast simulations, to be called initially
 
@@ -213,15 +248,18 @@ class TimeSeriesForecaster(time_series.Forecaster):
         self.memmap_shape = memmap_shape
         super().start_forecast(n_simulation, model_field)
 
+    #override
     def make_memmap_path(self):
         """Do nothing, memmap_path has already been provided
         """
         pass
 
+    #override
     def simulate_forecasts(self, index_range):
         #do not print progress
         super().simulate_forecasts(index_range, False)
 
+    #override
     def resume_forecast(self, n_simulation, memmap_shape):
         """Simulate more forecasts
 
@@ -242,6 +280,7 @@ class TimeSeriesForecaster(time_series.Forecaster):
             self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
             self.del_memmap()
 
+    #override
     def load_memmap(self, mode):
         """Load the memmap file for forecast_array
 
@@ -281,98 +320,3 @@ class ForecastMessage(object):
         if self.is_print:
             print("Predictive location", self.i_space)
         return self.time_series
-
-################################################################################
-#                              DEPRECATED
-################################################################################
-
-class ForecasterDual(Forecaster):
-    """Forecaster used by DownscaleDual
-
-    Extended to be able to use samples from the MCMC. Forecasting for
-        DownscaleDual is different compared to Downscale, this is because model
-        fields of the test set needs to be sampled. All model fields for all
-        time points are sampled altogether because they have a spatial
-        correlation.
-    For a forecast sample, all spatial parameters and training set model fields
-        are set from the same MCMC sample. All test set model fields are
-        sampled, parallel in time. Then for each location, in parallel, produce
-        one forecast. This is repeated until a requested number of forecasts is
-        achieved.
-
-    Attributes:
-        rng: rng to select a sample from the MCMC samples
-        rng_array: spawned rng to sample the model fields for each time point
-    """
-
-    def __init__(self, downscale, memmap_dir):
-        super().__init__(downscale, memmap_dir)
-        #rng used so that all time series in the forecast use the same mcmc
-            #sample
-        self.rng = None
-        self.rng_array = []
-
-    def start_forecast(self, n_simulation, data):
-        #override
-        #spawn multiple rng
-        self.n_time = len(data)
-        self.rng = self.downscale.spawn_rng(1)
-        self.rng_array = self.downscale.spawn_rng(self.n_time)
-        super().start_forecast(n_simulation, data)
-
-    def simulate_forecasts(self, index_range):
-        """Simulate forecasts
-
-        Override. Set all parameters and model fields from the mcmc sample, then
-            do one forecast. This is repeated for all pointers in index_range.
-
-        Args:
-            index_range: array of pointers to save results onto forecast_array
-        """
-        area_unmask = self.downscale.area_unmask
-        n_model_field = self.downscale.n_model_field
-        model_field_mcmc = self.downscale.model_field_mcmc
-        gp_mcmc = self.downscale.model_field_gp_mcmc
-        n_mcmc_sample = len(model_field_mcmc)
-
-        #instantiate a DownscaleDual to do gaussian process regression and
-            #sampling
-        future_downscale = compound_poisson.DownscaleDual(
-            self.data, self.downscale.n_arma, True) #true to show test data
-        future_downscale.pool = self.downscale.pool
-        future_downscale.model_field_target.rng_array = self.rng_array
-
-        for i_forecast in index_range:
-            #force to do one forecast for every mcmc sample
-            self.n_simulation = i_forecast+1
-
-            #set parameters and model fields from a mcmc sample
-                #the setting of the parameters is done in the super class method
-            mcmc_index = self.rng.randint(self.downscale.burn_in, n_mcmc_sample)
-            self.downscale.set_mcmc_index(mcmc_index)
-            model_field_sample = model_field_mcmc[mcmc_index]
-            gp_sample = gp_mcmc[mcmc_index]
-            self.downscale.model_field_target.update_state(model_field_sample)
-
-            #sample test set model field GP
-            future_downscale.model_field_gp_target.update_state(gp_sample)
-            model_field_sample = (
-                future_downscale.model_field_target.simulate_from_prior())
-
-            #see mcmc/target_model_field.py for the layout of the vector
-                #model_field_sample
-            #change the test data to have the model field GP sample
-            for i_time in range(len(future_downscale)):
-                for i_model_field, model_field_name in enumerate(
-                    self.data.model_field):
-                    for i_space, (lat_i, long_i) in enumerate(
-                        self.data.generate_unmask_coordinates()):
-                        x_i = model_field_sample[
-                            i_time*n_model_field*area_unmask
-                            + i_model_field*area_unmask
-                            + i_space]
-                        model_field_i = self.data.model_field[model_field_name]
-                        model_field_i[i_time, lat_i, long_i] = x_i
-
-            super().simulate_forecasts([i_forecast], False)
-            print("Predictive sample", i_forecast)
