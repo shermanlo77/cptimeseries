@@ -21,9 +21,9 @@ from os import path
 
 import numpy as np
 
-from compound_poisson import roc
 from compound_poisson.forecast import distribution_compare
 from compound_poisson.forecast import forecast_abstract
+from compound_poisson.forecast import roc
 from compound_poisson.forecast import time_series
 
 class Forecaster(forecast_abstract.Forecaster):

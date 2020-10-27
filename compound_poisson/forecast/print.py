@@ -27,11 +27,11 @@ import pandas.plotting
 from scipy import stats
 
 import compound_poisson
-from compound_poisson import roc
 from compound_poisson.forecast import coverage_analysis
 from compound_poisson.forecast import loss
 from compound_poisson.forecast import loss_segmentation
 from compound_poisson.forecast import residual_analysis
+from compound_poisson.forecast import roc
 from compound_poisson.forecast import time_segmentation
 import dataset
 
