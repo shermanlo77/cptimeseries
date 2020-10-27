@@ -29,6 +29,18 @@ from compound_poisson.forecast import time_series
 class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts for Downscale
 
+    Statistical note, method for forward simulation:
+        Each location has a Forecaster object which simulates independently,
+            in parallel and asynchronously. This means that each location will
+            forward simulate using DIFFERENT MCMC samples. This was chosen
+            because it is easier to parallise and it is faster. Effects average
+            out but this means individual forecasts should not be used as each
+            location would have different MCMC parameters.
+        Please refer to commit 206aa73 to implement the forward forecast
+            synchronously. That is: draw a MCMC sample, each location forward
+                simulate using that MCMC sample. Draw another MCMC sample,
+                simulate, draw, ...etc.
+
     Notes:
         self.data contains the test set, this includes the model fields AND the
             precipitation. This means the test set precipitation does not need
