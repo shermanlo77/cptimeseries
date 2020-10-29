@@ -1,5 +1,8 @@
 # compound_poisson.forecast
 
+* Copyright (c) 2020 Sherman Lo
+* MIT LICENSE
+
 For forecasting and assessing the performance of the forecast.
 
 ## Forecasting
@@ -31,8 +34,6 @@ For forecasting the test set, an instance from the classes `compound_poisson.for
 
 For multiple locations, multiple instances of `compound_poisson.downscale.TimeSeriesDownscale` are owned by `compound_poisson.downscale.Downscale`. Each instance of `compound_poisson.downscale.TimeSeriesDownscale` owns an instance of `compound_poisson.forecast.downscale.TimeSeriesForecaster`. The design was such that each location has a `compound_poisson.forecast.downscale.TimeSeriesForecaster` object. An instance of `compound_poisson.forecast.downscale.Forecaster` will modify each location's `compound_poisson.forecast.downscale.TimeSeriesForecaster` object to do forecasting. The reason `compound_poisson.forecast.downscale.TimeSeriesForecaster` was implemented was because all locations can share the same memmap file, writing and reading to it. Various methods are overridden to achieve this behaviour.
 
-Direct access to instances of these classes should only be needed when accessing and assessing forecasts. Methods in `compound_poisson.time_series.TimeSeries` and `compound_poisson.downscale.Downscale` should be available to encapsulate the forecasting using these instances.
-
 ## Assessing the Forecast
 
 Comparing the forecast with the observed. All figures are produced in the module `compound_poisson.forecast.print` which uses the following modules:
@@ -43,3 +44,10 @@ Comparing the forecast with the observed. All figures are produced in the module
 - `compound_poisson.forecast.roc` plot ROC curves,
 - `compound_poisson.forecast.time_segmentation` splits the forecast into segments such as yearly segments or for every season,
 - `compound_poisson.forecast.loss_segmentation` obtains the loss function for specified segments of the forecast.
+
+## Notes for Developers
+
+- Direct access to instances of these classes should only be needed when accessing and assessing forecasts. Methods in `compound_poisson.time_series.TimeSeries` and `compound_poisson.downscale.Downscale` should be available to encapsulate the forecasting using these instances.
+- For multiple locations, each location does a forecast independently, in parallel and asynchronously. This means that each location will forward simulate using different MCMC samples. This was chosen because it is easier to parallise and it is faster. Effects average out but this means individual forecasts should not be used as each location would have different MCMC parameters. Please refer to commit `206aa73` to implement the forward forecast synchronously. That is: draw a MCMC sample, each location forward simulate using that MCMC sample. Draw another MCMC sample, simulate, draw, ...etc.
+- Signatures for implemented methods, regarding forecast assessment, of `compound_poisson.forecast.forecast_abstract.Forecaster` can vary. This is because for `TimeSeries`, forecasting requires the test set model fields. Assessment of the forecast will require for the test set precipitation to be provided. For `Downscale`, forecasting requires a `dataset.data.DataDualGrid` object which contains the test set model fields and precipitation. The test set precipitation is not used for the forecasting but it is stored, thus assessment of the forecast can be done without providing the test set again.
+- The forecasting of the training set has not been implemented for `Downscale`.
