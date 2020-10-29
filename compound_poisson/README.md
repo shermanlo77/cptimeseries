@@ -8,7 +8,7 @@ Simulation, Bayesian inference and forecasting of precipitation using the compou
 * `compound_poisson.fit`
     * Modules for fitting the model onto data.
 * `compound_poisson.forecast`
-    * Modules for forward simulation given the fitted model. Also contain modules for assessing the performance of the forecast.
+    * Modules for forward simulation given the fitted model. Also contain modules for assessing the performance of the forecast. Please refer to the README as well.
 * `compound_poisson.mcmc`
     * Implementations of MCMC algorithms and target distributions.
 
@@ -22,7 +22,7 @@ Simulation, Bayesian inference and forecasting of precipitation using the compou
 * The module `compound_poisson.time_series_mcmc` contains classes for Bayesian inference, using Gibbs sampling, for the time series.
     * `compound_poisson.time_series.TimeSeriesMcmc` uses a full Metropolis-Hastings within Gibbs approach,
     * `compound_poisson.time_series_mcmc.TimeSeriesSlice` uses slice and elliptical slice sampling,
-    * `compound_poisson.time_series_mcmc..TimeSeriesHyperSlice` introduces a hyper parameter for the variance term, inferred using Metropolis-Hastings.
+    * `compound_poisson.time_series_mcmc.TimeSeriesHyperSlice` introduces a hyper parameter for the variance term, inferred using Metropolis-Hastings.
 
 ## Multiple Location Time Series
 `compound_poisson.downscale.Downscale` &#x25C7;-1..\* `compound_poisson.downscale.TimeSeriesDownscale`
