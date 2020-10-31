@@ -26,14 +26,14 @@ class PriorSimulator(object):
         self.downscale = compound_poisson.Downscale(
             dataset.AnaDual10Training(), (5, 5))
 
-    def simulate(self, variance=None):
+    def simulate(self, precision=None):
         downscale = self.downscale
         gp_target = downscale.parameter_gp_target
-        if not variance is None:
+        if not precision is None:
             gp_parameter = gp_target.simulate_from_prior(self.rng)
             for i, key in enumerate(gp_target.state):
-                if key == "gp_variance":
-                    gp_target.state[key] = variance
+                if key == "gp_precision":
+                    gp_target.state[key] = precision
                 else:
                     gp_target.state[key] = gp_parameter[i]
             gp_target.save_cov_chol()
@@ -75,7 +75,7 @@ class PriorSimulator(object):
         plt.savefig(path.join(directory, name + ".pdf"))
         plt.close()
 
-    def print(self, figure_directory=None, variance=None):
+    def print(self, figure_directory=None, precision=None):
 
         if figure_directory is None:
             figure_directory = self.figure_directory
@@ -85,7 +85,7 @@ class PriorSimulator(object):
         downscale = self.downscale
         try:
             for i_simulate in range(self.n_simulate):
-                self.simulate(variance)
+                self.simulate(precision)
                 poisson_rate = ma.empty(downscale.shape)
                 gamma_mean = ma.empty(downscale.shape)
                 rain = ma.empty(downscale.shape)
@@ -123,7 +123,7 @@ class PriorSimulator(object):
                         figure_directory, str(i_simulate) + "_autocorr.pdf"))
                 plt.close()
         except(linalg.LinAlgError):
-            print(variance, "fail")
+            print(precision, "fail")
 
     def __call__(self):
         self.print()
@@ -134,10 +134,10 @@ class PriorGpSimulator(PriorSimulator):
         super().__init__(figure_directory, rng)
 
     def __call__(self):
-        variance_array = np.linspace(0.0001, 1.0/278.0, 10)
-        for i, variance in enumerate(variance_array):
+        precision_array = np.linspace(278, 1000, 10)
+        for i, precision in enumerate(precision_array):
             figure_directory_i = os.path.join(self.figure_directory, str(i))
-            self.print(figure_directory_i, variance)
-            file = open(os.path.join(figure_directory_i, "variance.txt"), "w")
-            file.write(str(variance))
+            self.print(figure_directory_i, precision)
+            file = open(os.path.join(figure_directory_i, "precision.txt"), "w")
+            file.write(str(precision))
             file.close()
