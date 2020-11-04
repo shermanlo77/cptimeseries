@@ -113,3 +113,9 @@ so that [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessi
 
 ## Notes for Developers
 * Please see the packages [`compound_poisson`](./compound_poisson/) and [`dataset`](./dataset/) for further documentations.
+
+## Notes on Development and Sustainability
+- The author has a background in Java so there is a frequent use of classes and inheritance structure.
+- The author attempted to keep to the [Google Python style guide](https://google.github.io/styleguide/pyguide.html). There are a few omission such as underscores for denoting private and protected methods, variables and classes.
+- Documentation suitable for `pydoc` is on the `TODO` list.
+- Testing is on the `TODO` list.
