@@ -1,3 +1,33 @@
+"""Base abstract superclass is Mcmc. Given a Target distribution, it can get and
+    store MCMC samples in a memmap. Memmap are chosen to reduce memory
+    consumption.
+
+Also contains the class ReadOnlyFromSlice. Instances are dummy objects which
+    can read MCMC samples from a larger memmap. It does this by wrapping around
+    a Mcmc object which has that larger memmap. The suffix FromSlice is a
+    reference to the Python slice object, not to be confused with slice
+    sampling.
+
+The function do_gibbs_sampling() does Gibbs sampling when given an array of Mcmc
+    objects.
+
+Mcmc
+    <- ReadOnlyFromSlice
+    <- mcmc_parameter.Rwmh
+    <- mcmc_parameter.Elliptical
+    <- mcmc_z.ZRwmh
+    <- mcmc_z.ZSlice
+    <- mcmc_z.ZMcmcArray
+
+compound_poisson.time_series_mcmc.TimeSeriesMcmc
+    <>-1..* Mcmc
+compound_poisson.downscale.Downscale
+    <>-1..* Mcmc
+
+ReadOnlyFromSlice
+    <>-1 Mcmc
+"""
+
 import datetime
 import math
 import os
@@ -8,19 +38,42 @@ import numpy as np
 class Mcmc(object):
     """Abstract class for MCMC
 
-    Posterior distribution (otherwise known as the target distribution),
+    Given a Target distribution, it can get and store MCMC samples in a memmap.
+        Memmap are chosen to reduce memory consumption. To handle the memmap,
+        they should be read and del (closed) using the provided methods, in
+        particular to avoid having too many files opened. See the numpy.memmap
+        documentation
+        https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
+        for more information.
+    The posterior distribution (otherwise known as the target distribution),
         likelihood and the state (position vector of the current state) can be
-        obtained via a wrapper class Target. A Target object and a rng is to be
-        passed via the constructor.
-    Methods append, __len__, __getitem__ implemented which uses sample_array
+        obtained via a wrapper class Target. This is passed via the constructor.
+
+    Implemented methods:
+        append(): add a MCMC sample to sample_array
+        __len__(): length of sample_array, CAUTION: this is not the number of
+            MCMC samples during sampling
+        __getitem__(): get MCMC sample from sample_array
+
+    Methods to implement:
+        sample() to modify self.state after a MCMC step
 
     Attributes:
-        target: wrapper object which can evalute the posterior and obtain the
+        dtype: type of what is being sampled, used to read and write memmap
+        n_sample: number of MCMC samples
+        memmap_path: location of the memmap
+        memmap_path_old: temporary member variable, location of the original
+            memmap after calling extend_memmap()
+        target: Target object which can evalute the posterior and obtain the
             state vector
         rng: numpy.random.RandomState object
         n_dim: the length of the state vector
         state: the current state vector
-        sample_array: array of state vector, representing the chain
+        sample_array: memmap, array of state vector representing the chain
+            dim 0: for each sample
+            dim 1: for each dimension
+        sample_pointer: during sampling, 0th dimensional pointer of sample_array
+            to where to store the next MCMC sample
     """
 
     def __init__(self,
@@ -29,9 +82,20 @@ class Mcmc(object):
                  rng=None,
                  n_sample=None,
                  memmap_dir=None):
-        #None target to be used by ZMcmcArray
-        #None n_sample won't store mcmc sample
-        #Potential development: None memmap_path to use np.darray
+        """
+        Args:
+            dtype: type of what is being sampled, eg numpy.int32, numpy.float64
+            target: Target object containing the posterior distribution. Passing
+                None is reserved by ZMcmcArray because in Downscale, each
+                location has a dummy ZSlice object which does not do any MCMC
+                sampling by itself.
+            rng: numpy.random.RandomState object
+            n_sample: number of MCMC samples to sample. If None, a memmap is not
+                instantiate and MCMC samples cannot be stored without further
+                action.
+            memmap_dir: where the memmap lives
+        """
+
         self.dtype = dtype
         self.n_sample = None
         self.memmap_path = memmap_dir
@@ -51,8 +115,21 @@ class Mcmc(object):
                 self.instantiate_memmap(memmap_dir, n_sample, n_dim)
 
     def instantiate_memmap(self, directory, n_sample, n_dim):
-        #instantiate memmap to member variable, also assign member variables
-            #n_sample and n_dim
+        """Instantiate the member variable sample_array as a memmmap
+
+        Instantiate the member variable sample_array as a memmmap. Also assign
+            member variables n_sample and n_dim. The file name of the memmap
+            is a combination of the self.target type, time and memory address
+            to form a unique and identifiable name.
+
+        Args:
+            directory:
+            n_sample: number of MCMC samples to store, this sets the 0th
+                dimension of the sample_array memmap
+            n_dim: number of dimensions the state has (or the length of the
+                state vector), this sets the 1st dimension of the sample_array
+                memmap
+        """
         file_name = self.get_target_class()
         file_name = self.make_memmap_file_name(file_name)
         self.n_sample = n_sample
@@ -64,12 +141,17 @@ class Mcmc(object):
                                       shape=(n_sample, n_dim))
 
     def get_target_class(self):
+        """Return the full name , including the module, of the type of
+            self.target
+        """
         return (type(self.target).__module__.split(".")[-1]
             + "_" + type(self.target).__name__)
 
     def make_memmap_file_name(self, name):
-        """Prefix underscore, class name, append datetime and memory address and
-            .dat
+        """Return a propose file name for memmap for self.sample_array
+
+        File name consist of: underscore, class name, datetime and memory
+            address with extension .dat
         """
         datetime_id = str(datetime.datetime.now())
         datetime_id = datetime_id.replace("-", "")
@@ -81,8 +163,15 @@ class Mcmc(object):
         return file_name
 
     def extend_memmap(self, n_sample):
-        """Extend sample_array to store more mcmc, makes a new memmap and copies
-            values from the old memmap
+        """Extend sample_array to store more MCMC samples
+
+        Extend self.sample_array to store more MCMC samples by instantiating a
+            new memmap with a larger 0th dimension. Copy values from the old
+            memmap to the new memmap. This can be slow for large samples.
+        Does not delete the old memmap but does keep track of the path of the
+            old memmap by storing it in self.memmap_path_old.
+        Copying from one memmap to another is a design choice in case something
+            goes wrong during a MCMC run, eg time out on a server.
 
         Args:
             n_sample: new length of sample_array
@@ -96,15 +185,19 @@ class Mcmc(object):
                                     n_sample,
                                     self.n_dim)
             self.sample_array[0:n_sample_old] = sample_array_old
+            #del is required to stop reading the file of the old memmap
             del sample_array_old
 
     def delete_old_memmap(self):
-        """DANGEROUS: Actually delete the file containing the old MCMC samples
+        """DANGEROUS: Actually deletes the file containing the old MCMC samples
         """
         if path.exists(self.memmap_path_old):
             os.remove(self.memmap_path_old)
 
     def read_to_write_memmap(self):
+        """Read the memmap (using r+ mode) and assign it to self.sample_array.
+            Allows the memmap to read and write.
+        """
         self.sample_array = np.memmap(self.memmap_path,
                                       self.dtype,
                                       "r+",
@@ -112,22 +205,26 @@ class Mcmc(object):
 
     def del_memmap(self):
         """Delete reference to the memmap
+
+        Close the file to the memmap. This does not actually delete the file.
         """
         del self.sample_array
         self.sample_array = None
 
     def read_memmap(self):
+        """Read only the memmap and assign it to self.sample_array.
+        """
         self.sample_array = np.memmap(self.memmap_path,
                                       self.dtype,
                                       "r",
                                       shape=(self.n_sample, self.n_dim))
 
     def add_to_sample(self):
-        """Add to sample
+        """Add a MCMC sample to sample_array.
 
         Copy the state vector and append it to sample_array. This adds a
-            duplicate to sample_array. Used for rejection step or when sampling
-            another component in Gibbs sampling
+            duplicate to sample_array. Used when doing a MCMC step or when
+            sampling another component in Gibbs sampling.
         """
         if not self.sample_array is None:
             self.append(self.state.copy())
@@ -135,12 +232,13 @@ class Mcmc(object):
     def update_state(self):
         """Update state
 
-        Update the target distribution with the current state of the chain
+        Update the target distribution with the current state of the chain, used
+            to eg evaluate the log likelihood at this current state
         """
         self.target.update_state(self.state)
 
     def get_log_likelihood(self):
-        """Get log likelihood
+        """Return the log likelihood
         """
         return self.target.get_log_likelihood()
 
@@ -154,8 +252,8 @@ class Mcmc(object):
     def save_state(self):
         """Save state
 
-        Save a copy of the current state vector. This can be recovered using
-            revert_state()
+        Save a copy of the current state vector in self.target. This can be
+            recovered using revert_state(), eg. a rejection step.
         """
         self.target.save_state()
 
@@ -163,7 +261,7 @@ class Mcmc(object):
         """Revert state
 
         Revert the state vector and the target back to what it was before
-            calling save_state
+            calling save_state(). Used for eg. a rejection step.
         """
         self.target.revert_state()
         self.state = self.target.get_state()
@@ -187,8 +285,8 @@ class Mcmc(object):
         """Metropolis-Hastings accept and reject
 
         Args:
-            log_target_before
-            log_target_after
+            log_target_before: log likelihood at the state now
+            log_target_after log likelihood of the proposed state
 
         Returns:
             True if this is the accept step, else False
@@ -200,10 +298,11 @@ class Mcmc(object):
             return False
 
     def discard_sample(self, n_keep):
-        """Discard initial mcmc samples to save hard disk space
+        """ONLY FOR DEBUGGING PURPOSES: Discard initial mcmc samples to save
+            hard disk space
 
         For each mcmc, make a new memmap and store the last n_keep mcmc samples.
-            For saftey reasons, you will have to delete the old memmap file
+            As a precaution, you will have to delete the old memmap file
             yourself.
 
         Args:
@@ -222,23 +321,52 @@ class Mcmc(object):
         self.del_memmap()
 
     def return_self(self):
+        """Return itself, used by ReadOnlyFromSlice
+        """
         return self
 
     def __len__(self):
+        """Length of sample_array, CAUTION: this is not the number of MCMC
+            samples during sampling, use self.sample_pointer for that.
+        """
         return len(self.sample_array)
 
     def __getitem__(self, index):
         return self.sample_array[index]
 
     def append(self, state):
+        #cast state to the appropriate type for memmap
         if self.dtype.__name__ == "int32":
             state = state.astype(self.dtype)
         self.sample_array[self.sample_pointer] = state
         self.sample_pointer += 1
 
 class ReadOnlyFromSlice(Mcmc):
+    """A dummy and wrapper class. Instances can read MCMC samples from a larger
+        memmap. It does this by wrapping around a Mcmc object which has that
+        larger memmap.
+
+    Eg. a Mcmc object targetting an area has a large memmap. This class can be
+        used to extract MCMC samples for a particular location from that MCMC
+        object.
+
+    This was designed to ensure when passing sliced memmaps, it stays a memmap
+        when passed about, especially when passing to different threads.
+
+    Attributes:
+        slice_index: slice object (or anything similar which is used to index)
+            to select which of the 1st dimension of sample_array to extract
+        mcmc: Mcmc object to wrap around
+    """
 
     def __init__(self, mcmc, slice_index):
+        """
+        Args:
+            mcmc: the Mcmc object to wrap around
+            slice_index: slice object (or anything similar which is used to
+                index) to select which of the 1st dimension of sample_array to
+                extract
+        """
         super().__init__(mcmc.dtype)
         self.n_sample = mcmc.n_sample
         self.n_dim = mcmc.n_dim
@@ -247,30 +375,38 @@ class ReadOnlyFromSlice(Mcmc):
         self.mcmc = None
 
     def wrap_mcmc(self, mcmc):
-        self.mcmc = mcmc
+        """Wrap around a Mcmc to extract samples from
+        """
+        #return_self() is used to avoid nested nested nested... objects
+        self.mcmc = mcmc.return_self()
 
+    #implemented
     def sample(self):
+        """Sample using the wrapped mcmc
+        """
         #will throw an exception if self.mcmc is still None, designed to ensure
             #nothing is done when sample() is called where intended
         self.mcmc.sample()
 
+    #override
     def instantiate_memmap(self, directory, n_sample, n_dim):
-        """Override to do nothing
-        """
         pass
 
+    #override
     def read_to_write_memmap(self):
-        """Override to do nothing
-        """
         pass
 
     def read_memmap(self):
+        """Read the memmap by extracting the specified 1st dimensions
+        """
         super().read_memmap()
         sliced_sample_array = self.sample_array[:, self.slice_index]
         del self.sample_array
         self.sample_array = sliced_sample_array
 
     def return_self(self):
+        """Return the wrapped mcmc
+        """
         return self.mcmc
 
 def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
@@ -281,6 +417,8 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
         obtained by choosing one component at random and that component does a
         mcmc step, the rest of the components stay where they are, aka random
         scan.
+    Requires the mcmc objects in the mcmc_array to open their memmaps
+        beforehand. They are all del or closed afterwards.
 
     Args:
         mcmc_array: array of mcmc objects
@@ -291,7 +429,6 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
             probability that component gets sampled in a Gibbs step
         is_initial_sample: boolean, the initial value is a sample if True
     """
-
     prob_sample = np.asarray(gibbs_weight)
     prob_sample = prob_sample / np.sum(prob_sample)
     #initial value is a sample
@@ -303,11 +440,13 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
     #Gibbs sampling
     for i_step in range(n_sample):
         print("Sample", i_step)
+        #random scan
         mcmc_index = rng.choice(len(mcmc_array), 1, p=prob_sample)
         for i_mcmc, mcmc in enumerate(mcmc_array):
             if i_mcmc == mcmc_index:
                 mcmc.step()
             else:
                 mcmc.add_to_sample()
+    #close the files for all mcmc objects
     for mcmc in mcmc_array:
         mcmc.del_memmap()
