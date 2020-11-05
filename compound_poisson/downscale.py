@@ -477,7 +477,7 @@ class Downscale(object):
         for i, time_series in enumerate(self.generate_unmask_time_series()):
             z_mcmc_slice = mcmc.ReadOnlyFromSlice(
                 self.z_mcmc, slice(i*len(self), (i+1)*len(self)))
-            z_mcmc_slice.wrap_mcmc(time_series.z_mcmc.return_self())
+            z_mcmc_slice.wrap_mcmc(time_series.z_mcmc)
             time_series.z_mcmc = z_mcmc_slice
 
     def scatter_parameter_mcmc_sample(self):
