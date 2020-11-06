@@ -10,11 +10,12 @@ mcmc_abstract.Mcmc
     <- ZSlice
     <- ZMcmcArray
 
-ZMcmcArray
-    <>1- compound_poisson.downscale.Downscale
-but also
+By design...
 compound_poisson.downscale.Downscale
-    <>1- ZMcmcArray
+    <>-1 ZMcmcArray
+but in terms of pointers/references, the following applies as well...
+ZMcmcArray
+    <>-1 compound_poisson.downscale.Downscale
 """
 
 import math
@@ -224,7 +225,6 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         """
         time_series_array = self.downscale.pool.map(
             static_sample_z, self.downscale.generate_unmask_time_series())
-        #multiprocessing does a clone, reload the sample array
         self.downscale.replace_unmask_time_series(time_series_array)
 
     #override
