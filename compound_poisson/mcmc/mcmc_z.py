@@ -204,7 +204,7 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
             for each location
     """
 
-    def __init__(self, downscale, n_sample, memmap_dir):
+    def __init__(self, downscale):
         """
         Args:
             downscale: Downscale object
@@ -212,10 +212,7 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         super().__init__(np.int32)
         self.downscale = downscale
         n_dim = len(downscale) * downscale.area_unmask
-        self.instantiate_memmap(memmap_dir, n_sample, n_dim)
-
-    def instantiate_memmap(self, directory, n_sample, n_dim):
-        super().instantiate_memmap(directory, n_sample, n_dim)
+        self.instantiate_memmap(downscale.memmap_dir, downscale.n_sample, n_dim)
 
     #override
     def get_target_class(self):

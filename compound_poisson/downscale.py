@@ -218,7 +218,7 @@ class Downscale(object):
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
             time_series.instantiate_mcmc()
-        self.z_mcmc = mcmc.ZMcmcArray(self, self.n_sample, self.memmap_dir)
+        self.z_mcmc = mcmc.ZMcmcArray(self)
         self.parameter_gp_target.save_cov_chol()
 
     def get_mcmc_array(self):
