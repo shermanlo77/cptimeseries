@@ -38,16 +38,33 @@ import numpy as np
 class Mcmc(object):
     """Abstract class for MCMC
 
-    Given a Target distribution, it can get and store MCMC samples in a memmap.
-        Memmap are chosen to reduce memory consumption. To handle the memmap,
-        they should be read and del (closed) using the provided methods, in
-        particular to avoid having too many files opened. See the numpy.memmap
-        documentation
+    Given a Target distribution, it can sample and store MCMC samples in a
+        memmap.
+    Memmap are chosen to reduce memory consumption. To handle the memmap, they
+        should be read (using read_to_write_memmap() or read_memmap()) and del
+        aka closed (using del_memmap()) to avoid having too many files opened
+        where appropriate. Instantiating a MCMC object will instantiate a
+        memmap already opened for you.
+    See the numpy.memmap documentation
         https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
-        for more information.
+        for more information on the memmap used here.
     The posterior distribution (otherwise known as the target distribution),
         likelihood and the state (position vector of the current state) can be
         obtained via a wrapper class Target. This is passed via the constructor.
+
+    How to use:
+        Pass the Target distribution (and other required parameters) through
+            the constructor. The current state of the MCMC chain is stored
+            in self.state and the MCMC samples are stored as a memmap in
+            self.sample_array. The memmap is allocated drive space in the
+            constructor.
+        Call step() to do a MCMC step, updates self.state and save that sample
+            or state to the memmap.
+        Call sample() to do a MCMC step and updates self.state without saving
+             the sample or state to the memmap.
+        Call add_to_sample() to save the state to the memmap (can be repeated).
+        To store more MCMC samples than the allocated space for the memmap in
+            self.sample_array, call extend_memmap().
 
     Implemented methods:
         append(): add a MCMC sample to sample_array
@@ -396,6 +413,7 @@ class ReadOnlyFromSlice(Mcmc):
     def read_to_write_memmap(self):
         pass
 
+    #override
     def read_memmap(self):
         """Read the memmap by extracting the specified 1st dimensions
         """
@@ -417,7 +435,7 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
         obtained by choosing one component at random and that component does a
         mcmc step, the rest of the components stay where they are, aka random
         scan.
-    Requires the mcmc objects in the mcmc_array to open their memmaps
+    Requires the Mcmc objects in the mcmc_array to open their memmaps
         beforehand. They are all del or closed afterwards.
 
     Args:

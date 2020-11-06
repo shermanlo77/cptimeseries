@@ -1,3 +1,22 @@
+"""Implementations of MCMC algorithms targetting discrete target distributions
+
+MCMC algorithms design for targetting the latent variables z. Random walk
+    Metropolis-Hastings is implemented in ZRwmh. Slice sampling is implemented
+    in ZSlice, see Neal, R. M. (2003). Slice sampling. The Annals of Statistics,
+    31(3):705–741.
+
+mcmc_abstract.Mcmc
+    <- ZRwmh
+    <- ZSlice
+    <- ZMcmcArray
+
+ZMcmcArray
+    <>1- compound_poisson.downscale.Downscale
+but also
+compound_poisson.downscale.Downscale
+    <>1- ZMcmcArray
+"""
+
 import math
 
 import numpy as np
@@ -7,10 +26,12 @@ from compound_poisson.mcmc import mcmc_abstract
 class ZRwmh(mcmc_abstract.Mcmc):
     """Metropolis-Hastings for the latent variables z
 
-    Uses a non-adaptive proposal on integer space
+    Uses a non-adaptive proposal on integer space. The proposal distribution is
+        the multivariate uniform distribution, sampling each and every z.
 
+    For more attributes, see the superclass
     Attributes:
-        z_parameter: probability a single z does a propose step
+        z_parameter: proposal probability a single z moves
         n_propose: number of proposals
         n_accept: number of accept steps
         accept_array: acceptance rate at each proposal
@@ -23,11 +44,12 @@ class ZRwmh(mcmc_abstract.Mcmc):
         self.n_accept = 0
         self.accept_array = []
 
+    #implemented
     def sample(self):
         """Use Metropolis Hastings to sample z
 
-        Implemented
-        Uniform prior, proposal is step back, stay or step forward
+        Uniform prior, proposal is step back, stay or step forward. Probability
+            a single z moves is self.z_parameter.
         """
         #make a deep copy of the z, use it in case of rejection step
         self.save_state()
@@ -70,14 +92,14 @@ class ZRwmh(mcmc_abstract.Mcmc):
         """Return a proposed z
 
         Return a transitioned z. Probability that it will move is
-            self.proposal_z_parameter, otherwise move one step. Cannot move to
-            0.
+            self.proposal_z_parameter, otherwise stay where it is. Cannot move
+            to 0.
 
         Args:
             z: z at this step of MCMC
 
         Returns:
-            Proposed z
+            proposed z
         """
         if self.rng.rand() < self.z_parameter:
             if z == 1: #cannot move to 0, so move to 2
@@ -172,12 +194,21 @@ class ZSlice(mcmc_abstract.Mcmc):
         self.n_propose += 1
 
 class ZMcmcArray(mcmc_abstract.Mcmc):
-    """Wrapper class
+    """MCMC for multiple ZSlice objects, eg one for each location
 
-    Does MCMC on all z in Downscale
+    Does MCMC on all z in Downscale. Does this by accessing the member variables
+        of the Downscale object.
+
+    Attributes:
+        downscale: Downscale object containing array of TimeSeries objects, one
+            for each location
     """
 
     def __init__(self, downscale, n_sample, memmap_dir):
+        """
+        Args:
+            downscale: Downscale object
+        """
         super().__init__(np.int32)
         self.downscale = downscale
         n_dim = len(downscale) * downscale.area_unmask
@@ -186,21 +217,22 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
     def instantiate_memmap(self, directory, n_sample, n_dim):
         super().instantiate_memmap(directory, n_sample, n_dim)
 
+    #override
     def get_target_class(self):
         return ""
 
+    #implemented
     def sample(self):
-        """Duplicate z_array to the z chain
-
-        For all time_series, add z_array to the sample_array
+        """All locations in self.downscale to sample z (in parallel)
         """
         time_series_array = self.downscale.pool.map(
             static_sample_z, self.downscale.generate_unmask_time_series())
         #multiprocessing does a clone, reload the sample array
         self.downscale.replace_unmask_time_series(time_series_array)
 
+    #override
     def add_to_sample(self):
-        """All time_series sample z
+        """Override to extract z from all locations and append it
         """
         z_sample = []
         for time_series in self.downscale.generate_unmask_time_series():
@@ -209,6 +241,5 @@ class ZMcmcArray(mcmc_abstract.Mcmc):
         self.append(z_sample)
 
 def static_sample_z(time_series):
-    #multiprocessing does a clone, reload the sample array
     time_series.z_mcmc.sample()
     return time_series
