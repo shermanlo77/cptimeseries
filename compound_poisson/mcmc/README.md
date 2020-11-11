@@ -31,6 +31,28 @@ References to these MCMC algorithms are included at the bottom.
 The class `mcmc_abstract.ReadOnlyFromSlice` is a wrapper class which extract MCMC samples from a larger MCMC sampling scheme. For example, extract MCMC samples from one particular location from a multiple location sampling scheme.
 
 
+## Target Distributions
+- `target.Target`
+  - `target.time_series.TargetParameter`
+  - `target.time_series.TargetZ`
+  - `target.time_series.TargetPrecision`
+
+The base abstract class is `target.Target`. For `TimeSeries`, the implementations are `target.time_series.TargetParameter`, `TargetZ` and `TargetPrecision`. They represent the posterior distribution (up to a constant) of the regression parameters beta, latent variables z and hyper parameters tau (tuning or smoothing parameters in frequentist literature) respectively.
+
+- `target.Target`
+  - `target.downscale.TargetParameter`
+  - `target.downscale.TargetGp`
+
+For `Downscale`, the implementations are `target.downscale.TargetParameter` and `TargetGp`. They represent the posterior distribution (up to a constant) of the regression parameters beta, and hyper parameters tau (tuning or smoothing parameters in frequentist literature) respectively.
+
+Default priors and hyper parameters are in `target`. See functions:
+  - `get_parameter_mean_prior()`
+  - `get_parameter_std_prior()`
+  - `get_precision_prior()`
+  - `get_gp_precision_prior()`
+
+## Class Structure
+
 - `time_series.TimeSeriesMcmc`
   - &#x25C7;-1..\*`mcmc_abstract.Mcmc`
 
@@ -38,9 +60,14 @@ The class `mcmc_abstract.ReadOnlyFromSlice` is a wrapper class which extract MCM
 - `downscale.Downscale`
   - &#x25C7;-1..\*`mcmc_abstract.Mcmc`
 
-Instances of `time_series.TimeSeriesMcmc` and  `downscale.Downscale` will have a `mcmc_abstract.Mcmc` object for each component to sample. They are all sampled using randon scan Gibbs sampling.
+The intention was that instances of `time_series.TimeSeriesMcmc` and  `Downscale` will have a `mcmc_abstract.Mcmc` object for each component to sample. They are all sampled using randon scan Gibbs sampling.
 
-## Target Distributions
+- `mcmc_abstract.Mcmc`
+  - &#x25C7;1- `target.Target`
+
+Each `mcmc_abstract.Mcmc` has a `target.Target` distribution to sample.
+
+However, because of the Bayesian hierarchical structure, some `target.Target` instances will want to modify other `target.Target` instances, each owned by `mcmc_abstract.Mcmc`. To tackle this, `time_series.TimeSeriesMcmc` and `downscale.Downscale` instances will have pointers to all `target.Target` instances. Some implementations of `mcmc_abstract.Mcmc` may contain a pointer to the parent instance of `time_series.TimeSeriesMcmc` or `downscale.Downscale` so that `target.Target` instances can communicate to each other when required.
 
 
 ## References

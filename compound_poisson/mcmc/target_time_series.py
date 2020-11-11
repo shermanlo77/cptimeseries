@@ -1,10 +1,29 @@
+"""Implementations of Target for TimeSeries
+
+Target
+    <- TargetParameter
+    <- TargetZ
+    <- TargetPrecision
+
+TimeSeriesMcmc
+    <>1..*- Target (one for each component to sample)
+
+target.Target
+    <>1- TimeSeriesMcmc
+This allows the communication between Target distributions owned by
+    TimeSeriesMcmc
+
+Mcmc
+    <>1- Target
+"""
+
 import numpy as np
 from scipy import stats
 
 from compound_poisson.mcmc import target
 
 class TargetParameter(target.Target):
-    """Wrapper Target class to evaluate the posterior of the parameter
+    """Contains the posterior distribution of the beta parameters
 
     Attributes:
         time_series: TimeSeries object being wrapped around
@@ -22,6 +41,7 @@ class TargetParameter(target.Target):
         super().__init__()
         self.time_series = time_series
         self.prior_mean = None
+        #use the default prior for the std
         self.prior_cov_chol = (target.get_parameter_std_prior()
             * np.ones(self.get_n_dim()))
         self.cp_parameter_before = None
@@ -29,19 +49,24 @@ class TargetParameter(target.Target):
         parameter_name_array = self.time_series.get_parameter_vector_name()
         self.prior_mean = target.get_parameter_mean_prior(parameter_name_array)
 
+    #implemented
     def get_n_dim(self):
         return self.time_series.n_parameter
 
+    #implemented
     def get_state(self):
         return self.time_series.get_parameter_vector()
 
+    #implemented
     def update_state(self, state):
         self.time_series.set_parameter_vector(state)
         self.time_series.update_all_cp_parameters()
 
+    #implemented
     def get_log_likelihood(self):
         return self.time_series.get_joint_log_likelihood()
 
+    #implemented
     def get_log_target(self):
         ln_l = self.get_log_likelihood()
         ln_prior = self.get_log_prior()
@@ -52,20 +77,24 @@ class TargetParameter(target.Target):
             stats.norm.logpdf(
                 self.get_state(), self.prior_mean, self.prior_cov_chol))
 
+    #implemented
     def save_state(self):
         self.cp_parameter_before = self.time_series.copy_parameter()
 
+    #implemented
     def revert_state(self):
         self.time_series.set_parameter(self.cp_parameter_before)
 
+    #implemented
     def simulate_from_prior(self, rng):
         return rng.normal(self.prior_mean, self.prior_cov_chol)
 
+    #implemented
     def get_prior_mean(self):
         return self.prior_mean
 
 class TargetZ(target.Target):
-    """Wrapper Target class for the latent variables z
+    """Contains the posterior distribution for the latent variables z
 
     Attributes:
         time_series: TimeSeries object being wrapped around
@@ -77,39 +106,49 @@ class TargetZ(target.Target):
         self.time_series = time_series
         self.z_array_before = None
 
+    #implemented
     def get_n_dim(self):
         return len(self.time_series)
 
+    #implemented
     def get_state(self):
         return self.time_series.z_array
 
+    #implemented
     def update_state(self, state):
         self.time_series.z_array = state
         self.time_series.update_all_cp_parameters()
 
+    #implemented
     def get_log_likelihood(self):
         return self.time_series.get_joint_log_likelihood()
 
+    #implemented
     def get_log_target(self):
         return self.get_log_likelihood()
 
+    #implemented
     def save_state(self):
         self.z_array_before = self.time_series.z_array.copy()
 
+    #implemented
     def revert_state(self):
         self.update_state(self.z_array_before)
 
 class TargetPrecision(target.Target):
-    """Wrapper Target class to evaluate the posterior of the precision of the
-        parameter prior covariance
+    """Contains the posterior of the parameter precision
+
+    This class can assess an instance of TargetParameter via self.time_series.
+        See update_state() and prograte_precision().
 
     Attributes:
-        parameter_target: TargetParameter object
-        prior: array containing 2 distributions, random_state are accessed,
+        time_series: TimeSeries object
+        prior: dictionary containing 2 distributions, random_state are accessed,
             rvs() are logpdf() are called. E.g. use distributions from
             scipy.stats. 0th prior for regression parameter, 1st for ARMA
-            parameter
-        precision: 2 vector
+            parameter. The keys are "precision_reg" and "precision_arma" or see
+            target.get_precision_prior().
+        precision: 2 vector, state of the chain
         precision_before: copy of precision
         arma_index: array of boolean, pointing to each parameter, True if it the
             parameter is an ARMA term
@@ -147,19 +186,24 @@ class TargetPrecision(target.Target):
         cov_chol = np.sqrt(np.asarray(cov_chol))
         return cov_chol
 
+    #implemented
     def get_n_dim(self):
         return len(self.precision)
 
+    #implemented
     def get_state(self):
         return self.precision
 
+    #implemented
     def update_state(self, state):
         self.precision = state.copy()
         self.prograte_precision()
 
+    #implemented
     def get_log_likelihood(self):
         return self.time_series.parameter_target.get_log_prior()
 
+    #implemented
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
 
@@ -169,13 +213,16 @@ class TargetPrecision(target.Target):
             ln_prior += prior.logpdf(self.precision[i])
         return ln_prior
 
+    #implemented
     def save_state(self):
         self.precision_before = self.precision.copy()
 
+    #implemented
     def revert_state(self):
         self.precision = self.precision_before
         self.prograte_precision()
 
+    #implemented
     def simulate_from_prior(self, rng):
         prior_simulate = []
         for prior in self.prior.values():
@@ -184,4 +231,7 @@ class TargetPrecision(target.Target):
         return np.asarray(prior_simulate)
 
     def prograte_precision(self):
+        """Update the std vector in time_series.parameter_target with the
+            current state
+        """
         self.time_series.parameter_target.prior_cov_chol = self.get_cov_chol()

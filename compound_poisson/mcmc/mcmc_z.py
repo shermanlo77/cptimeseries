@@ -115,7 +115,9 @@ class ZRwmh(mcmc_abstract.Mcmc):
 class ZSlice(mcmc_abstract.Mcmc):
     """Slice sampling on the z latent variables
 
-    Does slice sampling for a randomly selected z. See Neal (2003).
+    Does slice sampling for a randomly selected z from TimeSeries. See Neal
+        (2003) for the slice samplng algorithm. Note: this implementation is not
+        a generalised one.
 
     For more attributes, see the superclass
     Attributes:

@@ -19,6 +19,9 @@ Mcmc
     <- mcmc_z.ZSlice
     <- mcmc_z.ZMcmcArray
 
+Mcmc
+    <>1- target.Target
+
 compound_poisson.time_series_mcmc.TimeSeriesMcmc
     <>-1..* Mcmc
 compound_poisson.downscale.Downscale
