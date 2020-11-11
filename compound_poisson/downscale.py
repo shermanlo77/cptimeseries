@@ -182,6 +182,7 @@ class Downscale(object):
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng,
                 self.gibbs_weight)
+        self.scatter_mcmc_sample()
         self.del_memmap()
         self.pool = None
 
@@ -204,6 +205,7 @@ class Downscale(object):
                 self.gibbs_weight, False)
             self.n_sample = n_sample
             self.delete_old_memmap()
+            self.scatter_mcmc_sample()
         self.del_memmap()
         self.pool = None
 
@@ -474,18 +476,24 @@ class Downscale(object):
                     i += 1
 
     def scatter_z_mcmc_sample(self):
+        z_mcmc = self.z_mcmc
         for i, time_series in enumerate(self.generate_unmask_time_series()):
-            z_mcmc_slice = mcmc.ReadOnlyFromSlice(
-                self.z_mcmc, slice(i*len(self), (i+1)*len(self)))
-            z_mcmc_slice.wrap_mcmc(time_series.z_mcmc)
-            time_series.z_mcmc = z_mcmc_slice
+            z_mcmc_i = time_series.z_mcmc
+            z_mcmc_i.set_memmap_slice(z_mcmc.n_sample,
+                                      z_mcmc.n_dim,
+                                      z_mcmc.memmap_path,
+                                      slice(i*len(self), (i+1)*len(self)))
 
     def scatter_parameter_mcmc_sample(self):
+        parameter_mcmc = self.parameter_mcmc
         for i, time_series in enumerate(self.generate_unmask_time_series()):
-            mcmc_slice = mcmc.ReadOnlyFromSlice(
-                self.parameter_mcmc,
-                slice(i, self.n_total_parameter, self.area_unmask))
-            time_series.parameter_mcmc = mcmc_slice
+            parameter_mcmc_i = mcmc.Mcmc(parameter_mcmc.dtype)
+            slice_index = slice(i, self.n_total_parameter, self.area_unmask)
+            parameter_mcmc_i.set_memmap_slice(parameter_mcmc.n_sample,
+                                              parameter_mcmc.n_dim,
+                                              parameter_mcmc.memmap_path,
+                                              slice_index)
+            time_series.parameter_mcmc = parameter_mcmc_i
 
     def scatter_mcmc_sample(self):
         self.scatter_z_mcmc_sample()

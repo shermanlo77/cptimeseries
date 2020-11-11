@@ -12,7 +12,6 @@ The function do_gibbs_sampling() does Gibbs sampling when given an array of Mcmc
     objects.
 
 Mcmc
-    <- ReadOnlyFromSlice
     <- mcmc_parameter.Rwmh
     <- mcmc_parameter.Elliptical
     <- mcmc_z.ZRwmh
@@ -26,9 +25,6 @@ compound_poisson.time_series_mcmc.TimeSeriesMcmc
     <>-1..* Mcmc
 compound_poisson.downscale.Downscale
     <>-1..* Mcmc
-
-ReadOnlyFromSlice
-    <>-1 Mcmc
 """
 
 import datetime
@@ -54,6 +50,12 @@ class Mcmc(object):
     The posterior distribution (otherwise known as the target distribution),
         likelihood and the state (position vector of the current state) can be
         obtained via a wrapper class Target. This is passed via the constructor.
+
+    To use MCMC to read/write from a larger memmap, do not pass n_sample and
+        memmap_dir via the constructor. After instantiation, call
+        set_memmap_slice() to set where to read the memmap and slice it to view
+        a requested range of dimensions. This is useful for a single location
+        analysis from a larger multi-location inference for example.
 
     How to use:
         Pass the Target distribution (and other required parameters) through
@@ -94,6 +96,12 @@ class Mcmc(object):
             dim 1: for each dimension
         sample_pointer: during sampling, 0th dimensional pointer of sample_array
             to where to store the next MCMC sample
+        slice_index: optional slice object, if not None only use specific index
+            of dimension 1 for sample_array. To be set after instantiation.
+            Useful for reading MCMC samples from a larger sampling scheme, eg
+            a location from a multi-location inference.
+        n_dim_parent: optional, size of dimension 1 when initally reading
+            the memmap in memmap
     """
 
     def __init__(self,
@@ -126,6 +134,8 @@ class Mcmc(object):
         self.state = None
         self.sample_array = None
         self.sample_pointer = 0
+        self.slice_index = None
+        self.n_dim_parent = None
 
         if not target is None:
             n_dim = target.get_n_dim()
@@ -218,10 +228,38 @@ class Mcmc(object):
         """Read the memmap (using r+ mode) and assign it to self.sample_array.
             Allows the memmap to read and write.
         """
+        self.load_memmap("r+")
+
+    def read_memmap(self):
+        """Read only the memmap and assign it to self.sample_array.
+        """
+        self.load_memmap("r")
+
+    def load_memmap(self, mode):
+        """Load the memmap
+
+        If n_dim_parent exist, then load a memmap from a larger inference
+            scheme. This is then sliced in the 1st dimension according to
+            self.slice_index
+
+        Args:
+            mode: eg "r", "r+"
+        """
+        shape = None
+        if self.n_dim_parent is None:
+            shape = (self.n_sample, self.n_dim)
+        else:
+            shape = (self.n_sample, self.n_dim_parent)
+
         self.sample_array = np.memmap(self.memmap_path,
                                       self.dtype,
-                                      "r+",
-                                      shape=(self.n_sample, self.n_dim))
+                                      mode,
+                                      shape=shape)
+        #slice the first dimension
+        if not self.slice_index is None:
+            sliced_sample_array = self.sample_array[:, self.slice_index]
+            del self.sample_array
+            self.sample_array = sliced_sample_array
 
     def del_memmap(self):
         """Delete reference to the memmap
@@ -230,14 +268,6 @@ class Mcmc(object):
         """
         del self.sample_array
         self.sample_array = None
-
-    def read_memmap(self):
-        """Read only the memmap and assign it to self.sample_array.
-        """
-        self.sample_array = np.memmap(self.memmap_path,
-                                      self.dtype,
-                                      "r",
-                                      shape=(self.n_sample, self.n_dim))
 
     def add_to_sample(self):
         """Add a MCMC sample to sample_array.
@@ -340,6 +370,25 @@ class Mcmc(object):
         del sample_array_old
         self.del_memmap()
 
+    def set_memmap_slice(
+        self, n_sample, n_dim_parent, memmap_path, slice_index):
+        """Set the member variables n_sample, n_dim_parent, memmap_path and
+            slice_index so that it can read and write to/from an already existing
+            larger memmap.
+
+        Args:
+            n_sample: number of samples, size of the 0th dimension of
+                sample_array
+            n_dim_parent: TOTAL number of dimensions, size of the 1st
+                dimension of sample_array before slicing
+            memmap_path: the location of the memmap
+            slice_index: slice object, which of the 1st dimension to use
+        """
+        self.n_sample = n_sample
+        self.n_dim_parent = n_dim_parent
+        self.memmap_path = memmap_path
+        self.slice_index = slice_index
+
     def return_self(self):
         """Return itself, used by ReadOnlyFromSlice
         """
@@ -360,75 +409,6 @@ class Mcmc(object):
             state = state.astype(self.dtype)
         self.sample_array[self.sample_pointer] = state
         self.sample_pointer += 1
-
-class ReadOnlyFromSlice(Mcmc):
-    """A dummy and wrapper class. Instances can read MCMC samples from a larger
-        memmap. It does this by wrapping around a Mcmc object which has that
-        larger memmap.
-
-    Eg. a Mcmc object targetting an area has a large memmap. This class can be
-        used to extract MCMC samples for a particular location from that MCMC
-        object.
-
-    This was designed to ensure when passing sliced memmaps, it stays a memmap
-        when passed about, especially when passing to different threads.
-
-    Attributes:
-        slice_index: slice object (or anything similar which is used to index)
-            to select which of the 1st dimension of sample_array to extract
-        mcmc: Mcmc object to wrap around
-    """
-
-    def __init__(self, mcmc, slice_index):
-        """
-        Args:
-            mcmc: the Mcmc object to wrap around
-            slice_index: slice object (or anything similar which is used to
-                index) to select which of the 1st dimension of sample_array to
-                extract
-        """
-        super().__init__(mcmc.dtype)
-        self.n_sample = mcmc.n_sample
-        self.n_dim = mcmc.n_dim
-        self.memmap_path = mcmc.memmap_path
-        self.slice_index = slice_index
-        self.mcmc = None
-
-    def wrap_mcmc(self, mcmc):
-        """Wrap around a Mcmc to extract samples from
-        """
-        #return_self() is used to avoid nested nested nested... objects
-        self.mcmc = mcmc.return_self()
-
-    #implemented
-    def sample(self):
-        """Sample using the wrapped mcmc
-        """
-        #will throw an exception if self.mcmc is still None, designed to ensure
-            #nothing is done when sample() is called where intended
-        self.mcmc.sample()
-
-    #override
-    def instantiate_memmap(self, directory, n_sample, n_dim):
-        pass
-
-    #override
-    def read_to_write_memmap(self):
-        pass
-
-    #override
-    def read_memmap(self):
-        """Read the memmap by extracting the specified 1st dimensions
-        """
-        super().read_memmap()
-        sliced_sample_array = self.sample_array[:, self.slice_index]
-        del self.sample_array
-        self.sample_array = sliced_sample_array
-
-    def return_self(self):
-        """Return the wrapped mcmc
-        """
-        return self.mcmc
 
 def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
         is_initial_sample=True):

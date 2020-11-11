@@ -25,12 +25,6 @@ The base abstract class is `mcmc_abstract.Mcmc`. MCMC targetting continuous dist
 
 References to these MCMC algorithms are included at the bottom.
 
-- `mcmc_abstract.ReadOnlyFromSlice`
-  - &#x25C7;-1 `mcmc_abstract.Mcmc`
-
-The class `mcmc_abstract.ReadOnlyFromSlice` is a wrapper class which extract MCMC samples from a larger MCMC sampling scheme. For example, extract MCMC samples from one particular location from a multiple location sampling scheme.
-
-
 ## Target Distributions
 - `target.Target`
   - `target.time_series.TargetParameter`
