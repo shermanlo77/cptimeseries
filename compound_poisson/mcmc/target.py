@@ -1,12 +1,30 @@
+"""Contain the base class Target for representing the target or posterior
+    distribution to be sampled. Also contains default prior distributions (or
+    parameters for a family of distributions), retrived using the provided
+    functions.
+
+Target
+    <- target_time_series.TargetParameter
+    <- target_time_series.TargetZ
+    <- target_time_series.TargetPrecision
+    <- target_downscale.TargetParameter
+    <- target_downscale.TargetGp
+"""
+
 import numpy as np
 from scipy import stats
 
 class Target(object):
-    """Abstract class for evaluating the posterior distribution for MCMC
+    """Abstract class for evaluating the posterior distribution for MCMC and
+        keeping track of the state of the model so that it can evalaute the
+        likelihood.
 
-    Subclasses will need to implement the methods get_n_dim(), get_state(),
-        update_state(), get_log_likelihood(), get_log_target(), save_state(),
-        revert_state(), simulate_from_prior().
+    Methods to be implemented: get_n_dim(), get_state(), update_state(),
+        get_log_likelihood(), get_log_target(), save_state(), revert_state(),
+        simulate_from_prior(), get_prior_mean().
+    Slight abusement: Not all methods need to be implemented, eg.
+        simulate_from_prior() is only required for elliptical slice sampling,
+        eg. may not exisit if the prior is improper.
     """
 
     def __init__(self):
@@ -23,7 +41,7 @@ class Target(object):
         raise NotImplementedError
 
     def update_state(self, state):
-        """Update the model with a new state vector
+        """Update the model given a new state vector
         """
         raise NotImplementedError
 
@@ -41,7 +59,8 @@ class Target(object):
         raise NotImplementedError
 
     def save_state(self):
-        """Save a copy of the state vector
+        """Save a copy of the state vector, or any other information about the
+            state of the model
         """
         raise NotImplementedError
 
@@ -50,7 +69,7 @@ class Target(object):
             save_state() was called
 
         From the state vector saved in save_state, update the model with it
-            and set self.state to it. In other words,
+            and set self.state to it.
         """
         raise NotImplementedError
 
@@ -61,27 +80,33 @@ class Target(object):
             rng: numpy.random.RandomState object
 
         Returns:
-            Sample from the prior
+            Sample from the prior, numpy vector
         """
         raise NotImplementedError
 
     def get_prior_mean(self):
-        """Return the mean of the prior
+        """Return the mean of the prior as a vector
         """
         raise NotImplementedError
 
     def set_from_prior(self, rng):
+        """Set the model using the parameter sampled from the prior
+
+        Args:
+            rng: numpy.random.RandomState object
+        """
         state = self.simulate_from_prior(rng)
         self.update_state(state)
 
 def get_parameter_mean_prior(parameter_name_array):
-    """Return the default mean prior for the parameter
+    """Return the default mean prior for the compound-Poisson parameters (beta
+        in the literature)
 
     Args:
         parameter_name_array: array of names of each parameter
 
     Return:
-        prior mean for the parameter
+        numpy array, prior mean for the parameter
     """
     prior_mean = np.zeros(len(parameter_name_array))
     #check the parameter by looking into the parameter name
@@ -96,16 +121,18 @@ def get_parameter_mean_prior(parameter_name_array):
     return prior_mean
 
 def get_parameter_std_prior():
-    """Return the default prior std for the parameter
+    """Return the default prior std for the compound-Poisson parameter (beta
+        in the literature)
     """
     return 0.5
 
 def get_precision_prior():
-    """Return the default prior for the precision
+    """Return the default prior distribution for the precision of the
+        compound-Poisson parameter (beta in the literature).
 
     Return:
         array containing 2 gamma distributions, first one for the parameter,
-            second for ARMA terms
+            second for ARMA terms.
     """
     prior = {
         "precision_reg": stats.gamma(a=2.8, scale=2.3),
@@ -117,7 +144,7 @@ def get_gp_precision_prior():
     return stats.invgamma(a=1, scale=556)
 
 def get_arma_index(parameter_name_array):
-    """Check with parameters are ARMA terms
+    """Check which parameters are ARMA terms
 
     Args:
         parameter_name_array

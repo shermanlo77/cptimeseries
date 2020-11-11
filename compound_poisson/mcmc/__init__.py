@@ -1,6 +1,5 @@
 from compound_poisson.mcmc import target
 from compound_poisson.mcmc import target_downscale
-from compound_poisson.mcmc import target_model_field
 from compound_poisson.mcmc import target_time_series
 from compound_poisson.mcmc.mcmc_abstract import ReadOnlyFromSlice
 from compound_poisson.mcmc.mcmc_abstract import do_gibbs_sampling

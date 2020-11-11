@@ -1,3 +1,21 @@
+"""Implementations of Target for Downscale
+
+Target
+    <- TargetParameter
+    <- TargetGp
+
+Downscale
+    <>1..*- Target (one for each component to sample)
+
+Target
+    <>1- Downscale
+This allows the communication between Target distributions owned by
+    Downscale
+
+Mcmc
+    <>1- Target
+"""
+
 import math
 
 import numpy as np
@@ -35,28 +53,28 @@ class TargetParameter(target.Target):
         self.prior_mean = target.get_parameter_mean_prior(parameter_name_array)
         self.arma_index = target.get_arma_index(parameter_name_array)
 
+    #implemented
     def get_n_dim(self):
-        #implemented
         return self.n_total_parameter
 
+    #implemented
     def get_state(self):
-        #implemented
         return self.downscale.get_parameter_vector()
 
+    #implemented
     def update_state(self, state):
-        #implemented
         #set all time series parameters and update them so that the likelihood
             #can be evaluated
         self.downscale.set_parameter_vector(state)
         self.downscale.update_all_cp_parameters()
 
+    #implemented
     def get_log_likelihood(self):
-        #implemented
         #a self.downscale.update_all_cp_parameters() is required beforehand
         return self.downscale.get_log_likelihood()
 
+    #implemented
     def get_log_target(self):
-        #implemented
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
@@ -92,17 +110,17 @@ class TargetParameter(target.Target):
                 -0.5 * (precision * np.dot(z_i, z_i) + ln_det_cov))
         return np.sum(ln_prior_term)
 
+    #implemented
     def save_state(self):
-        #implemented
         self.parameter_before = self.get_state()
 
+    #implemented
     def revert_state(self):
-        #implemneted
         self.update_state(self.parameter_before)
 
+    #implemented
     def simulate_from_prior(self, rng):
-        #implemented
-        #required for study of prior distribution and slice sampling
+        #required for study of prior distribution and elliptical slice sampling
         parameter_vector = self.prior_mean.copy()
         gp_target = self.downscale.parameter_gp_target
         chol = gp_target.cov_chol #cholesky of kernel matrix
@@ -128,17 +146,18 @@ class TargetGp(target.Target):
     """Contains density information for the GP precision parameters
 
     Attributes:
-        downscale: pointer to parent
+        downscale: pointer to parent Downscale object
         prior: dictionary of scipy.stats objects to represent the prior
             distributions
-        state: dictionary of the different precision parameters
-        state_before: copy of state when doing mcmc (ie reverting after
+        state: dictionary of the different precision parameters. The keys are:
+            "precision_arma", "precision_reg", "gp_precision"
+        state_before: copy of state when doing mcmc (for reverting after
             rejection)
         cov_chol: kernel matrix, cholesky
-        cov_chol_before: copy of cov_chol when doing mcmc (ie reverting after
+        cov_chol_before: copy of cov_chol when doing mcmc (for reverting after
             rejection)
         square_error: matrix (area_unmask x area_unmask) containing square error
-            of topography between each point in space
+            of topography between each point in space.
     """
 
     def __init__(self, downscale):
@@ -151,6 +170,7 @@ class TargetGp(target.Target):
         self.state_before = None
         self.cov_chol = None
         self.cov_chol_before = None
+        #square_error does not change so points to the copy owned by Downscale
         self.square_error = downscale.square_error
 
         self.prior = target.get_precision_prior()
@@ -161,27 +181,27 @@ class TargetGp(target.Target):
             if not math.isfinite(self.state[key]):
                 self.state[key] = prior.median()
 
+    #implemented
     def get_n_dim(self):
-        #implemneted
         return len(self.state)
 
+    #implemented
     def get_state(self):
-        #implemented
         return np.asarray(list(self.state.values()))
 
+    #implemented
     def update_state(self, state):
-        #implmented
         #update state and the covariance matrix
         for i, key in enumerate(self.prior):
             self.state[key] = state[i]
         self.save_cov_chol()
 
+    #implemented
     def get_log_likelihood(self):
-        #implemented
         return self.downscale.parameter_target.get_log_prior()
 
+    #implemented
     def get_log_target(self):
-        #implemented
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
@@ -190,18 +210,19 @@ class TargetGp(target.Target):
             ln_prior += self.prior[key].logpdf(self.state[key])
         return ln_prior
 
+    #implemented
     def save_state(self):
-        #implemented
+        #make a deep copy of the state and the covariance matrix
         self.state_before = self.state.copy()
         self.cov_chol_before = self.cov_chol.copy()
 
+    #implemented
     def revert_state(self):
-        #implemented
         self.state = self.state_before
         self.cov_chol = self.cov_chol_before
 
+    #implemented
     def simulate_from_prior(self, rng):
-        #implemented
         prior_simulate = []
         for prior in self.prior.values():
             prior.random_state = rng
@@ -209,7 +230,7 @@ class TargetGp(target.Target):
         return np.asarray(prior_simulate)
 
     def save_cov_chol(self):
-        """Calculate the kernel matrix
+        """Calculate and save the Cholesky decomposition of the kernel matrix
         """
         cov_chol = self.square_error.copy()
         cov_chol *= -self.state["gp_precision"] / 2

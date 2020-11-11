@@ -1,14 +1,21 @@
+"""Contains the abstract class
+    compound_poisson.forecast.forecast_abstract.Forecaster
+
+compound_poisson.forecast.forecast_abstract.Forecaster
+    <- compound_poisson.forecast.time_series.Forecaster
+        <- compound_poisson.forecast.time_series.SelfForecaster
+        <- compound_poisson.forecast.downscale.TimeSeriesForecaster
+    <- compound_poisson.forecast.downscale.Forecaster
+"""
+
 import datetime
-import math
 import os
 from os import path
 
 import numpy as np
 
-from compound_poisson import multiprocess
-
 class Forecaster(object):
-    """Contain Monte Carlo forecasts
+    """Contains and simulate Monte Carlo forecasts
 
     Abstract class
     Contain Monte Carlo forecasts in forecast_array as a numpy.memmap object.
@@ -17,12 +24,21 @@ class Forecaster(object):
         stored in member variables.
     Used by classes TimeSeries and Downscale when calling forecast() and
         forecast_self().
-
     Methods to implement: copy_to_memmap(), simulate_forecasts(),
-        get_prob_rain()
-    Methods to override: load_memmap() by providing memmap_shape,
-        start_forecast() by adding an extra argument to accept data,
-        make_memmap_path() by providing a
+        get_prob_rain(), get_roc_curve_array(),
+        compare_dist_with_observed()
+    Methods to override:
+        load_memmap() by providing memmap_shape,
+        start_forecast() by adding an extra argument to accept data if needed
+        make_memmap_path() by providing a a description for the file name
+
+    Notes on memmap:
+        Accessing the memmap file, containg the forecast samples, will require
+            handling the file and something must be responsible to delete the
+            memmap after useage. This prevents too many files being opened. The
+            methods load_memmap() and del_memmap() to assist in this.
+        For further information, refer to numpy.memmap manual
+        https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
 
     Attributes:
         time_array: array, containing time stamps for each point in the forecast
@@ -30,8 +46,10 @@ class Forecaster(object):
             implementation
         n_time: length of forecast or number of time points
         n_simulation: number of simulations to be done
-        memmap_dir: directory to forecast_array memmap file
-        memmap_path: file path to forecast_array memmap file
+        memmap_dir: relative directory to forecast_array memmap file (should be
+            fixed)
+        memmap_path: relative file path to forecast_array memmap file (may
+            change after simulation after simulation)
     """
 
     def __init__(self, memmap_dir):
@@ -63,7 +81,7 @@ class Forecaster(object):
     def start_forecast(self, n_simulation):
         """Start forecast simulations, to be called initially
 
-        Should be overriden by adding an extra argument to accept data, handles
+        Can be overriden by adding an extra argument to accept data, stores
             it, then call this class's method to do forecasting.
 
         Args:
@@ -135,6 +153,42 @@ class Forecaster(object):
         """
         raise NotImplementedError
 
+    def get_roc_curve_array(
+        self, rain_warning_array, rain_observed, time_index=None):
+        """Get array of ROC curves
+
+        Evaluate the ROC curve for different amounts of precipitation
+
+        CAUTION: signature may vary as rain_observed may not be needed in
+            certain subclasses
+
+        Args:
+            rain_warning_array: array of amount of precipitation to be detected
+            rain_observed: optional, observed precipitation, array, for each
+                time point
+            time_index: slice object, which time points to consider
+
+        Return:
+            array of roc.Roc objects
+        """
+        raise NotImplementedError
+
+    def compare_dist_with_observed(self, observed_rain, n_linspace=500):
+        """Return an object from distribution_compare, used to compare the
+            distribution of the precipitation of the forecast and the observed
+
+        CAUTION: signature may vary as observed_rain may not be needed in
+            certain subclasses
+
+        Args:
+            observed_rain: numpy array of observed precipitation
+            n_linspace: number of points to evaluate between 0 mm and max
+                observed rain
+
+        Return: object from distribution_compare
+        """
+        raise NotImplementedError
+
     def load_memmap(self, mode, memmap_shape):
         """Load the memmap file for forecast_array
 
@@ -154,8 +208,3 @@ class Forecaster(object):
         """
         del self.forecast_array
         self.forecast_array = None
-
-    def bootstrap(self, rng):
-        """Return a clone of itself with bootstrapped forecast samples
-        """
-        raise NotImplementedError

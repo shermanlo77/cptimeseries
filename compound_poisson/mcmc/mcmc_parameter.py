@@ -1,3 +1,17 @@
+"""Implementations of MCMC algorithms targetting continuous target distributions
+
+Rwmh is adaptive random-walk Metropolis-Hastings, the version presented in
+    Roberts, G. O. and Rosenthal, J. S. (2009). Examples of adaptive MCMC.
+    Journal of Computational and Graphical Statistics, 18(2):349–367.
+Elliptical is elliptical slice sampling, see Murray, I., Adams, R. P., and
+    MacKay, D. J. (2010). Elliptical slice sampling. In Proceedings of the 13th
+    International Conference on Artificial Intelligence and Statistics.
+
+mcmc_abstract.Mcmc
+    <- Rwmh
+    <- Elliptical
+"""
+
 import math
 
 import numpy as np
@@ -9,8 +23,13 @@ class Rwmh(mcmc_abstract.Mcmc):
     """Random walk Metropolis Hastings
 
     Adaptive MCMC from Roberts and Rosenthal (2009). Proposal covariance is
-        proportional to the sample covariance of the chain.
+        proportional to the sample covariance of the chain. Initially, MCMC
+        always uses a small proposal covariance. Afterwards, 5% of MCMC steps
+        uses a small proposal covariance, 95% uses sample covaraince of the
+        chain.
+    Proposal distribution is Normal.
 
+    For more attributes, see the superclass
     Attributes:
         n_till_adapt: the chain always use the small proposal initially, number
             of steps till use the adaptive proposal covariance
@@ -18,14 +37,16 @@ class Rwmh(mcmc_abstract.Mcmc):
             the proposal covariance for the reggression parameters
         proposal_covariance_small: the size of the small proposal covariance,
             scalar, it is to be multipled by an identity matrix
-        proposal_scale: proposal covariance for the regression parameters is
-            proposal_scale times chain_covariance
-        chain_mean: mean of the regression parameter chain (excludes z step)
-        chain_covariance: covariance of the regression parameter chain (excludes
-            samples from sampling other dimensions)
+        proposal_scale: proposal covariance is proposal_scale times
+            chain_covariance
+        chain_mean: mean of the regression parameter chain (excludes samples
+            from sampling other dimensions in Gibbs)
+        chain_covariance: covariance of the chain (excludes samples from
+            sampling other dimensions in Gibbs)
         n_propose: number of proposals
         n_accept: number of accept steps
-        accept_array: acceptance rate at each proposal
+        accept_array: acceptance rate at each proposal (excludes samples from
+            sampling other dimensions in Gibbs)
     """
 
     def __init__(self, target, rng, n_sample=None, memmap_dir=None):
@@ -40,11 +61,9 @@ class Rwmh(mcmc_abstract.Mcmc):
         self.n_accept = 0
         self.accept_array = []
 
+    #implemented
     def sample(self):
         """Use Metropolis Hastings to sample parameters
-
-        Implemented
-        Normal prior, normal proposal
         """
         #decide to use small proposal or adaptive proposal
         #for the first n_adapt runs, they are small to ensure chain_covariance
@@ -68,17 +87,17 @@ class Rwmh(mcmc_abstract.Mcmc):
         self.save_state()
         #get posterior
         log_posterior_before = self.get_log_target()
-        #make a step if there are numerical problems, treat it as a rejection
+        #make a step, if there are numerical problems, treat it as a rejection
             #step
         try:
-            #self.propose(proposal_covariance) changes the all the member
+            #self.propose(proposal_covariance) changes all the member
                 #variable parameters, the likelihood is evaulated with these new
                 #parameters
             self.propose(proposal_covariance)
             log_posterior_after = self.get_log_target()
             if not self.is_accept_step(
                 log_posterior_before, log_posterior_after):
-                #regression step, set the parameters before the MCMC step
+                #rejection step, set the parameters before the MCMC step
                 self.revert_state()
             else:
                 #acceptance step, keep track of acceptance rate
@@ -95,7 +114,7 @@ class Rwmh(mcmc_abstract.Mcmc):
     def propose(self, covariance):
         """Propose parameters
 
-        Update itself with the proposed regression parameters.
+        Update itself with the proposed state
 
         Args:
             covariance: proposal covariance
@@ -131,7 +150,7 @@ class Elliptical(mcmc_abstract.Mcmc):
     """Elliptical slice sampling
 
     Elliptical slice sampling, see Murray, Adams, MacKay (2010). Samples from a
-        Gaussian prior and do slice sampling
+        Gaussian prior and do slice sampling.
 
     For more attributes, see the superclass
     Attributes:
@@ -142,10 +161,10 @@ class Elliptical(mcmc_abstract.Mcmc):
         super().__init__(np.float64, target, rng, n_sample, memmap_dir)
         self.n_reject_array = []
 
+    #implemented
     def sample(self):
         """Uses elliptical slice sampling
 
-        Implemented
         See Murray, Adams, MacKay (2010)
         """
         target = self.target
