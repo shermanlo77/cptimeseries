@@ -138,11 +138,11 @@ class Mcmc(object):
         self.n_dim_parent = None
 
         if not target is None:
-            n_dim = target.get_n_dim()
+            self.n_dim = target.get_n_dim()
             self.state = target.get_state()
 
             if not n_sample is None:
-                self.instantiate_memmap(memmap_dir, n_sample, n_dim)
+                self.instantiate_memmap(memmap_dir, n_sample, self.n_dim)
 
     def instantiate_memmap(self, directory, n_sample, n_dim):
         """Instantiate the member variable sample_array as a memmmap

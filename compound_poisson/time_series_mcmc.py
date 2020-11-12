@@ -202,6 +202,10 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         for mcmc_i in self.get_mcmc_array():
             mcmc_i.read_memmap()
 
+    def read_to_write_memmap(self):
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.read_to_write_memmap()
+
     def del_memmap(self):
         for mcmc_i in self.get_mcmc_array():
             mcmc_i.del_memmap()
