@@ -368,8 +368,11 @@ class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
         self.read_to_write_memmap()
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(
-            mcmc_array, self.n_sample, self.rng, self.gibbs_weight)
+            mcmc_array, self.n_sample, self.rng, self.gibbs_weight,
+            is_print=False)
         self.del_memmap()
+        print("Location " + str(self.id) + " " + str(self.n_sample)
+            + " samples")
 
     def resume_fitting(self, n_sample):
         if n_sample > self.n_sample:
@@ -378,9 +381,11 @@ class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
             #in resume, do not use initial value as sample (False in arg 3)
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng,
-                self.gibbs_weight, False)
+                self.gibbs_weight, False, is_print=False)
             self.n_sample = n_sample
             self.del_memmap()
+            print("Location " + str(self.id) + " " + str(self.n_sample)
+                + " samples")
 
     def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
         #override to include MCMC samples

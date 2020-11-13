@@ -411,7 +411,7 @@ class Mcmc(object):
         self.sample_pointer += 1
 
 def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
-        is_initial_sample=True):
+        is_initial_sample=True, is_print=True):
     """Do Gibbs sampling
 
     Given the mcmc of all components, do a Gibbs sampling. One sample is
@@ -434,13 +434,15 @@ def do_gibbs_sampling(mcmc_array, n_sample, rng, gibbs_weight,
     prob_sample = prob_sample / np.sum(prob_sample)
     #initial value is a sample
     if is_initial_sample:
-        print("Sample initial")
+        if is_print:
+            print("Sample initial")
         for mcmc in mcmc_array:
             mcmc.add_to_sample()
         n_sample -= 1
     #Gibbs sampling
     for i_step in range(n_sample):
-        print("Sample", i_step)
+        if is_print:
+            print("Sample", i_step)
         #random scan
         mcmc_index = rng.choice(len(mcmc_array), 1, p=prob_sample)
         for i_mcmc, mcmc in enumerate(mcmc_array):
