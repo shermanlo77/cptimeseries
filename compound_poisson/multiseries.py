@@ -7,6 +7,7 @@ from numpy import random
 
 from compound_poisson import forecast
 from compound_poisson import mcmc
+from compound_poisson import multiprocess
 from compound_poisson import time_series_mcmc
 
 class MultiSeries(object):
@@ -59,6 +60,7 @@ class MultiSeries(object):
 
                 #provide information to time_series
                 time_series.id = [lat_i, long_i]
+                time_series.time_array = self.time_array
                 time_series_array[lat_i].append(time_series)
 
         #set other member variables
@@ -108,10 +110,11 @@ class MultiSeries(object):
 
             message_array = []
             for time_series_i in self.generate_unmask_time_series():
-                message_array.append(ResumeFittingMessage(time_series_i, n_sample))
-            time_series_array = self.pool.map(FitMessage.fit, message_array)
+                message_array.append(
+                    ResumeFittingMessage(time_series_i, n_sample))
+            time_series_array = self.pool.map(
+                ResumeFittingMessage.fit, message_array)
             self.replace_unmask_time_series(time_series_array)
-
 
             self.delete_old_memmap()
         self.del_memmap()
@@ -198,7 +201,6 @@ class MultiSeries(object):
                     plt.close()
 
             elif "TargetZ" in name:
-
                 chain_i = []
                 for i in position_index_array:
                     chain_i.append(
@@ -494,9 +496,9 @@ class FitMessage(object):
 class ResumeFittingMessage(object):
     def __init__(self, time_series, n_sample):
         self.time_series = time_series
-        self.n_sample
+        self.n_sample = n_sample
     def fit(self):
-        self.time_series.resume_fitting(n_sample)
+        self.time_series.resume_fitting(self.n_sample)
         return self.time_series
 
 class PlotMcmcMessage(object):
