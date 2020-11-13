@@ -37,7 +37,13 @@ class Fitter(fitter.Fitter):
 class FitterDownscale(Fitter):
 
     def __init__(self, directory=""):
+        super().__init__(compound_poisson.Downscale, directory)
+
+class FitterMultiSeries(Fitter):
+
+    def __init__(self, directory=""):
         super().__init__(compound_poisson.MultiSeries, directory)
+
 
 ################################################################################
 #                              DEPRECATED
