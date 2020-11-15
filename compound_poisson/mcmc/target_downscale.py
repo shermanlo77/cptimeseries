@@ -85,7 +85,21 @@ class TargetParameter(target.Target):
         ln_prior_term = []
         #retrive covariance information from parameter_gp_target
         gp_target = self.downscale.parameter_gp_target
+        log_precision_target = self.downscale.parameter_log_precision_target
         chol = gp_target.cov_chol
+
+        std_reg = np.exp(-0.5*log_precision_target.get_reg_state())
+        std_arma = np.exp(-0.5*log_precision_target.get_arma_state())
+
+        chol_reg = chol.copy()
+        chol_arma = chol.copy()
+        ln_det_cov_reg = 2*np.sum(np.log(np.diagonal(chol_reg)))
+        ln_det_cov_arma = 2*np.sum(np.log(np.diagonal(chol_arma)))
+
+        for i in range(len(chol)):
+            chol_reg[i] *= std_reg[i]
+            chol_arma[i] *= std_arma[i]
+
         #evaluate the Normal density for each parameter, each parameter has a
             #covariance matrix which represent the correlation in space. There
             #is no correlation between different parameters. In other words,
@@ -96,18 +110,21 @@ class TargetParameter(target.Target):
         for i in range(self.n_parameter):
             #z is the parameter - mean
             z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
+
+            chol_i = None
+            ln_det_cov_i = None
             if self.arma_index[i*self.area_unmask]:
-                precision = gp_target.state["precision_arma"]
+                chol_i = chol_arma
+                ln_det_cov_i = ln_det_cov_arma
             else:
-                precision = gp_target.state["precision_reg"]
-            z_i = linalg.solve_triangular(chol, z_i, lower=True)
+                chol_i = chol_reg
+                ln_det_cov_i = ln_det_cov_reg
             #reminder: det(cX) = c^d det(X)
             #reminder: det(L*L) = det(L) * det(L)
             #reminder: 1/sqrt(precision) = standard deviation or scale
-            ln_det_cov = (2*np.sum(np.log(np.diagonal(chol)))
-                - self.area_unmask * math.log(precision))
-            ln_prior_term.append(
-                -0.5 * (precision * np.dot(z_i, z_i) + ln_det_cov))
+            z_i = linalg.solve_triangular(chol_i, z_i, lower=True)
+            ln_prior_term.append(-0.5 * (np.dot(z_i, z_i) + ln_det_cov_i))
+
         return np.sum(ln_prior_term)
 
     #implemented
@@ -122,35 +139,137 @@ class TargetParameter(target.Target):
     def simulate_from_prior(self, rng):
         #required for study of prior distribution and elliptical slice sampling
         parameter_vector = self.prior_mean.copy()
-        gp_target = self.downscale.parameter_gp_target
-        chol = gp_target.cov_chol #cholesky of kernel matrix
+        log_precision_target = self.downscale.parameter_log_precision_target
+        #cholesky of kernel matrix
+        chol = self.downscale.parameter_gp_target.cov_chol
         #simulate each parameter, correlation only in space, not between
             #parameters
+        std_reg = np.exp(-0.5*log_precision_target.get_reg_state())
+        std_arma = np.exp(-0.5*log_precision_target.get_arma_state())
         for i in range(self.n_parameter):
-            parameter_i = np.asarray(rng.normal(size=self.area_unmask))
-            parameter_i = np.matmul(chol, parameter_i)
             if self.arma_index[i*self.area_unmask]:
-                precision = gp_target.state["precision_arma"]
+                std_array = std_arma
             else:
-                precision = gp_target.state["precision_reg"]
-            parameter_i *= 1/math.sqrt(precision)
-            parameter_vector[i*self.area_unmask : (i+1)*self.area_unmask] += (
+                std_array = std_reg
+            chol_i = chol.copy()
+            for i_row in range(len(chol_i)):
+                chol_i[i_row] *= std_array[i_row]
+
+            parameter_i = np.asarray(rng.normal(size=self.area_unmask))
+            parameter_i = np.matmul(chol_i, parameter_i)
+            parameter_vector[i*self.area_unmask:(i+1)*self.area_unmask] += (
                 parameter_i)
+
         return parameter_vector
 
     def get_prior_mean(self):
         #implemented
         return self.prior_mean
 
+class TargetLogPrecision(target.Target):
+    """Target implementation for the log precision for the parameters
+
+    Each location has 2 log precisions, one for regression and constant terms,
+        the other for ARMA.
+
+    Attributes:
+        downscale: pointer to parent downscale object
+        area_unmask: number of spatial points on land
+        prior: dictionary of distributions
+        state: numpy array of log precisions
+        state_before: deep copy of state after calling save_state()
+    """
+
+    def __init__(self, downscale):
+        self.downscale = downscale
+        self.area_unmask = self.downscale.area_unmask
+        self.prior = target.get_log_precision_prior()
+        self.state = None
+        self.state_before = None
+
+        self.state = []
+        for prior in self.prior.values():
+            for i_location in range(self.area_unmask):
+                self.state.append(prior.mean())
+        self.state = np.asarray(self.state)
+
+    #implemented
+    def get_n_dim(self):
+        return self.downscale.area_unmask * 2
+
+    #implemented
+    def get_state(self):
+        return self.state
+
+    def get_sub_state(self, prior_key):
+        """Extract the vector of log precisions for a parameter
+        """
+        for i, key in enumerate(self.prior):
+            if key == prior_key:
+                return self.state[i*self.area_unmask : (i+1)*self.area_unmask]
+
+    def get_reg_state(self):
+        """Return vector of log precisions for regression parameters
+        """
+        return self.get_sub_state("log_precision_reg")
+
+    def get_arma_state(self):
+        """Return vector of log precisions for ARMA parameters
+        """
+        return self.get_sub_state("log_precision_arma")
+
+    #implemented
+    def update_state(self, state):
+        self.state = state
+
+    #implemented
+    def get_log_likelihood(self):
+        return self.downscale.parameter_target.get_log_prior()
+
+    def get_log_prior(self):
+        ln_prior = []
+        for i_prior, prior in enumerate(self.prior.values()):
+            for i_location in range(self.area_unmask):
+                state_i = self.state[i_prior * self.area_unmask + i_location]
+                ln_prior.append(prior.logpdf(state_i))
+        return np.sum(ln_prior)
+
+    #implemented
+    def get_log_target(self):
+        return self.get_log_likelihood() + self.get_log_prior()
+
+    #implemented
+    def save_state(self):
+        self.state_before = self.state.copy()
+
+    #implemented
+    def revert_state(self):
+        self.state = self.state_before
+
+    #implemented
+    def simulate_from_prior(self, rng):
+        state = []
+        for prior in self.prior.values():
+            prior.random_state = rng
+            for i_location in range(self.area_unmask):
+                state.append(prior.rvs())
+        return np.asarray(state)
+
+    #implemented
+    def get_prior_mean(self):
+        state = []
+        for prior in self.prior.values():
+            for i_location in range(self.area_unmask):
+                state.append(prior.mean())
+        return np.asarray(state)
+
 class TargetGp(target.Target):
     """Contains density information for the GP precision parameters
 
     Attributes:
         downscale: pointer to parent Downscale object
-        prior: dictionary of scipy.stats objects to represent the prior
-            distributions
-        state: dictionary of the different precision parameters. The keys are:
-            "precision_arma", "precision_reg", "gp_precision"
+        prior: scipy.stats prior distributions
+        state: gp precision
         state_before: copy of state when doing mcmc (for reverting after
             rejection)
         cov_chol: kernel matrix, cholesky
@@ -165,33 +284,27 @@ class TargetGp(target.Target):
         self.downscale = downscale
         #keys for prior and state are in order:
             #precision_reg, precision_arma, gp_precision
-        self.prior = {}
-        self.state = {}
+        self.prior = target.get_gp_precision_prior()
+        self.state = self.prior.mean()
         self.state_before = None
         self.cov_chol = None
         self.cov_chol_before = None
         #square_error does not change so points to the copy owned by Downscale
         self.square_error = downscale.square_error
 
-        self.prior = target.get_precision_prior()
-        self.prior["gp_precision"] = target.get_gp_precision_prior()
-        #initalise using the mean of the prior distributions
-        for key, prior in self.prior.items():
-            self.state[key] = prior.mean()
+        self.state = self.prior.mean()
 
     #implemented
     def get_n_dim(self):
-        return len(self.state)
+        return 1
 
     #implemented
     def get_state(self):
-        return np.asarray(list(self.state.values()))
+        return np.asarray([self.state])
 
     #implemented
     def update_state(self, state):
-        #update state and the covariance matrix
-        for i, key in enumerate(self.prior):
-            self.state[key] = state[i]
+        self.state = state[0]
         self.save_cov_chol()
 
     #implemented
@@ -203,15 +316,12 @@ class TargetGp(target.Target):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
-        ln_prior = 0
-        for i, key in enumerate(self.prior):
-            ln_prior += self.prior[key].logpdf(self.state[key])
-        return ln_prior
+        return self.prior.logpdf(self.state)
 
     #implemented
     def save_state(self):
         #make a deep copy of the state and the covariance matrix
-        self.state_before = self.state.copy()
+        self.state_before = self.state
         self.cov_chol_before = self.cov_chol.copy()
 
     #implemented
@@ -221,17 +331,14 @@ class TargetGp(target.Target):
 
     #implemented
     def simulate_from_prior(self, rng):
-        prior_simulate = []
-        for prior in self.prior.values():
-            prior.random_state = rng
-            prior_simulate.append(prior.rvs())
-        return np.asarray(prior_simulate)
+        self.prior.random_state = rng
+        return np.asarray([self.prior.rvs()])
 
     def save_cov_chol(self):
         """Calculate and save the Cholesky decomposition of the kernel matrix
         """
         cov_chol = self.square_error.copy()
-        cov_chol *= -self.state["gp_precision"] / 2
+        cov_chol *= -self.state / 2
         cov_chol = np.exp(cov_chol)
         cov_chol = linalg.cholesky(cov_chol, True)
         self.cov_chol = cov_chol

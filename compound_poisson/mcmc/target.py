@@ -140,6 +140,21 @@ def get_precision_prior():
     }
     return prior
 
+def get_log_precision_prior():
+    """Return the default prior distribution for the log precision of the
+        compound-Poisson parameter (beta in the literature). ie precision has
+        log-Normal distribution
+
+    Return:
+        array containing 2 normal distributions, first one for the parameter,
+            second for ARMA terms.
+    """
+    prior = {
+        "log_precision_reg": stats.norm(loc=1.7, scale=0.36),
+        "log_precision_arma": stats.norm(loc=4.3, scale=0.55),
+    }
+    return prior
+
 def get_gp_precision_prior():
     return stats.gamma(a=0.72, loc=2.27, scale=8.1)
 

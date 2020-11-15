@@ -42,8 +42,10 @@ class Downscale(object):
         seed_seq: numpy.random.SeedSequence object
         rng: numpy.random.RandomState object
         parameter_target: TargetParameter object
+        parameter_log_precision_target:
         parameter_gp_target: TargetGp object
         parameter_mcmc: Mcmc object wrapping around parameter_target
+        parameter_log_precision_mcmc:
         parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
         z_mcmc: array of all ZMcmc objects (owned by each unmasked time series)
         n_sample: number of mcmc samples
@@ -80,12 +82,14 @@ class Downscale(object):
         self.seed_seq = None
         self.rng = None
         self.parameter_target = None
+        self.parameter_log_precision_target = None
         self.parameter_gp_target = None
         self.parameter_mcmc = None
+        self.parameter_log_precision_mcmc = None
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
         self.n_sample = 10000
-        self.gibbs_weight = [0.003*len(self), 1, 0.2]
+        self.gibbs_weight = [0.003*len(self), 1, 0.1, 0.1]
         self.burn_in = 0
         self.model_field_shift = []
         self.model_field_scale = []
@@ -163,6 +167,8 @@ class Downscale(object):
             self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
             self.n_total_parameter = self.area_unmask * self.n_parameter
             self.parameter_target = target_downscale.TargetParameter(self)
+            self.parameter_log_precision_target = (
+                target_downscale.TargetLogPrecision(self))
             self.parameter_gp_target = target_downscale.TargetGp(self)
 
     def get_time_series_class(self):
@@ -214,6 +220,9 @@ class Downscale(object):
         """
         self.parameter_mcmc = mcmc.Elliptical(
             self.parameter_target, self.rng, self.n_sample, self.memmap_dir)
+        self.parameter_log_precision_mcmc = mcmc.Elliptical(
+            self.parameter_log_precision_target, self.rng, self.n_sample,
+            self.memmap_dir)
         self.parameter_gp_mcmc = mcmc.Rwmh(
             self.parameter_gp_target, self.rng, self.n_sample, self.memmap_dir)
         #all time series objects instantiate mcmc objects to store the z chain
@@ -229,6 +238,7 @@ class Downscale(object):
         mcmc_array = [
             self.z_mcmc,
             self.parameter_mcmc,
+            self.parameter_log_precision_mcmc,
             self.parameter_gp_mcmc,
         ]
         return mcmc_array
@@ -396,14 +406,25 @@ class Downscale(object):
             plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
             plt.close()
 
-        chain = np.asarray(self.parameter_gp_mcmc[:])
-        for i, key in enumerate(self.parameter_gp_target.state):
-            chain_i = chain[:, i]
-            plt.plot(chain_i)
+        chain = np.asarray(self.parameter_log_precision_mcmc[:])
+        area_unmask = self.area_unmask
+        parameter_name = list(self.parameter_log_precision_target.prior.keys())
+        for i, parameter_name_i in enumerate(parameter_name):
+            chain_i = []
+            for position_index in position_index_array:
+                chain_i.append(chain[:, i*area_unmask + position_index])
+            plt.plot(np.asarray(chain_i).T)
             plt.xlabel("sample number")
-            plt.ylabel(key)
-            plt.savefig(path.join(directory, key + "_downscale.pdf"))
+            plt.ylabel(parameter_name_i)
+            plt.savefig(path.join(directory, parameter_name_i + ".pdf"))
             plt.close()
+
+        plt.figure()
+        plt.plot(self.parameter_gp_mcmc[:])
+        plt.xlabel("sample number")
+        plt.ylabel("gp_precision")
+        plt.savefig(path.join(directory, "gp_precision.pdf"))
+        plt.close()
 
         chain = []
         for i, time_series in enumerate(self.generate_unmask_time_series()):
@@ -418,8 +439,6 @@ class Downscale(object):
         plt.close()
 
         #plot each chain for each location
-        #note to developer: memory problem when parallelising
-            #only for Cardiff for now (19, 22)
         message_array = []
         for i_space, time_series in enumerate(
             self.generate_unmask_time_series()):
