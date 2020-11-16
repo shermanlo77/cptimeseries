@@ -292,7 +292,7 @@ class TargetGp(target.Target):
         #square_error does not change so points to the copy owned by Downscale
         self.square_error = downscale.square_error
 
-        self.state = self.prior.mean()
+        self.state = self.prior.median()
 
     #implemented
     def get_n_dim(self):

@@ -104,8 +104,10 @@ class Downscale(object):
             self.topography_normalise = data.topography_normalise
 
             #get the square error matrix used for GP
+            #only use longitude and latitude
             unmask = np.logical_not(self.mask).flatten()
-            for topo_i in self.topography_normalise.values():
+            for topo_i_key in ["longitude", "latitude"]:
+                topo_i = self.topography_normalise[topo_i_key]
                 topo_i = topo_i.flatten()
                 topo_i = topo_i[unmask]
                 for i in range(self.area_unmask):

@@ -38,7 +38,13 @@ class PriorSimulator(object):
                     gp_target.state[key] = gp_parameter[i]
             gp_target.save_cov_chol()
         else:
-            gp_target.set_from_prior(self.rng)
+            is_reject = True
+            while is_reject:
+                try:
+                    gp_target.set_from_prior(self.rng)
+                    is_reject = False
+                except(linalg.LinAlgError):
+                    print("Reject!")
         #cannot use downscale.parameter_target.set_from_prior as this would
             #require a cp parameter update for all time steps which can cause
             #numerical problems
@@ -128,7 +134,7 @@ class PriorGpSimulator(PriorSimulator):
         super().__init__(figure_directory, rng)
 
     def __call__(self):
-        precision_array = np.linspace(2.27, 20, 10)
+        precision_array = np.linspace(278, 1000, 10)
         for i, precision in enumerate(precision_array):
             figure_directory_i = os.path.join(self.figure_directory, str(i))
             self.print(figure_directory_i, precision)

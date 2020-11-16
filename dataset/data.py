@@ -78,6 +78,7 @@ class DataDualGrid(object):
         self.rain_units = None
         self.time_array = []
         self.topography = {}
+        self.topography_coarse = {}
         self.topography_normalise = {}
 
         if path_to_storage is None:
@@ -93,6 +94,12 @@ class DataDualGrid(object):
                 LONGITUDE_ARRAY, LATITUDE_ARRAY)
             self.topography["longitude"] = longitude_grid
             self.topography["latitude"] = latitude_grid
+
+            longitude_grid, latitude_grid = np.meshgrid(
+                LONGITUDE_COARSE_ARRAY, LATITUDE_COARSE_ARRAY)
+            self.topography_coarse["longitude"] = longitude_grid
+            self.topography_coarse["latitude"] = latitude_grid
+
             self.normalise_topography()
             self.load_data()
             print("Saving", storage_file)

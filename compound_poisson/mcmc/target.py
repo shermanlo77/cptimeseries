@@ -156,7 +156,7 @@ def get_log_precision_prior():
     return prior
 
 def get_gp_precision_prior():
-    return stats.gamma(a=0.72, loc=2.27, scale=8.1)
+    return stats.invgamma(a=1, scale=556)
 
 def get_arma_index(parameter_name_array):
     """Check which parameters are ARMA terms
