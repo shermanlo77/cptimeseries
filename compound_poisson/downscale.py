@@ -89,7 +89,7 @@ class Downscale(object):
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
         self.n_sample = 10000
-        self.gibbs_weight = [0.003*len(self), 1, 0.1, 0.1]
+        self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2]
         self.burn_in = 0
         self.model_field_shift = []
         self.model_field_scale = []
