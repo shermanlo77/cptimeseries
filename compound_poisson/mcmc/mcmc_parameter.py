@@ -170,7 +170,7 @@ class Elliptical(mcmc_abstract.Mcmc):
         target = self.target
         state_before = self.state.copy()
         #sample from the prior (with zero mean for now)
-        prior_sample = self.simulate_from_prior()
+        prior_sample = self.simulate_from_prior() - target.get_prior_mean()
         #sample the vertical line
         ln_y = self.get_log_likelihood() + math.log(self.rng.rand())
         #sample from where on the ellipse
