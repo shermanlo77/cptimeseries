@@ -44,6 +44,11 @@ class FitterMultiSeries(Fitter):
     def __init__(self, directory=""):
         super().__init__(compound_poisson.MultiSeries, directory)
 
+class FitterDownscaleDeepGp(Fitter):
+
+    def __init__(self, directory=""):
+        super().__init__(compound_poisson.DownscaleDeepGp, directory)
+
 
 ################################################################################
 #                              DEPRECATED

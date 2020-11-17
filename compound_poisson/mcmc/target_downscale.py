@@ -2,7 +2,10 @@
 
 Target
     <- TargetParameter
+    <- TargetLogPrecision
+        <- TargetLogPrecisionGp
     <- TargetGp
+        <- TargetDeepGp
 
 Downscale
     <>1..*- Target (one for each component to sample)
@@ -170,7 +173,7 @@ class TargetLogPrecision(target.Target):
     """Target implementation for the log precision for the parameters
 
     Each location has 2 log precisions, one for regression and constant terms,
-        the other for ARMA.
+        the other for ARMA. They have a iid prior.
 
     Attributes:
         downscale: pointer to parent downscale object
@@ -206,7 +209,9 @@ class TargetLogPrecision(target.Target):
         """
         for i, key in enumerate(self.prior):
             if key == prior_key:
-                return self.state[i*self.area_unmask : (i+1)*self.area_unmask]
+                state_i = self.state[
+                    i*self.area_unmask : (i+1)*self.area_unmask]
+                return state_i.copy()
 
     def get_reg_state(self):
         """Return vector of log precisions for regression parameters
@@ -220,7 +225,7 @@ class TargetLogPrecision(target.Target):
 
     #implemented
     def update_state(self, state):
-        self.state = state
+        self.state = state.copy()
 
     #implemented
     def get_log_likelihood(self):
@@ -262,6 +267,64 @@ class TargetLogPrecision(target.Target):
             for i_location in range(self.area_unmask):
                 state.append(prior.mean())
         return np.asarray(state)
+
+class TargetLogPrecisionGp(TargetLogPrecision):
+    """Target implementation for the log precision for the parameters. This
+        extension has a GP prior on the log precision for each location.
+
+    Each location has 2 log precisions, one for regression and constant terms,
+        the other for ARMA. They have a GP prior.
+
+    Attributes:
+        downscale: pointer to parent downscale object
+        area_unmask: number of spatial points on land
+        prior: dictionary of distributions
+        state: numpy array of log precisions
+        state_before: deep copy of state after calling save_state()
+    """
+
+    def __init__(self, downscale):
+        super().__init__(downscale)
+
+    #override
+    def get_log_prior(self):
+        ln_prior = []
+        cov_chol = self.downscale.parameter_log_precision_gp_target.cov_chol
+        for i_prior, prior in enumerate(self.prior.values()):
+
+            cov_chol_i = cov_chol.copy()
+            for i_row in range(len(cov_chol_i)):
+                cov_chol_i[i_row] *= prior.std()
+            ln_det_cov_i = 2*np.sum(np.log(np.diagonal(cov_chol_i)))
+
+            z_i = self.state[
+                i_prior*self.area_unmask : (i_prior+1)*self.area_unmask].copy()
+            z_i -= prior.mean()
+
+            #reminder: det(cX) = c^d det(X)
+            #reminder: det(L*L) = det(L) * det(L)
+            #reminder: 1/sqrt(precision) = standard deviation or scale
+            z_i = linalg.solve_triangular(cov_chol_i, z_i, lower=True)
+            ln_prior.append(-0.5 * (np.dot(z_i, z_i) + ln_det_cov_i))
+
+        return np.sum(ln_prior)
+
+    #override
+    def simulate_from_prior(self, rng):
+        state = self.get_prior_mean()
+        cov_chol = self.downscale.parameter_log_precision_gp_target.cov_chol
+        for i, prior in enumerate(self.prior.values()):
+            state_i = np.asarray(rng.normal(size=self.area_unmask))
+
+            cov_chol_i = cov_chol.copy()
+            for i_row in range(len(cov_chol_i)):
+                cov_chol_i[i_row] *= prior.std()
+
+            state_i = np.asarray(rng.normal(size=self.area_unmask))
+            parameter_i = np.matmul(cov_chol_i, state_i)
+
+            state[i*self.area_unmask:(i+1)*self.area_unmask] += parameter_i
+        return state
 
 class TargetGp(target.Target):
     """Contains density information for the GP precision parameters
@@ -342,3 +405,14 @@ class TargetGp(target.Target):
         cov_chol = np.exp(cov_chol)
         cov_chol = linalg.cholesky(cov_chol, True)
         self.cov_chol = cov_chol
+
+class TargetDeepGp(TargetGp):
+    """Target implementation of GP precision for the log precision prior
+    """
+
+    def __init__(self, downscale):
+        super().__init__(downscale)
+
+    #override
+    def get_log_likelihood(self):
+        return self.downscale.parameter_log_precision_target.get_log_prior()

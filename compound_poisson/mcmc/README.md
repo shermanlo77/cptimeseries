@@ -35,14 +35,17 @@ The base abstract class is `target.Target`. For `TimeSeries`, the implementation
 
 - `target.Target`
   - `target.downscale.TargetParameter`
+  - `target.downscale.TargetLogPrecision`
   - `target.downscale.TargetGp`
+  - `target.downscale.TargetDeepGp`
 
-For `Downscale`, the implementations are `target.downscale.TargetParameter` and `TargetGp`. They represent the posterior distribution (up to a constant) of the regression parameters beta, and hyper parameters tau (tuning or smoothing parameters in frequentist literature) respectively.
+For `Downscale`, the implementations are `target.downscale.TargetParameter`, `TargetLogPrecision` and `TargetGp`. They represent the posterior distribution (up to a constant) of the regression parameters beta, hyper parameters tau (tuning or smoothing parameters in frequentist literature) and the Gaussian process precision parameter respectively.
 
 Default priors and hyper parameters are in `target`. See functions:
   - `get_parameter_mean_prior()`
   - `get_parameter_std_prior()`
   - `get_precision_prior()`
+  - `get_log_precision_prior()`
   - `get_gp_precision_prior()`
 
 ## Class Structure

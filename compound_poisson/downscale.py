@@ -18,8 +18,9 @@ class Downscale(object):
     """Collection of multiple TimeSeries objects
 
     Fit a compound Poisson time series on multiple locations in 2d space.
-        Parameters have a Gaussian process (GP) prior with gamma hyper
-        parameters
+        Parameters have a Gaussian process (GP) prior, each location has a
+        log precision parameter with iid Normal prior. The GP precision
+        has an inverse Gamma prior.
 
     Attributes:
         n_arma: 2-tuple, containing number of AR and MA terms
@@ -42,10 +43,11 @@ class Downscale(object):
         seed_seq: numpy.random.SeedSequence object
         rng: numpy.random.RandomState object
         parameter_target: TargetParameter object
-        parameter_log_precision_target:
+        parameter_log_precision_target: TargetLogPrecisionGp object
         parameter_gp_target: TargetGp object
         parameter_mcmc: Mcmc object wrapping around parameter_target
-        parameter_log_precision_mcmc:
+        parameter_log_precision_mcmc: Mcmc object wrapping around
+            parameter_log_precision_target
         parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
         z_mcmc: array of all ZMcmc objects (owned by each unmasked time series)
         n_sample: number of mcmc samples
@@ -655,6 +657,57 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
             which should own instances of this class
         """
         pass
+
+class DownscaleDeepGp(Downscale):
+    """Extension of Downscale by putting a GP prior on the log precision
+        parameters. The GP precision has an inverse Gamma prior.
+
+    Attributes:
+        parameter_log_precision_target: TargetLogPrecisionGp object
+        parameter_log_precision_gp_target: TargetDeepGp object
+        parameter_log_precision_gp_mcmc: Mcmc object wrapping around
+            parameter_log_precision_gp_target
+    """
+
+    def __init__(self, data, n_arma=(0,0)):
+        self.parameter_log_precision_gp_target = None
+        self.parameter_log_precision_gp_mcmc = None
+        super().__init__(data, n_arma)
+        if not data.model_field is None:
+            self.parameter_log_precision_target = (
+                target_downscale.TargetLogPrecisionGp(self))
+            self.parameter_log_precision_gp_target = (
+                target_downscale.TargetDeepGp(self))
+        self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2, 0.2]
+
+    #override
+    def instantiate_mcmc(self):
+        super().instantiate_mcmc()
+        self.parameter_log_precision_gp_mcmc = mcmc.Rwmh(
+            self.parameter_log_precision_gp_target, self.rng, self.n_sample,
+            self.memmap_dir)
+        self.parameter_log_precision_gp_target.save_cov_chol()
+
+    #override
+    def get_mcmc_array(self):
+        mcmc_array = super().get_mcmc_array()
+        mcmc_array.append(self.parameter_log_precision_gp_mcmc)
+        return mcmc_array
+
+    #override
+    def print_mcmc(self, directory, pool):
+        super().print_mcmc(directory, pool)
+
+        self.read_memmap()
+
+        directory = path.join(directory, "chain")
+        plt.figure()
+        plt.plot(self.parameter_log_precision_gp_mcmc[:])
+        plt.xlabel("sample number")
+        plt.ylabel("log_precision_gp_precision")
+        plt.savefig(path.join(directory, "log_precision_gp_precision.pdf"))
+        plt.close()
+        self.del_memmap()
 
 class ForecastMessage(object):
     #message to pass, see Downscale.forecast
