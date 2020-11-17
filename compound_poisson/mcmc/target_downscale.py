@@ -96,12 +96,13 @@ class TargetParameter(target.Target):
 
         chol_reg = chol.copy()
         chol_arma = chol.copy()
-        ln_det_cov_reg = 2*np.sum(np.log(np.diagonal(chol_reg)))
-        ln_det_cov_arma = 2*np.sum(np.log(np.diagonal(chol_arma)))
 
         for i in range(len(chol)):
             chol_reg[i] *= std_reg[i]
             chol_arma[i] *= std_arma[i]
+
+        ln_det_cov_reg = 2*np.sum(np.log(np.diagonal(chol_reg)))
+        ln_det_cov_arma = 2*np.sum(np.log(np.diagonal(chol_arma)))
 
         #evaluate the Normal density for each parameter, each parameter has a
             #covariance matrix which represent the correlation in space. There
@@ -141,7 +142,7 @@ class TargetParameter(target.Target):
     #implemented
     def simulate_from_prior(self, rng):
         #required for study of prior distribution and elliptical slice sampling
-        parameter_vector = self.prior_mean.copy()
+        parameter_vector = self.get_prior_mean()
         log_precision_target = self.downscale.parameter_log_precision_target
         #cholesky of kernel matrix
         chol = self.downscale.parameter_gp_target.cov_chol
@@ -149,14 +150,19 @@ class TargetParameter(target.Target):
             #parameters
         std_reg = np.exp(-0.5*log_precision_target.get_reg_state())
         std_arma = np.exp(-0.5*log_precision_target.get_arma_state())
+
+        chol_reg = chol.copy()
+        chol_arma = chol.copy()
+
+        for i in range(len(chol)):
+            chol_reg[i] *= std_reg[i]
+            chol_arma[i] *= std_arma[i]
+
         for i in range(self.n_parameter):
             if self.arma_index[i*self.area_unmask]:
-                std_array = std_arma
+                chol_i = chol_arma
             else:
-                std_array = std_reg
-            chol_i = chol.copy()
-            for i_row in range(len(chol_i)):
-                chol_i[i_row] *= std_array[i_row]
+                chol_i = chol_reg
 
             parameter_i = np.asarray(rng.normal(size=self.area_unmask))
             parameter_i = np.matmul(chol_i, parameter_i)
@@ -167,7 +173,7 @@ class TargetParameter(target.Target):
 
     def get_prior_mean(self):
         #implemented
-        return self.prior_mean
+        return self.prior_mean.copy()
 
 class TargetLogPrecision(target.Target):
     """Target implementation for the log precision for the parameters
