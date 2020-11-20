@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
 
+import compound_poisson
 from compound_poisson import forecast
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
@@ -26,6 +27,8 @@ class MultiSeries(object):
         self.shape = self.mask.shape
         self.area = self.shape[0] * self.shape[1]
         self.area_unmask = np.sum(np.logical_not(self.mask))
+        self.seed_seq = None
+        self.rng = None
         self.n_sample = 10000
         self.burn_in = 0
         self.pool = None
@@ -43,31 +46,37 @@ class MultiSeries(object):
             time_series_array.append([])
             for long_i in range(self.shape[1]):
 
-                x_i, rain_i = data.get_data(lat_i, long_i)
-                is_mask = self.mask[lat_i, long_i]
-                if is_mask:
-                    #provide no rain if this space is masked
-                    time_series = TimeSeries(x_i,
-                                             poisson_rate_n_arma=n_arma,
-                                             gamma_mean_n_arma=n_arma)
+                if data.model_field is None:
+                    time_series = TimeSeries()
                 else:
-                    #provide rain
-                    time_series = TimeSeries(x_i, rain_i.data, n_arma, n_arma)
 
-                for i in range(time_series.n_parameter):
-                    self.parameter_mask_vector.append(is_mask)
-                self.n_parameter = time_series.n_parameter
+                    x_i, rain_i = data.get_data(lat_i, long_i)
+                    is_mask = self.mask[lat_i, long_i]
+                    if is_mask:
+                        #provide no rain if this space is masked
+                        time_series = TimeSeries(x_i,
+                                                 poisson_rate_n_arma=n_arma,
+                                                 gamma_mean_n_arma=n_arma)
+                    else:
+                        #provide rain
+                        time_series = TimeSeries(
+                            x_i, rain_i.data, n_arma, n_arma)
+
+                    for i in range(time_series.n_parameter):
+                        self.parameter_mask_vector.append(is_mask)
+                    self.n_parameter = time_series.n_parameter
 
                 #provide information to time_series
                 time_series.id = [lat_i, long_i]
                 time_series.time_array = self.time_array
                 time_series_array[lat_i].append(time_series)
 
-        #set other member variables
-        self.set_seed_seq(random.SeedSequence())
-        self.set_time_series_rng()
-        self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
-        self.n_total_parameter = self.area_unmask * self.n_parameter
+        if not data.model_field is None:
+            #set other member variables
+            self.set_seed_seq(random.SeedSequence())
+            self.set_time_series_rng()
+            self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
+            self.n_total_parameter = self.area_unmask * self.n_parameter
 
     def get_time_series_class(self):
         return TimeSeriesMultiSeries
@@ -81,6 +90,7 @@ class MultiSeries(object):
         if pool is None:
             pool = multiprocess.Serial()
         self.pool = pool
+        self.initalise_z()
         self.instantiate_mcmc()
         self.scatter_mcmc_sample()
 
@@ -94,6 +104,7 @@ class MultiSeries(object):
 
         self.pool = None
 
+    #override
     def resume_fitting(self, n_sample, pool=None):
         """Run more MCMC samples
 
@@ -124,9 +135,46 @@ class MultiSeries(object):
         """Instantiate MCMC objects
         """
         for time_series_i in self.generate_unmask_time_series():
-            time_series_i.initalise_z()
             time_series_i.instantiate_mcmc()
         self.mcmc = MultiMcmc(self)
+
+    def initalise_z(self):
+        """Initalise z for all time series
+        """
+        #all time series initalise z, needed so that the likelihood can be
+            #evaluated, eg y=0 if and only if x=0
+        method = time_series_mcmc.static_initalise_z
+        time_series_array = self.pool.map(
+            method, self.generate_unmask_time_series())
+        self.replace_unmask_time_series(time_series_array)
+
+    def simulate_i(self, i):
+        """Simulate a point in time for all time series
+        """
+        for time_series in self.generate_all_time_series():
+            time_series.simulate_i(i)
+
+    def simulate(self):
+        """Simulate the entire time series for all time series
+        """
+        for time_series in self.generate_all_time_series():
+            time_series.simulate()
+
+    def update_all_cp_parameters(self):
+        """Update all compound Poisson parameters in all time series
+        """
+        function = compound_poisson.time_series.static_update_all_cp_parameters
+        time_series_array = self.pool.map(
+            function, self.generate_unmask_time_series())
+        self.replace_unmask_time_series(time_series_array)
+
+    def get_log_likelihood(self):
+        """Return log likelihood
+        """
+        method = (compound_poisson.time_series.TimeSeries
+            .get_joint_log_likelihood)
+        ln_l_array = self.pool.map(method, self.generate_unmask_time_series())
+        return np.sum(ln_l_array)
 
     def forecast(self, data, n_simulation, pool=None):
         """Do forecast
@@ -299,6 +347,20 @@ class MultiSeries(object):
 
     def delete_old_memmap(self):
         self.mcmc.delete_old_memmap()
+
+    def discard_sample(self, n_keep):
+        """Discard initial mcmc samples to save hard disk space
+
+        For each mcmc, make a new memmap and store the last n_keep mcmc samples.
+            For saftey reasons, you will have to delete the old memmap file
+            yourself.
+
+        Args:
+            n_keep: number of mcmc samples to keep (from the end of the chain)
+        """
+        for mcmc in self.get_mcmc_array():
+            mcmc.discard_sample(n_keep)
+        self.n_sample = n_keep
 
     def set_seed_seq(self, seed_sequence):
         self.seed_seq = seed_sequence
@@ -505,6 +567,17 @@ class ResumeFittingMessage(object):
     def fit(self):
         self.time_series.resume_fitting(self.n_sample)
         return self.time_series
+
+class ForecastMessage(object):
+    #message to pass, see Downscale.forecast
+
+    def __init__(self, time_series, model_field, n_simulation):
+        self.time_series = time_series
+        self.model_field = model_field
+        self.n_simulation = n_simulation
+
+    def forecast(self):
+        return self.time_series.forecast(self.model_field, self.n_simulation)
 
 class PlotMcmcMessage(object):
 

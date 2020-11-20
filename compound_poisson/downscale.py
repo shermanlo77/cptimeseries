@@ -1,20 +1,18 @@
 import math
 import os
 from os import path
-import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy import random
 
-import compound_poisson
 from compound_poisson import forecast
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
+from compound_poisson import multiseries
 from compound_poisson import time_series_mcmc
 from compound_poisson.mcmc import target_downscale
 
-class Downscale(object):
+class Downscale(multiseries.MultiSeries):
     """Collection of multiple TimeSeries objects
 
     Fit a compound Poisson time series on multiple locations in 2d space.
@@ -63,26 +61,11 @@ class Downscale(object):
         memmap_dir: location to store mcmc samples and forecasts
     """
 
-    def __init__(self, data, n_arma=(0,0), is_test=False):
-        #is_test argument used by DownscaleForGp (see forecast/downscale.py)
+    def __init__(self, data, n_arma=(0,0)):
         #data is compatible with era5 as well by assuming data.model_field is
             #None
-        self.n_arma = n_arma
-        self.time_series_array = []
-        self.time_array = data.time_array
-        self.model_field_units = None
-        self.n_model_field = None
-        self.mask = data.mask
-        self.parameter_mask_vector = []
-        self.n_parameter = None
-        self.n_total_parameter = None
-        self.topography = data.topography
+        super().__init__(data, n_arma)
         self.topography_normalise = None
-        self.shape = self.mask.shape
-        self.area = self.shape[0] * self.shape[1]
-        self.area_unmask = np.sum(np.logical_not(self.mask))
-        self.seed_seq = None
-        self.rng = None
         self.parameter_target = None
         self.parameter_log_precision_target = None
         self.parameter_gp_target = None
@@ -92,13 +75,10 @@ class Downscale(object):
         self.z_mcmc = None
         self.n_sample = 10000
         self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2]
-        self.burn_in = 0
         self.model_field_shift = []
         self.model_field_scale = []
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
         self.pool = None
-        self.memmap_dir = ""
-        self.forecaster = None
 
         if not data.model_field is None:
             self.model_field_units = data.model_field_units
@@ -126,58 +106,24 @@ class Downscale(object):
             self.model_field_shift = np.asarray(self.model_field_shift)
             self.model_field_scale = np.asarray(self.model_field_scale)
 
-        #instantiate time series for every point in space
-        #unmasked points have rain, provide it to the constructor to
-            #TimeSeries
-        #masked points do not have rain, cannot provide it
-        time_series_array = self.time_series_array
-        TimeSeries = self.get_time_series_class()
-        for lat_i in range(self.shape[0]):
-            time_series_array.append([])
-            for long_i in range(self.shape[1]):
-
-                if data.model_field is None:
-                    time_series = TimeSeries()
-                else:
-
-                    x_i, rain_i = data.get_data(lat_i, long_i)
-                    is_mask = self.mask[lat_i, long_i]
-                    if is_mask or is_test:
-                        #provide no rain if this space is masked
-                        #or the data provided is the test set
-                        time_series = TimeSeries(x_i,
-                                                 poisson_rate_n_arma=n_arma,
-                                                 gamma_mean_n_arma=n_arma)
-                    else:
-                        #provide rain
-                        time_series = TimeSeries(
-                            x_i, rain_i.data, n_arma, n_arma)
-
-                    for i in range(time_series.n_parameter):
-                        self.parameter_mask_vector.append(is_mask)
-                    self.n_parameter = time_series.n_parameter
-                #provide information to time_series
-                time_series.id = [lat_i, long_i]
-                time_series.x_shift = self.model_field_shift
-                time_series.x_scale = self.model_field_scale
-                time_series.time_array = self.time_array
-                time_series.memmap_dir = self.memmap_dir
-                time_series_array[lat_i].append(time_series)
+        for time_series_array_i in self.time_series_array:
+            for time_series_i in time_series_array_i:
+                time_series_i.x_shift = self.model_field_shift
+                time_series_i.x_scale = self.model_field_scale
+                time_series_i.memmap_dir = self.memmap_dir
 
         if not data.model_field is None:
-            #set other member variables
-            self.set_seed_seq(random.SeedSequence())
-            self.set_time_series_rng()
-            self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
-            self.n_total_parameter = self.area_unmask * self.n_parameter
+            #set target
             self.parameter_target = target_downscale.TargetParameter(self)
             self.parameter_log_precision_target = (
                 target_downscale.TargetLogPrecision(self))
             self.parameter_gp_target = target_downscale.TargetGp(self)
 
+    #override
     def get_time_series_class(self):
         return TimeSeriesDownscale
 
+    #override
     def fit(self, pool=None):
         """Fit using Gibbs sampling
 
@@ -196,6 +142,7 @@ class Downscale(object):
         self.del_memmap()
         self.pool = None
 
+    #override
     def resume_fitting(self, n_sample, pool=None):
         """Run more MCMC samples
 
@@ -219,6 +166,7 @@ class Downscale(object):
         self.del_memmap()
         self.pool = None
 
+    #override
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
@@ -246,28 +194,6 @@ class Downscale(object):
             self.parameter_gp_mcmc,
         ]
         return mcmc_array
-
-    def initalise_z(self):
-        """Initalise z for all time series
-        """
-        #all time series initalise z, needed so that the likelihood can be
-            #evaluated, eg y=0 if and only if x=0
-        method = time_series_mcmc.static_initalise_z
-        time_series_array = self.pool.map(
-            method, self.generate_unmask_time_series())
-        self.replace_unmask_time_series(time_series_array)
-
-    def simulate_i(self, i):
-        """Simulate a point in time for all time series
-        """
-        for time_series in self.generate_all_time_series():
-            time_series.simulate_i(i)
-
-    def simulate(self):
-        """Simulate the entire time series for all time series
-        """
-        for time_series in self.generate_all_time_series():
-            time_series.simulate()
 
     def get_parameter_3d(self):
         """Return the parameters from all time series (3D)
@@ -338,50 +264,7 @@ class Downscale(object):
                 parameter_name_3d[np.logical_not(self.mask), i].flatten())
         return np.asarray(parameter_name_array).flatten()
 
-    def update_all_cp_parameters(self):
-        """Update all compound Poisson parameters in all time series
-        """
-        function = compound_poisson.time_series.static_update_all_cp_parameters
-        time_series_array = self.pool.map(
-            function, self.generate_unmask_time_series())
-        self.replace_unmask_time_series(time_series_array)
-
-    def get_log_likelihood(self):
-        """Return log likelihood
-        """
-        method = (compound_poisson.time_series.TimeSeries
-            .get_joint_log_likelihood)
-        ln_l_array = self.pool.map(method, self.generate_unmask_time_series())
-        return np.sum(ln_l_array)
-
-    def forecast(self, data, n_simulation, pool=None):
-        """Do forecast
-
-        Args:
-            data: test data
-            n_simulation: number of Monte Carlo simulations
-            pool: optional, a pool object to do parallel tasks
-
-        Return:
-            nested array of Forecast objects, shape corresponding to fine grid
-        """
-        if pool is None:
-            pool = multiprocess.Serial()
-        self.pool = pool
-        self.read_memmap()
-        self.scatter_mcmc_sample()
-
-        if self.forecaster is None:
-            self.forecaster = self.instantiate_forecaster()
-            self.forecaster.start_forecast(n_simulation, data)
-        else:
-            self.forecaster.resume_forecast(n_simulation)
-
-        self.del_memmap()
-
-    def instantiate_forecaster(self):
-        return forecast.downscale.Forecaster(self, self.memmap_dir)
-
+    #override
     def print_mcmc(self, directory, pool):
         """Print the mcmc chains
         """
@@ -446,57 +329,17 @@ class Downscale(object):
         message_array = []
         for i_space, time_series in enumerate(
             self.generate_unmask_time_series()):
-            message = PlotMcmcMessage(
+            message = multiseries.PlotMcmcMessage(
                 self, chain, time_series, i_space, location_directory)
             message_array.append(message)
-        pool.map(PlotMcmcMessage.print, message_array)
+        pool.map(multiseries.PlotMcmcMessage.print, message_array)
 
         self.del_memmap()
 
-    def get_random_position_index(self):
-        """Return array of random n_plot numbers, choose from
-            range(self.area_unmask) without replacement
-
-        Used to select random positions and plot their chains
-        """
-        n_plot = np.amin((6, self.area_unmask))
-        rng = random.RandomState(np.uint32(4020967302))
-        return np.sort(rng.choice(self.area_unmask, n_plot, replace=False))
-
-    def generate_all_time_series(self):
-        """Generate all time series in self.time_series_array
-        """
-        for time_series_i in self.time_series_array:
-            for time_series in time_series_i:
-                yield time_series
-
-    def generate_unmask_time_series(self):
-        """Generate all unmasked (on land) time series
-        """
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    yield self.time_series_array[lat_i][long_i]
-
-    def replace_single_time_series(self, time_series):
-        """Replace a single time series in time_series_array, locataion is
-            identified using time_series.id
-        """
-        lat_i = time_series.id[0]
-        long_i = time_series.id[1]
-        self.time_series_array[lat_i][long_i] = time_series
-
-    def replace_unmask_time_series(self, time_series):
-        """Replace all unmaksed time series with provided time series array
-
-        Needed as parallel methods will do a deep copy of time_series objects
-        """
-        i = 0
-        for lat_i in range(self.shape[0]):
-            for long_i in range(self.shape[1]):
-                if not self.mask[lat_i, long_i]:
-                    self.time_series_array[lat_i][long_i] = time_series[i]
-                    i += 1
+    #override
+    def scatter_mcmc_sample(self):
+        self.scatter_z_mcmc_sample()
+        self.scatter_parameter_mcmc_sample()
 
     def scatter_z_mcmc_sample(self):
         z_mcmc = self.z_mcmc
@@ -518,25 +361,7 @@ class Downscale(object):
                                               slice_index)
             time_series.parameter_mcmc = parameter_mcmc_i
 
-    def scatter_mcmc_sample(self):
-        self.scatter_z_mcmc_sample()
-        self.scatter_parameter_mcmc_sample()
-
-    def set_burn_in(self, burn_in):
-        self.burn_in = burn_in
-        for time_series in self.generate_unmask_time_series():
-            time_series.burn_in = burn_in
-
-    def set_memmap_dir(self, memmap_dir):
-        """Set the location to save mcmc sample onto disk
-
-        Modifies all mcmc objects to save the mcmc sample onto a specified
-            location
-        """
-        self.memmap_dir = memmap_dir
-        for time_series in self.generate_all_time_series():
-            time_series.memmap_dir = memmap_dir
-
+    #override
     def read_memmap(self):
         """Set memmap objects to read from file
 
@@ -545,73 +370,15 @@ class Downscale(object):
         for mcmc in self.get_mcmc_array():
             mcmc.read_memmap()
 
+    #override
     def del_memmap(self):
         for mcmc in self.get_mcmc_array():
             mcmc.del_memmap()
 
+    #override
     def delete_old_memmap(self):
         for mcmc in self.get_mcmc_array():
             mcmc.delete_old_memmap()
-
-    def discard_sample(self, n_keep):
-        """Discard initial mcmc samples to save hard disk space
-
-        For each mcmc, make a new memmap and store the last n_keep mcmc samples.
-            For saftey reasons, you will have to delete the old memmap file
-            yourself.
-
-        Args:
-            n_keep: number of mcmc samples to keep (from the end of the chain)
-        """
-        for mcmc in self.get_mcmc_array():
-            mcmc.discard_sample(n_keep)
-        self.n_sample = n_keep
-
-    def set_seed_seq(self, seed_sequence):
-        self.seed_seq = seed_sequence
-        self.rng = self.spawn_rng()
-
-    def set_time_series_rng(self):
-        """Set rng for all time series
-        """
-        for time_series in self.generate_all_time_series():
-            time_series.set_rng(self.seed_seq)
-
-    def set_rng(self, seed_sequence):
-        """Set rng for all objects which uses rng
-
-        To be override by subclasses
-        """
-        self.set_seed_seq(seed_sequence)
-        self.set_time_series_rng()
-
-    def spawn_rng(self, n=1):
-        """Return array of substream rng
-
-        Return array of independent random number generators by spawning from
-            the seed sequence
-
-        Return:
-            array of numpy.random.RandomState objects if n > 1, or just a single
-                object if n == 1
-        """
-        seed_spawn = self.seed_seq.spawn(n)
-        rng_array = []
-        for s in seed_spawn:
-            rng_s = random.RandomState(random.MT19937(s))
-            rng_array.append(rng_s)
-        if len(rng_array) == 1:
-            rng_array = rng_array[0]
-        return rng_array
-
-    def __len__(self):
-        return len(self.time_array)
-
-    def __getstate__(self):
-        #required as multiprocessing cannot pickle multiprocessing.Pool
-        self_dict = self.__dict__.copy()
-        self_dict['pool'] = None
-        return self_dict
 
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
     """Modify TimeSeriesSlice to only sample z
@@ -708,25 +475,3 @@ class DownscaleDeepGp(Downscale):
         plt.savefig(path.join(directory, "log_precision_gp_precision.pdf"))
         plt.close()
         self.del_memmap()
-
-class ForecastMessage(object):
-    #message to pass, see Downscale.forecast
-
-    def __init__(self, time_series, model_field, n_simulation):
-        self.time_series = time_series
-        self.model_field = model_field
-        self.n_simulation = n_simulation
-
-    def forecast(self):
-        return self.time_series.forecast(self.model_field, self.n_simulation)
-
-class PlotMcmcMessage(object):
-
-    def __init__(self, downscale, chain, time_series, i_space, directory):
-        self.time_series = time_series
-        self.sub_directory = path.join(directory, str(time_series.id))
-        if not path.isdir(self.sub_directory):
-            os.mkdir(self.sub_directory)
-
-    def print(self):
-        self.time_series.print_mcmc(self.sub_directory)
