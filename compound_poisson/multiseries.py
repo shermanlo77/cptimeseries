@@ -14,11 +14,12 @@ from compound_poisson import time_series_mcmc
 class MultiSeries(object):
 
     def __init__(self, data, n_arma=(0,0)):
+        #note: data can have no model fields (eg ERA5)
         self.n_arma = n_arma
         self.time_series_array = []
         self.time_array = data.time_array
-        self.model_field_units = data.model_field_units
-        self.n_model_field = len(data.model_field)
+        self.model_field_units = None
+        self.n_model_field = None
         self.mask = data.mask
         self.parameter_mask_vector = []
         self.n_parameter = None
@@ -73,6 +74,8 @@ class MultiSeries(object):
 
         if not data.model_field is None:
             #set other member variables
+            self.model_field_units = data.model_field_units
+            self.n_model_field = len(data.model_field)
             self.set_seed_seq(random.SeedSequence())
             self.set_time_series_rng()
             self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
