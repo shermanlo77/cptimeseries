@@ -36,6 +36,8 @@ class MultiSeries(object):
         self.memmap_dir = ""
         self.forecaster = None
         self.mcmc = None
+        self.model_field_shift = []
+        self.model_field_scale = []
 
         #instantiate time series for every point in space
         #unmasked points have rain, provide it to the constructor to
@@ -80,6 +82,19 @@ class MultiSeries(object):
             self.set_time_series_rng()
             self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
             self.n_total_parameter = self.area_unmask * self.n_parameter
+
+            #get normalising info for model fields using mean and standard
+                #deviation over all space and time
+            for model_field in data.model_field.values():
+                self.model_field_shift.append(np.mean(model_field))
+                self.model_field_scale.append(np.std(model_field, ddof=1))
+            self.model_field_shift = np.asarray(self.model_field_shift)
+            self.model_field_scale = np.asarray(self.model_field_scale)
+
+            for time_series_array_i in self.time_series_array:
+                for time_series_i in time_series_array_i:
+                    time_series_i.x_shift = self.model_field_shift
+                    time_series_i.x_scale = self.model_field_scale
 
     def get_time_series_class(self):
         return TimeSeriesMultiSeries

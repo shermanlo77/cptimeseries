@@ -75,14 +75,10 @@ class Downscale(multiseries.MultiSeries):
         self.z_mcmc = None
         self.n_sample = 10000
         self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2]
-        self.model_field_shift = []
-        self.model_field_scale = []
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
         self.pool = None
 
         if not data.model_field is None:
-            self.model_field_units = data.model_field_units
-            self.n_model_field = len(data.model_field)
             self.topography_normalise = data.topography_normalise
 
             #get the square error matrix used for GP
@@ -98,26 +94,15 @@ class Downscale(multiseries.MultiSeries):
                             topo_i[i] - topo_i[j], 2)
                         self.square_error[j,i] = self.square_error[i,j]
 
-            #get normalising info for model fields using mean and standard
-                #deviation over all space and time
-            for model_field in data.model_field.values():
-                self.model_field_shift.append(np.mean(model_field))
-                self.model_field_scale.append(np.std(model_field, ddof=1))
-            self.model_field_shift = np.asarray(self.model_field_shift)
-            self.model_field_scale = np.asarray(self.model_field_scale)
-
-        for time_series_array_i in self.time_series_array:
-            for time_series_i in time_series_array_i:
-                time_series_i.x_shift = self.model_field_shift
-                time_series_i.x_scale = self.model_field_scale
-                time_series_i.memmap_dir = self.memmap_dir
-
         if not data.model_field is None:
             #set target
             self.parameter_target = target_downscale.TargetParameter(self)
             self.parameter_log_precision_target = (
                 target_downscale.TargetLogPrecision(self))
             self.parameter_gp_target = target_downscale.TargetGp(self)
+
+        for time_series_i in self.generate_unmask_time_series():
+            time_series_i.memmap_dir = self.memmap_dir
 
     #override
     def get_time_series_class(self):
