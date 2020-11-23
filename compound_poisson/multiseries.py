@@ -179,7 +179,79 @@ class MultiSeries(object):
         ln_l_array = self.pool.map(method, self.generate_unmask_time_series())
         return np.sum(ln_l_array)
 
-    def forecast(self, data, n_simulation, pool=None):
+    def get_parameter_3d(self):
+        """Return the parameters from all time series (3D)
+
+        Return a 3D array of all the parameters in all unmasked time series
+            dim 0: for each latitude
+            dim 1: for each longitude
+            dim 2: for each parameter
+        """
+        parameter = []
+        for time_series_lat in self.time_series_array:
+            parameter.append([])
+            for time_series_i in time_series_lat:
+                parameter[-1].append(time_series_i.get_parameter_vector())
+        parameter = np.asarray(parameter)
+        return parameter
+
+    def get_parameter_vector(self):
+        """Return the parameters from all time series (vector)
+
+        Return a vector of all the parameters in all unmasked time series. The
+            vector is arrange in a format suitable for block diagonal Gaussian
+            process
+        """
+        parameter_3d = self.get_parameter_3d()
+        parameter_vector = []
+        for i in range(self.n_parameter):
+            parameter_vector.append(
+                parameter_3d[np.logical_not(self.mask), i].flatten())
+        return np.asarray(parameter_vector).flatten()
+
+    def set_parameter_vector(self, parameter_vector):
+        """Set the parameter for each time series
+
+        Args:
+            parameter_vector: vector of length area_unmask * n_parameter. See
+                get_parameter_vector for the format of parameter_vector
+        """
+        parameter_3d = np.empty(
+            (self.shape[0], self.shape[1], self.n_parameter))
+        for i in range(self.n_parameter):
+            parameter_i = parameter_vector[
+                i*self.area_unmask : (i+1)*self.area_unmask]
+            parameter_3d[np.logical_not(self.mask), i] = parameter_i
+        for lat_i in range(self.shape[0]):
+            for long_i in range(self.shape[1]):
+                if not self.mask[lat_i, long_i]:
+                    parameter_i = parameter_3d[lat_i, long_i, :]
+                    self.time_series_array[lat_i][long_i].set_parameter_vector(
+                        parameter_i)
+
+    def get_parameter_vector_name_3d(self):
+        """Get name of all parameters (3D)
+        """
+        parameter_name = []
+        for time_series_lat in self.time_series_array:
+            parameter_name.append([])
+            for time_series_i in time_series_lat:
+                parameter_name[-1].append(
+                    time_series_i.get_parameter_vector_name())
+        parameter_name = np.asarray(parameter_name)
+        return parameter_name
+
+    def get_parameter_vector_name(self):
+        """Get name of all parameters (vector)
+        """
+        parameter_name_3d = self.get_parameter_vector_name_3d()
+        parameter_name_array = []
+        for i in range(self.n_parameter):
+            parameter_name_array.append(
+                parameter_name_3d[np.logical_not(self.mask), i].flatten())
+        return np.asarray(parameter_name_array).flatten()
+
+    def forecast(self, data, n_simulation, pool=None, use_gp=False):
         """Do forecast
 
         Args:
@@ -197,15 +269,19 @@ class MultiSeries(object):
         self.scatter_mcmc_sample()
 
         if self.forecaster is None:
-            self.forecaster = self.instantiate_forecaster()
+            self.forecaster = self.instantiate_forecaster(use_gp)
             self.forecaster.start_forecast(n_simulation, data)
         else:
             self.forecaster.resume_forecast(n_simulation)
 
         self.del_memmap()
 
-    def instantiate_forecaster(self):
-        return forecast.downscale.Forecaster(self, self.memmap_dir)
+    def instantiate_forecaster(self, use_gp=False):
+        if use_gp:
+            forecaster = forecast.downscale.ForecasterGp(self, self.memmap_dir)
+        else:
+            forecaster = forecast.downscale.Forecaster(self, self.memmap_dir)
+        return forecaster
 
     def print_mcmc(self, directory, pool):
         """Print the mcmc chains

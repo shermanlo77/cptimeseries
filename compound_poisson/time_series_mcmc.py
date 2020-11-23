@@ -29,6 +29,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         burn_in: integer, which samples to discard when doing posterior sampling
             which is used for forecasting
         memmap_dir: directory to store the MCMC samples
+        set_from_mcmc: boolean, True if to automatically randomly set from
+            MCMC samples
     """
 
     def __init__(self,
@@ -50,6 +52,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.gibbs_weight = [0.003*len(self), 1]
         self.burn_in = 0
         self.memmap_dir = ""
+        self.set_from_mcmc = True
 
     def fit(self):
         """Fit using Gibbs sampling
@@ -144,7 +147,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     def instantiate_forecast_self(self):
         """Override - Set the parameter from the MCMC sample
         """
-        self.set_parameter_from_sample(self.self_forecaster_rng)
+        if self.set_from_mcmc:
+            self.set_parameter_from_sample(self.self_forecaster_rng)
         forecast = super().instantiate_forecast_self()
         return forecast
 
@@ -157,7 +161,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     def instantiate_forecast(self, x):
         """Override - Set the parameter from the MCMC sample
         """
-        self.set_parameter_from_sample(self.forecaster_rng)
+        if self.set_from_mcmc:
+            self.set_parameter_from_sample(self.forecaster_rng)
         forecast = super().instantiate_forecast(x)
         return forecast
 

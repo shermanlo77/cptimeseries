@@ -7,6 +7,7 @@ class Fitter(fitter.Fitter):
 
     def __init__(self, downscale_class, directory=""):
         super().__init__(downscale_class, directory)
+        self.use_gp = False
 
     def initial_fit(self, dataset, seed, n_sample=None, pool=None):
         #dataset is Data object (see dataset module)
@@ -26,7 +27,7 @@ class Fitter(fitter.Fitter):
 
     def do_forecast(self, downscale, dataset, n_simulation, pool):
         #dataset is Data object (see dataset module)
-        downscale.forecast(dataset, n_simulation, pool)
+        downscale.forecast(dataset, n_simulation, pool, self.use_gp)
 
     def print_forecast(self, downscale, dataset, pool):
         #dataset is Data object (see dataset module)

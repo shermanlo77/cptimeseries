@@ -15,11 +15,14 @@ compound_poisson.forecast.time_series.Forecaster
 because
 compound_poisson.downscale.TimeSeriesDownscale
     <>1- compound_poisson.forecast.downscale.TimeSeriesForecaster
+
+TODO: improve signature use of simulate_forecasts()
 """
 
 from os import path
 
 import numpy as np
+from sklearn import gaussian_process
 
 from compound_poisson.forecast import distribution_compare
 from compound_poisson.forecast import forecast_abstract
@@ -87,7 +90,6 @@ class Forecaster(forecast_abstract.Forecaster):
     #implemented
     def simulate_forecasts(self, index_range, is_print=True):
         area_unmask = self.downscale.area_unmask
-        n_total_parameter = self.downscale.n_total_parameter
 
         forecast_message = []
         for i_space, time_series in enumerate(
@@ -225,6 +227,70 @@ class Forecaster(forecast_abstract.Forecaster):
         comparer = distribution_compare.Downscale()
         comparer.compare(self, n_linspace)
         return comparer
+
+class ForecasterGp(Forecaster):
+    """
+    Do GP smoothing on the parameters before every forecast
+
+    Attributes:
+        gp_input: array of spatial points (latitude, longitude) of the
+            trained model
+    """
+
+    def __init__(self,
+                 downscale,
+                 memmap_dir):
+        super().__init__(downscale, memmap_dir)
+        self.gp_input = []
+
+        #get the input variables of the GP (latitude, longitude) from the
+            #training
+        latitude_array = downscale.topography["latitude"][:,0]
+        longitude_array = downscale.topography["longitude"][0]
+        for time_series_i in downscale.generate_unmask_time_series():
+            latitude_i = latitude_array[time_series_i.id[0]]
+            longitude_i = longitude_array[time_series_i.id[1]]
+            self.gp_input.append([latitude_i, longitude_i])
+            time_series_i.set_from_mcmc = False
+
+    #override
+    def simulate_forecasts(self, index_range):
+        #loop: get mcmc sample, forecast, ..etc
+        #the forecast is done in parallel
+        area_unmask = self.downscale.area_unmask
+        for i_forecast in index_range:
+
+            #all time series set mcmc sample
+            mcmc_index = self.downscale.rng.randint(
+                self.downscale.burn_in, self.downscale.n_sample)
+            for time_series_i in self.downscale.generate_unmask_time_series():
+                time_series_i.read_memmap()
+                time_series_i.set_parameter_from_sample_i(mcmc_index)
+                time_series_i.del_memmap()
+
+            #get the parameter and smooth it using GP
+            parameter_vector = self.downscale.get_parameter_vector()
+            for i_parameter in range(self.downscale.n_parameter):
+                slice_index = slice(
+                    i_parameter*area_unmask, (i_parameter+1)*area_unmask)
+                parameter_i = parameter_vector[slice_index]
+                gp = gaussian_process.GaussianProcessRegressor()
+                gp.fit(self.gp_input, parameter_i)
+                parameter_i = gp.sample_y(
+                    self.gp_input, random_state=self.downscale.rng)
+                parameter_vector[slice_index] = parameter_i.flatten()
+
+            #set the smoothed parameter
+            self.downscale.set_parameter_vector(parameter_vector)
+            self.downscale.update_all_cp_parameters()
+
+            #do one sample
+                #hack: set the member variable n_simulation to do only one
+                    #forecast
+            self.n_simulation = i_forecast + 1
+            super().simulate_forecasts([i_forecast], False)
+
+            print("Predictive sample", i_forecast)
 
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
