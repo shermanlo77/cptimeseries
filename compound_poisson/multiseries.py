@@ -12,6 +12,39 @@ from compound_poisson import multiprocess
 from compound_poisson import time_series_mcmc
 
 class MultiSeries(object):
+    """Collection of multiple TimeSeries objects
+
+    Fit a compound Poisson time series on multiple locations in 2d space.
+        Fitting is all done in parallel.
+
+    Attributes:
+        n_arma: 2-tuple, containing number of AR and MA terms
+        time_series_array: 2d array containing TimeSeries objects, correspond to
+            the fine grid
+        time_array: array containing time stamp for each time step
+        model_field_units: dictionary containing units for each model field,
+            keys are strings describing the model field
+        n_model_field: number of model fields
+        mask: 2d boolean, True if on water, therefore masked
+        parameter_mask_vector: mask as a vector
+        n_parameter: number of parameters for one location
+        n_total_parameter: n_parameter times number of unmasked time series
+        topography: dictonary of topography information
+        shape: 2-tuple, shape of the space
+        area: area of the space
+        area_unmask: area of the unmasked space (number of points on fine grid)
+        seed_seq: numpy.random.SeedSequence object
+        rng: numpy.random.RandomState object
+        n_sample: number of mcmc samples
+        burn_in: number of initial mcmc samples to discard when forecasting
+        model_field_shift: mean of model field, vector, entry for each model
+            field
+        model_field_scale: std of model field, vector, entry of reach model
+            field
+        pool: object for parallel programming
+        memmap_dir: location to store mcmc samples and forecasts
+        mcmc: MultiMcmc object, containing each locations' Mcmc
+    """
 
     def __init__(self, data, n_arma=(0,0)):
         #note: data can have no model fields (eg ERA5)

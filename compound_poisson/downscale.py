@@ -21,25 +21,8 @@ class Downscale(multiseries.MultiSeries):
         has an inverse Gamma prior.
 
     Attributes:
-        n_arma: 2-tuple, containing number of AR and MA terms
-        time_series_array: 2d array containing TimeSeries objects, correspond to
-            the fine grid
-        time_array: array containing time stamp for each time step
-        model_field_units: dictionary containing units for each model field,
-            keys are strings describing the model field
-        n_model_field: number of model fields
-        mask: 2d boolean, True if on water, therefore masked
-        parameter_mask_vector: mask as a vector
-        n_parameter: number of parameters for one location
-        n_total_parameter: n_parameter times number of unmasked time series
-        topography: dictonary of topography information
         topography_normalise: dictonary of topography information normalised,
             mean 0, std 1
-        shape: 2-tuple, shape of the space
-        area: area of the space
-        area_unmask: area of the unmasked space (number of points on fine grid)
-        seed_seq: numpy.random.SeedSequence object
-        rng: numpy.random.RandomState object
         parameter_target: TargetParameter object
         parameter_log_precision_target: TargetLogPrecisionGp object
         parameter_gp_target: TargetGp object
@@ -47,18 +30,10 @@ class Downscale(multiseries.MultiSeries):
         parameter_log_precision_mcmc: Mcmc object wrapping around
             parameter_log_precision_target
         parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
-        z_mcmc: array of all ZMcmc objects (owned by each unmasked time series)
-        n_sample: number of mcmc samples
+        z_mcmc: ZMcmcArray object
         gibbs_weight: probability of sampling each mcmc in self.get_mcmc_array()
-        burn_in: number of initial mcmc samples to discard when forecasting
-        model_field_shift: mean of model field, vector, entry for each model
-            field
-        model_field_scale: std of model field, vector, entry of reach model
-            field
         square_error: matrix (area_unmask x area_unmask) containing square error
             of topography between each point in space
-        pool: object for parallel programming
-        memmap_dir: location to store mcmc samples and forecasts
     """
 
     def __init__(self, data, n_arma=(0,0)):
@@ -73,10 +48,8 @@ class Downscale(multiseries.MultiSeries):
         self.parameter_log_precision_mcmc = None
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
-        self.n_sample = 10000
         self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2]
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
-        self.pool = None
 
         if not data.model_field is None:
             self.topography_normalise = data.topography_normalise
