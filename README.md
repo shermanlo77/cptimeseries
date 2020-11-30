@@ -21,11 +21,13 @@ Keywords: *Compound Poisson, MCMC sampling, downscale, time series, Gaussian pro
 * `pupygrib`
 * `cartopy`
     * [Installation instructions](https://scitools.org.uk/cartopy/docs/latest/installing.html)
+    * [Possible help when installing](https://stackoverflow.com/questions/1099981/why-cant-python-find-shared-objects-that-are-in-directories-in-sys-path)
 * `netCDF4`
     * [Installation instructions](https://unidata.github.io/netcdf4-python/netCDF4/index.html)
 * `cftime`
     * Must be *version 1.0.4.2* because future releases change the use of num2date, see the [change log](https://github.com/Unidata/cftime/blob/master/Changelog) for further details.
 * `gdal`
+    * [Installation instructions](https://mothergeo-py.readthedocs.io/en/latest/development/how-to/gdal-ubuntu-pkg.html)
     * [Possible help when installing](https://gis.stackexchange.com/questions/28966/python-gdal-package-missing-header-file-when-installing-via-pip)
 * `mpi4py`
     * Requires [MPICH](https://www.mpich.org/)
