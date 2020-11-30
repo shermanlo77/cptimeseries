@@ -112,7 +112,7 @@ def plot_rain(data, figure_dir, pool):
     plt.close()
 
     #plot the rainfall as a time series for each city
-    for city in dataset.CITY_LOCATION:
+    for city in data.generate_city():
 
         #get the time series for this city
         rainfall_series = data.get_rain_city(city)
@@ -179,7 +179,7 @@ def plot_rain(data, figure_dir, pool):
 
     #plot the rain (spatial map for each time step)
     message_array = []
-    for i in range(365):
+    for i in range(len(data)):
         rain_plot = data.rain[i].copy()
         rain_plot.mask[rain_plot == 0] = True
         figure_title = ("precipitation (" + data.rain_units + ") : "
@@ -209,12 +209,15 @@ class HeatmapPlotMessage(object):
         ax = plt.axes(projection=crs.PlateCarree())
         im = ax.pcolor(self.longitude_grid,
                        self.latitude_grid,
-                       self.value)
+                       self.value,
+                       vmin=0,
+                       vmax=15,
+                       cmap='Greys')
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
         plt.title(self.title)
-        plt.savefig(self.path_to_figure)
+        plt.savefig(self.path_to_figure, bbox_inches="tight")
         plt.close()
 
 
@@ -319,7 +322,7 @@ def plot_model_fields(data, figure_dir, pool):
             pool.map(HeatmapPlotMessage.print, message_array)
 
     #for each city time series
-    for city in dataset.CITY_LOCATION:
+    for city in data.generate_city():
 
         #get the time series
         model_field_time_series = data.get_model_field_city(city)
@@ -391,7 +394,7 @@ def plot_matrix(data, figure_dir):
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
     #for each city, do matrix plot of all the variables
-    for city in dataset.CITY_LOCATION:
+    for city in data.generate_city():
 
         data_frame = {}
         data_frame["rain"] = np.asarray(data.get_rain_city(city))

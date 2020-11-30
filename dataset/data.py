@@ -548,6 +548,19 @@ class DataDualGrid(object):
         self.time_array = self.time_array[array_index]
         self.time_array = self.time_array.tolist()
 
+    def generate_city(self):
+        latitude_min = self.topography["latitude"].min()
+        latitude_max = self.topography["latitude"].max()
+        longitude_min = self.topography["longitude"].min()
+        longitude_max = self.topography["longitude"].max()
+
+        for city, coordinates in CITY_LOCATION.items():
+            if ((coordinates[0] <= latitude_max)
+                and (latitude_min <= coordinates[0])):
+                if ((coordinates[1] <= longitude_min)
+                    and (longitude_max <= coordinates[1])):
+                    yield city
+
     def generate_unmask_rain(self):
         for lat_i, long_i in self.generate_unmask_coordinates():
             yield self.rain[:, lat_i, long_i]
