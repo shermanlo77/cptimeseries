@@ -394,9 +394,13 @@ class TimeSeries(Printer):
             if forecast_sliced.forecast_sigma:
                 forecast_lower_error = forecast_sliced.forecast_sigma[-1]
                 forecast_upper_error = forecast_sliced.forecast_sigma[1]
+                forecast_lower_error_2 = forecast_sliced.forecast_sigma[-2]
+                forecast_upper_error_2 = forecast_sliced.forecast_sigma[2]
             else:
                 forecast_lower_error = forecast_median_i
                 forecast_upper_error = forecast_median_i
+                forecast_lower_error_2 = forecast_median_i
+                forecast_upper_error_2 = forecast_median_i
             time_array_i = forecast_sliced.time_array
 
             #plot forecast and observation time series
@@ -436,6 +440,31 @@ class TimeSeries(Printer):
             plt.savefig(
                 path.join(self.directory,
                           self.prefix+"forecast_median_"+str(year)+".pdf"),
+                bbox_inches="tight")
+            plt.close()
+
+            #plot forecast using median instead
+            plt.figure()
+            ax = plt.gca()
+            ax.set_prop_cycle(monochrome)
+            plt.fill_between(time_array_i,
+                             forecast_lower_error_2,
+                             forecast_upper_error_2,
+                             color=[0.8, 0.8, 0.8])
+            plt.fill_between(time_array_i,
+                             forecast_lower_error,
+                             forecast_upper_error,
+                             color=[0.5, 0.5, 0.5])
+            plt.plot(
+                time_array_i, forecast_median_i, label="forecast", linewidth=1)
+            plt.plot(time_array_i, observed_rain_i, 'k+', label="observed")
+            plt.xticks(rotation=45)
+            plt.xlabel("time")
+            plt.ylabel("precipitation (mm)")
+            plt.legend()
+            plt.savefig(
+                path.join(self.directory,
+                          self.prefix+"forecast_only_"+str(year)+".pdf"),
                 bbox_inches="tight")
             plt.close()
 
@@ -683,7 +712,8 @@ class PrintForecastMapMessage(object):
                        self.latitude_grid,
                        self.forecast_i,
                        vmin=0,
-                       vmax=15)
+                       vmax=15,
+                       cmap='Greys')
         ax.coastlines(resolution="50m")
         plt.colorbar(im)
         ax.set_aspect("auto", adjustable=None)
