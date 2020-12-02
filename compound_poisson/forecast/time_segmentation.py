@@ -119,6 +119,14 @@ class YearSegmentator(TimeSegmentator):
         year = datetime.date(year, 1, 1)
         return year
 
+class Q12Segmentator(TimeSegmentator):
+    def __init__(self, time_array):
+        super().__init__(time_array, 1, 1, 7, 1)
+
+class Q34Segmentator(TimeSegmentator):
+    def __init__(self, time_array):
+        super().__init__(time_array, 7, 1, 1, 1)
+
 class SpringSegmentator(TimeSegmentator):
     def __init__(self, time_array):
         super().__init__(time_array, 3, 1, 6, 1)

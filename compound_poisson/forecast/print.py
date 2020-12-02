@@ -376,127 +376,135 @@ class TimeSeries(Printer):
                                        linewidth=[1, 1],
                                        alpha=[1, 0.5])
 
-        year_segmentator = time_segmentation.YearSegmentator(
-            self.forecaster.time_array)
+        segmentator_array = []
+        segmentator_array.append(
+            time_segmentation.Q12Segmentator(self.forecaster.time_array))
+        segmentator_array.append(
+            time_segmentation.Q34Segmentator(self.forecaster.time_array))
 
-        #for each year
-        for date, index in year_segmentator:
-            year = date.year
+        for i_segmentator, segmentator in enumerate(segmentator_array):
 
-            #slice the current forecast and observation for this year
-            forecast_sliced = self.forecaster[index]
-            observed_rain_i = self.observed_rain[index]
+            for date, index in segmentator:
+                label = str(date.year)
+                if i_segmentator == 0:
+                    label += "Q12"
+                else:
+                    label += "Q34"
 
-            #get the forecasts
-                #era5 won't have a sigma, handle accordingly
-            forecast_i = forecast_sliced.forecast
-            forecast_median_i = forecast_sliced.forecast_median
-            if forecast_sliced.forecast_sigma:
-                forecast_lower_error = forecast_sliced.forecast_sigma[-1]
-                forecast_upper_error = forecast_sliced.forecast_sigma[1]
-                forecast_lower_error_2 = forecast_sliced.forecast_sigma[-2]
-                forecast_upper_error_2 = forecast_sliced.forecast_sigma[2]
-            else:
-                forecast_lower_error = forecast_median_i
-                forecast_upper_error = forecast_median_i
-                forecast_lower_error_2 = forecast_median_i
-                forecast_upper_error_2 = forecast_median_i
-            time_array_i = forecast_sliced.time_array
+                #slice the current forecast and observation for this year
+                forecast_sliced = self.forecaster[index]
+                observed_rain_i = self.observed_rain[index]
 
-            #plot forecast and observation time series
-            plt.figure()
-            ax = plt.gca()
-            ax.set_prop_cycle(cycle_forecast)
-            plt.fill_between(time_array_i,
-                             forecast_lower_error,
-                             forecast_upper_error,
-                             alpha=0.25)
-            plt.plot(time_array_i, forecast_i, label="forecast")
-            plt.plot(time_array_i, observed_rain_i, label="observed")
-            plt.xticks(rotation=45)
-            plt.xlabel("time")
-            plt.ylabel("precipitation (mm)")
-            plt.legend()
-            plt.savefig(
-                path.join(self.directory,
-                          self.prefix+"forecast_"+str(year)+".pdf"),
-                bbox_inches="tight")
-            plt.close()
+                #get the forecasts
+                    #era5 won't have a sigma, handle accordingly
+                forecast_i = forecast_sliced.forecast
+                forecast_median_i = forecast_sliced.forecast_median
+                if forecast_sliced.forecast_sigma:
+                    forecast_lower_error = forecast_sliced.forecast_sigma[-1]
+                    forecast_upper_error = forecast_sliced.forecast_sigma[1]
+                    forecast_lower_error_2 = forecast_sliced.forecast_sigma[-2]
+                    forecast_upper_error_2 = forecast_sliced.forecast_sigma[2]
+                else:
+                    forecast_lower_error = forecast_median_i
+                    forecast_upper_error = forecast_median_i
+                    forecast_lower_error_2 = forecast_median_i
+                    forecast_upper_error_2 = forecast_median_i
+                time_array_i = forecast_sliced.time_array
 
-            #plot forecast using median instead
-            plt.figure()
-            ax = plt.gca()
-            ax.set_prop_cycle(cycle_forecast)
-            plt.fill_between(time_array_i,
-                             forecast_lower_error,
-                             forecast_upper_error,
-                             alpha=0.25)
-            plt.plot(time_array_i, forecast_median_i, label="forecast")
-            plt.plot(time_array_i, observed_rain_i, label="observed")
-            plt.xticks(rotation=45)
-            plt.xlabel("time")
-            plt.ylabel("precipitation (mm)")
-            plt.legend()
-            plt.savefig(
-                path.join(self.directory,
-                          self.prefix+"forecast_median_"+str(year)+".pdf"),
-                bbox_inches="tight")
-            plt.close()
+                #plot forecast and observation time series
+                plt.figure()
+                ax = plt.gca()
+                ax.set_prop_cycle(cycle_forecast)
+                plt.fill_between(time_array_i,
+                                 forecast_lower_error,
+                                 forecast_upper_error,
+                                 alpha=0.25)
+                plt.plot(time_array_i, forecast_i, label="forecast")
+                plt.plot(time_array_i, observed_rain_i, label="observed")
+                plt.xticks(rotation=45)
+                plt.xlabel("time")
+                plt.ylabel("precipitation (mm)")
+                plt.legend()
+                plt.savefig(
+                    path.join(self.directory,
+                              self.prefix+"forecast_"+label+".pdf"),
+                    bbox_inches="tight")
+                plt.close()
 
-            #plot forecast using median instead
-            plt.figure()
-            ax = plt.gca()
-            ax.set_prop_cycle(monochrome)
-            plt.fill_between(time_array_i,
-                             forecast_lower_error_2,
-                             forecast_upper_error_2,
-                             color=[0.8, 0.8, 0.8])
-            plt.fill_between(time_array_i,
-                             forecast_lower_error,
-                             forecast_upper_error,
-                             color=[0.5, 0.5, 0.5])
-            plt.plot(
-                time_array_i, forecast_median_i, label="forecast", linewidth=1)
-            plt.plot(time_array_i, observed_rain_i, 'k+', label="observed")
-            plt.xticks(rotation=45)
-            plt.xlabel("time")
-            plt.ylabel("precipitation (mm)")
-            plt.legend()
-            plt.savefig(
-                path.join(self.directory,
-                          self.prefix+"forecast_only_"+str(year)+".pdf"),
-                bbox_inches="tight")
-            plt.close()
+                #plot forecast using median instead
+                plt.figure()
+                ax = plt.gca()
+                ax.set_prop_cycle(cycle_forecast)
+                plt.fill_between(time_array_i,
+                                 forecast_lower_error,
+                                 forecast_upper_error,
+                                 alpha=0.25)
+                plt.plot(time_array_i, forecast_median_i, label="forecast")
+                plt.plot(time_array_i, observed_rain_i, label="observed")
+                plt.xticks(rotation=45)
+                plt.xlabel("time")
+                plt.ylabel("precipitation (mm)")
+                plt.legend()
+                plt.savefig(
+                    path.join(self.directory,
+                              self.prefix+"forecast_median_"+label+".pdf"),
+                    bbox_inches="tight")
+                plt.close()
 
-            #plot residual
-            plt.figure()
-            ax = plt.gca()
-            ax.set_prop_cycle(monochrome)
-            plt.plot(time_array_i, forecast_median_i - observed_rain_i)
-            plt.xticks(rotation=45)
-            plt.xlabel("time")
-            plt.ylabel("residual (mm)")
-            plt.savefig(
-                path.join(self.directory,
-                          self.prefix+"residual_"+str(year)+".pdf"),
-                bbox_inches="tight")
-            plt.close()
-
-            #plot probability of more than rain precipitation
-            for rain in RAIN_THRESHOLD_ARRAY:
+                #plot forecast using median instead
                 plt.figure()
                 ax = plt.gca()
                 ax.set_prop_cycle(monochrome)
-                plt.plot(time_array_i, forecast_sliced.get_prob_rain(rain))
+                plt.fill_between(time_array_i,
+                                 forecast_lower_error_2,
+                                 forecast_upper_error_2,
+                                 color=[0.8, 0.8, 0.8])
+                plt.fill_between(time_array_i,
+                                 forecast_lower_error,
+                                 forecast_upper_error,
+                                 color=[0.5, 0.5, 0.5])
+                plt.plot(
+                    time_array_i, forecast_median_i, label="forecast", linewidth=1)
+                plt.plot(time_array_i, observed_rain_i, 'k+', label="observed")
                 plt.xticks(rotation=45)
                 plt.xlabel("time")
-                plt.ylabel("forecasted probability of > "+str(rain)+" mm")
+                plt.ylabel("precipitation (mm)")
+                plt.legend()
                 plt.savefig(
                     path.join(self.directory,
-                              self.prefix+"prob_"+str(rain)+"_"+str(year)
-                                +".pdf"),
+                              self.prefix+"forecast_only_"+label+".pdf"),
                     bbox_inches="tight")
                 plt.close()
+
+                #plot residual
+                plt.figure()
+                ax = plt.gca()
+                ax.set_prop_cycle(monochrome)
+                plt.plot(time_array_i, forecast_median_i - observed_rain_i)
+                plt.xticks(rotation=45)
+                plt.xlabel("time")
+                plt.ylabel("residual (mm)")
+                plt.savefig(
+                    path.join(self.directory,
+                              self.prefix+"residual_"+label+".pdf"),
+                    bbox_inches="tight")
+                plt.close()
+
+                #plot probability of more than rain precipitation
+                for rain in RAIN_THRESHOLD_ARRAY:
+                    plt.figure()
+                    ax = plt.gca()
+                    ax.set_prop_cycle(monochrome)
+                    plt.plot(time_array_i, forecast_sliced.get_prob_rain(rain))
+                    plt.xticks(rotation=45)
+                    plt.xlabel("time")
+                    plt.ylabel("forecasted probability of > "+str(rain)+" mm")
+                    plt.savefig(
+                        path.join(self.directory,
+                                  self.prefix+"prob_"+str(rain)+"_"+label
+                                    +".pdf"),
+                        bbox_inches="tight")
+                    plt.close()
 
     #implemented
     def get_roc_curve_array(self, rain_warning_array, index=None):
