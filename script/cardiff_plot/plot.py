@@ -56,10 +56,12 @@ def main():
     observed_rain = observed_data.rain
     time_array = observed_data.time_array
 
-    training_size_array = [1, 5]
+    training_size_array = [1, 5, 10, 20]
     script_dir_array = [
         "cardiff_1_20",
         "cardiff_5_20",
+        "cardiff_10_20",
+        "cardiff_20_20",
     ]
     for i, dir_i in enumerate(script_dir_array):
         script_dir_array[i] = path.join("..", dir_i)
@@ -150,6 +152,7 @@ def main():
         loss_segmentator_array.append(loss_segmentator_i)
 
     pandas.plotting.register_matplotlib_converters()
+    time_series_pointer = [0, 1, 4]
     for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
 
         #array of arrays, one for each time_series in time_series_array
@@ -157,8 +160,9 @@ def main():
         bias_loss_plot_array = []
         bias_median_loss_plot_array = []
 
-        for time_series_i, loss_segmentator_i in zip(
-            time_series_array, loss_segmentator_array):
+        for i_time_series in time_series_pointer:
+            time_series_i = time_series_array[i_time_series]
+            loss_segmentator_i = loss_segmentator_array[i_time_series]
             bias_loss_plot, bias_median_loss_plot = (
                 loss_segmentator_i.get_bias_plot(i_loss))
             bias_loss_plot_array.append(bias_loss_plot)
@@ -167,8 +171,10 @@ def main():
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome2)
-        for time_series_label, bias_plot_array in zip(time_series_name_array,
-            bias_loss_plot_array):
+
+        for i_time_series, bias_plot_array in zip(
+            time_series_pointer, bias_loss_plot_array):
+            time_series_label = time_series_name_array[i_time_series]
             plt.plot(loss_segmentator_i.time_array,
                      bias_plot_array,
                      label=time_series_label)
@@ -184,8 +190,9 @@ def main():
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome2)
-        for time_series_label, bias_plot_array in zip(time_series_name_array,
+        for i_time_series, bias_plot_array in zip(time_series_pointer,
             bias_median_loss_plot_array):
+            time_series_label = time_series_name_array[i_time_series]
             plt.plot(loss_segmentator_i.time_array,
                      bias_plot_array,
                      label=time_series_label)
