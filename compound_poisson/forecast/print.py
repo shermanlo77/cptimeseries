@@ -36,7 +36,7 @@ from compound_poisson.forecast import time_segmentation
 import dataset
 
 RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15] #rain to consider for yearly ROC
-RAIN_THRESHOLD_EXTREME_ARRAY = [5, 15, 25] #rain to consider for total ROC
+RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 15, 25] #rain to consider for total ROC
 LINESTYLE = ['-', '--', '-.', ':']
 
 def get_monochrome_cycler():
