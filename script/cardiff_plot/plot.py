@@ -213,40 +213,54 @@ def main():
         "autumn": time_segmentation.AutumnSegmentator(time_array),
         "winter": time_segmentation.WinterSegmentator(time_array),
     }
-    loss_name_array = []
-    float_format_array = [] #each column to have a certain decimial values
-    for Loss in loss_segmentation.LOSS_CLASSES:
-        #using training set size 5 years to get bootstrap variance, this is used
-            #to guide the number of decimial places to use
-        loss_name_array.append(Loss.get_short_bias_name())
-        n_decimial = number_of_decimial_places(
-            time_series_array[1], observed_rain, Loss, 100, rng)
-        float_format_array.append(("{:."+str(n_decimial)+"f}").format)
+    time_segmentator_names = list(time_segmentator_array.keys())
+
+    #array of loss_segmentator objects, for each time series
+        #dim 0: for each time series
+        #dim 1: for each time segmentator
+    loss_array = []
 
     #plot the table (for mean, the median bias)
-    for time_key, time_segmentator_k in time_segmentator_array.items():
-        #table of losses
-            #columns: for each loss
-            #rows: for each time series
-        loss_array = []
-        loss_median_array = []
-        for i, time_series_i in enumerate(time_series_array):
-            loss_array.append([])
-            loss_median_array.append([])
+    for i, time_series_i in enumerate(time_series_array):
+        loss_array.append([])
+        for time_segmentator_k in time_segmentator_array.values():
             forecaster_i = time_series_i.forecaster
             loss_i = loss_segmentation.TimeSeries(forecaster_i, observed_rain)
             loss_i.evaluate_loss(time_segmentator_k)
-            for loss_ij in loss_i.loss_all_array:
-                loss_array[i].append(loss_ij.get_bias_loss())
-                loss_median_array[i].append(loss_ij.get_bias_median_loss())
+            loss_array[i].append(loss_i)
+
+
+    for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
+
+        #using training set size 5 years to get bootstrap variance, this is used
+            #to guide the number of decimial places to use
+        n_decimial = 3
+        float_format = ("{:."+str(n_decimial)+"f}").format
+
+        #table of losses
+            #columns: for each time segmentator
+            #rows: for each time series
+        loss_mean_array = []
+        loss_median_array = []
+
+        #plot the table (for mean, the median bias)
+        for i_time_series, time_series_i in enumerate(time_series_array):
+            loss_mean_array.append([])
+            loss_median_array.append([])
+            for loss_segmentator_i in loss_array[i_time_series]:
+                loss = loss_segmentator_i.loss_all_array[i_loss]
+                loss_mean_array[i_time_series].append(loss.get_bias_loss())
+                loss_median_array[i_time_series].append(
+                    loss.get_bias_median_loss())
 
         for prefix, loss_table in zip(
-            ["mean", "median"], [loss_array, loss_median_array]):
+            ["mean", "median"], [loss_mean_array, loss_median_array]):
             data_frame = pd.DataFrame(
-                loss_table, time_series_name_array, loss_name_array)
-            path_to_table = path.join(directory, prefix+"_"+time_key+".txt")
+                loss_table, time_series_name_array, time_segmentator_names)
+            path_to_table = path.join(
+                directory, prefix+"_"+Loss.get_short_bias_name()+".txt")
             data_frame.to_latex(path_to_table,
-                                formatters=float_format_array)
+                                float_format=float_format)
 
     for i, time_series_i in enumerate(time_series_array):
         residual_plot = residual_analysis.ResidualLnqqPlotter()
