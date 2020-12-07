@@ -35,7 +35,7 @@ def main():
     longitude_grid = test_set.topography["longitude"] - angle_resolution / 2
     latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
 
-    dir = path.join("..", "wales")
+    dir = path.join("..", "wales_5_20")
     downscale = joblib.load(
         path.join(dir, "result", "MultiSeries.gz"))
 
