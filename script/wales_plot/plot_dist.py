@@ -38,7 +38,7 @@ def main():
 
     dir = path.join("..", "wales_5_20")
     downscale = joblib.load(
-        path.join(dir, "result", "Downscale.gz"))
+        path.join(dir, "result", "MultiSeries.gz"))
     downscale_name = "CP-MCMC (5)"
     era5_name = "IFS"
     observed_name = "observed"
