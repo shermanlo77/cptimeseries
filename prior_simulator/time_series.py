@@ -62,8 +62,7 @@ class PriorSimulator(object):
 
         for i_simulate in range(self.n_simulate):
             time_series = self.get_time_series(prior_std)
-            compound_poisson.print.time_series(
-                time_series, figure_directory, str(i_simulate) + "_")
+            time_series.print_figures(figure_directory, str(i_simulate) + "_")
             y = time_series.y_array
             acf = stattools.acf(y, nlags=self.n_lag, fft=True)
             try:
