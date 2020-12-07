@@ -463,8 +463,10 @@ class TimeSeries(Printer):
                                  forecast_lower_error,
                                  forecast_upper_error,
                                  color=[0.5, 0.5, 0.5])
-                plt.plot(
-                    time_array_i, forecast_median_i, label="forecast", linewidth=1)
+                plt.plot(time_array_i,
+                         forecast_median_i,
+                         label="forecast",
+                         linewidth=1)
                 plt.plot(time_array_i, observed_rain_i, 'k+', label="observed")
                 plt.xticks(rotation=45)
                 plt.xlabel("time")
@@ -661,7 +663,8 @@ class Downscale(Printer):
 
     #implemented
     def get_roc_curve_array(self, rain_warning_array, index=None):
-        return self.forecaster.get_roc_curve_array(rain_warning_array, index)
+        return self.forecaster.get_roc_curve_array(
+            rain_warning_array, index, self.pool)
 
     #implemented
     def get_distribution_comparer(self):
