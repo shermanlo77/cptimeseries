@@ -18,8 +18,9 @@ def main():
     downscale = compound_poisson.era5.Downscale(era5)
     downscale.fit(era5, observed_data)
 
-    compound_poisson.forecast.print.downscale(
-        downscale.forecaster, observed_data, directory, pool)
+    printer = compound_poisson.forecast.print.Downscale(
+        downscale.forecaster, directory, pool)
+    printer.print()
 
 if __name__ == "__main__":
     main()
