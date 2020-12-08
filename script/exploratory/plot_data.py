@@ -27,9 +27,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ma
 import pandas as pd
+import scipy.interpolate
 import scipy.stats
 from statsmodels.tsa import stattools
 
+import compound_poisson.forecast.print
 import dataset
 
 def plot_data(data):
@@ -176,6 +178,38 @@ def plot_rain(data, figure_dir, pool):
                                      figure_title,
                                      figure_path)
         message.print()
+
+    #plot cdf for all rain
+        #evaluate the cdf at RAIN_THRESHOLD_EXTREME_ARRAY using interpolation
+    rain_threshold_array = (
+        compound_poisson.forecast.print.RAIN_THRESHOLD_EXTREME_ARRAY)
+    rainfall_all = data.rain[np.logical_not(data.rain.mask)].flatten()
+    n = len(rainfall_all)
+    rain_sorted = np.sort(rainfall_all)
+    cdf = np.linspace(0, 1, n)
+    #interpolation does not support step function at 0 mm, will need to keep
+        #the cdf at 0 mm as a seperate case
+    cdf_0 = np.sum(rainfall_all == 0) / n
+    cdf_function = scipy.interpolate.interp1d(rain_sorted, cdf)
+    cdf_evaluated = cdf_function(rain_threshold_array)
+
+    plt.figure()
+    plt.plot(rain_sorted, cdf)
+    if np.any(rain_sorted == 0):
+        non_zero_index = np.nonzero(rain_sorted)[0][0] - 1
+        plt.scatter(0, cdf[non_zero_index])
+    for rain_threshold, cdf_threshold in zip(
+        rain_threshold_array, cdf_evaluated):
+        if rain_threshold == 0:
+            cdf_threshold = cdf_0
+        survival = 1 - cdf_threshold
+        plt.vlines(rain_threshold, 0, cdf_threshold, label=str(rain_threshold)+" mm < : " + str(survival*100) + "%")
+    plt.title("cdf precipitation")
+    plt.ylabel("precipitation (" + data.rain_units + ")")
+    plt.ylabel("cumulative density")
+    plt.legend()
+    plt.savefig(path.join(series_dir, "rainfall_cdf_all.pdf"))
+    plt.close()
 
     #plot the rain (spatial map for each time step)
     message_array = []
