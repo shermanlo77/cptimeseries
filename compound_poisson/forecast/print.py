@@ -27,6 +27,7 @@ import pandas.plotting
 from scipy import stats
 
 import compound_poisson
+from compound_poisson.forecast import bias_var_analysis
 from compound_poisson.forecast import coverage_analysis
 from compound_poisson.forecast import loss
 from compound_poisson.forecast import loss_segmentation
@@ -99,6 +100,12 @@ class Printer(object):
 
         #main forecasts plot
         self.print_forecast()
+
+        #####-----BIAS VARIANCE ANALYSIS-----######
+        bias_var_analyser = self.get_bias_var_analyser()
+        bias_var_analyser.analyse()
+        bias_var_analyser.plot(
+            path.join(self.directory, self.prefix + "bias_var.pdf"), monochrome)
 
         #####-----ROC ANALYSIS-----######
 
@@ -339,6 +346,13 @@ class Printer(object):
         """
         raise NotImplementedError
 
+    def get_bias_var_analyser(self):
+        """Return an instantiated
+            compound_poisson.forecast.bias_var_analysis.BiasVarAnalyser object.
+            Used to investigate the variance-bias relationship.
+        """
+        raise NotImplementedError
+
 class TimeSeries(Printer):
     """For plotting forecast figures for TimeSeries
 
@@ -544,6 +558,10 @@ class TimeSeries(Printer):
         coverage.add_data(self.forecaster, self.observed_rain)
         return coverage
 
+    #implemented
+    def get_bias_var_analyser(self):
+        return bias_var_analysis.TimeSeries(self.forecaster, self.observed_rain)
+
 class Downscale(Printer):
     """For plotting forecast figures for TimeSeries
 
@@ -696,6 +714,10 @@ class Downscale(Printer):
         coverage.credible_level_array = np.linspace(0.01, 0.99, 50)
         coverage.add_data(self.forecaster)
         return coverage
+
+    #implemented
+    def get_bias_var_analyser(self):
+        return bias_var_analysis.Downscale(self.forecaster)
 
 class PrintForecastMapMessage(object):
     """For printing forecast over space for a given time point (in parallel)
