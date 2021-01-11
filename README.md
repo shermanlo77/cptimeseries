@@ -34,6 +34,18 @@ Keywords: *Compound Poisson, MCMC sampling, downscale, time series, Gaussian pro
 * `abcpy`
     * Requires [MPICH](https://www.mpich.org/)
 
+## Download the Data
+The data is available on [FigShare](https://figshare.com/s/c881cb81eff6942a61ac). Please download and extract the files so that the directories are as follow:
+- `Data/ana/`
+- `Data/eobs/`
+- `Data/era5/`
+- `Data/topo/`
+
+## Summary of the Repository
+All code to read the data are stored in package `dataset`. All statistical code are in the package `compound_poisson`. Scripts to reproduce results or to play a the toy model are in the directory `script`. The packages `dataset` and `compound_poisson` will need to be `import`-ed in order to run scripts.
+
+Please see `README.md` files in the packages for further information.
+
 ## Single Location Scripts
 * `script/london`
     * Training set: 1980-1989 inclusive
@@ -44,10 +56,26 @@ Keywords: *Compound Poisson, MCMC sampling, downscale, time series, Gaussian pro
 * `script/cardiff_5_20`
     * Training set: 1995-1999 inclusive
     * Test set: 2000-2019 inclusive
+* `script/cardiff_10_20`
+    * Training set: 1990-1999 inclusive
+    * Test set: 2000-2019 inclusive
+* `script/cardiff_20_20`
+    * Training set: 1979-1999 inclusive
+    * Test set: 2000-2019 inclusive
 
-Run the script `hyper_slice.py` to run 10 000 MCMC samples. Afterwards, run `hyper_slice_forecast.py` to sample 1 000 forecast samples. Figures are plotted and saved in the `figure` directory.
+To reproduce the results, run the script `hyper_slice.py` followed by `hyper_slice_forecast.py`. Figures are plotted and saved in the `figure` directory.
 
-The options may be provided which may be useful for development or debugging purposes. The following examples are provided:
+Options are provided which may be useful for development, debugging or check-pointing purposes.
+
+- `python3 hyper_slice.py [--sample [nsample]]`
+    - `--sample nsample`: Run MCMC until `nsample` posterior samples are obtained.
+
+- `python3 hyper_slice_forecast.py [--sample [nsample]] [--burnin [burnin]] [--noprint]`
+    - `--sample nsample`: Run posterior predictions until `nsample` predictive samples are obtained.
+    - `--burnin burnin`: Set the burn-in to `burnin`. Otherwise, uses the default value.
+    - `--noprint`: Do not print figures.
+
+The following examples are provided:
 
 * `python3 hyper_slice.py`
     * Does the default number of MCMC samples
