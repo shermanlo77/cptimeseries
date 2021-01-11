@@ -3,15 +3,15 @@ import pathlib
 
 from dataset import data
 
-PATH_TO_MODEL_FIELD = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "Rain_Data_Mar20")
-MODEL_FIELD_FILE_0 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_new_0.grib")
-MODEL_FIELD_FILE_1 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_new_1.grib")
-MODEL_FIELD_FILE_2 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_new_2.grib")
-MODEL_FIELD_FILE_3 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_new_3.grib")
-MODEL_FIELD_FILE_4 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_new_4.grib")
-PATH_TO_RAIN = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "Rain_Data_Nov19")
+PATH_TO_MODEL_FIELD = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "ana")
+MODEL_FIELD_FILE_0 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_0.grib")
+MODEL_FIELD_FILE_1 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_1.grib")
+MODEL_FIELD_FILE_2 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_2.grib")
+MODEL_FIELD_FILE_3 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_3.grib")
+MODEL_FIELD_FILE_4 = path.join(PATH_TO_MODEL_FIELD, "ana_cpdn_4.grib")
+PATH_TO_RAIN = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "eobs")
 RAIN_FILE = path.join(PATH_TO_RAIN, "rr_ens_mean_0.1deg_reg_v20.0e_197901-201907_uk.nc")
-PATH_TO_TOPO = PATH_TO_RAIN
+PATH_TO_TOPO = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "topo")
 TOPO_FILE = path.join(PATH_TO_TOPO, "topo_0.1_degree.grib")
 
 class AnaDualTraining(data.DataDualGrid):

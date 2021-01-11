@@ -20,7 +20,7 @@ from dataset import wales
 #ERA5 will need to be cropped to fit with the rest of the data
 TRIM_INDEX = (slice(2, -2), slice(2, -2))
 
-PATH_TO_ERA5 = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "Rain_Data_tp")
+PATH_TO_ERA5 = path.join(pathlib.Path(__file__).parent.absolute(), "..", "Data", "era5")
 ERA5_1_FILE = path.join(PATH_TO_ERA5, "tp_sum_1.grib")
 ERA5_2_FILE = path.join(PATH_TO_ERA5, "tp_sum_2.grib")
 ERA5_3_FILE = path.join(PATH_TO_ERA5, "tp_sum_3.grib")
