@@ -152,12 +152,13 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         forecast = super().instantiate_forecast_self()
         return forecast
 
+    #override
     def forecast(self, x, n_simulation):
-        #override
         self.read_memmap()
         super().forecast(x, n_simulation)
         self.del_memmap()
 
+    #override
     def instantiate_forecast(self, x):
         """Override - Set the parameter from the MCMC sample
         """

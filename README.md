@@ -42,7 +42,7 @@ The data is available on [FigShare](https://figshare.com/s/c881cb81eff6942a61ac)
 - `Data/topo/`
 
 ## Summary of the Repository
-All code to read the data are stored in package `dataset`. All statistical code are in the package `compound_poisson`. Scripts to reproduce results or to play a the toy model are in the directory `script`. The packages `dataset` and `compound_poisson` will need to be `import`-ed in order to run scripts.
+All code which reads the data are stored in the package `dataset`. All statistical code are in the package `compound_poisson`. Scripts to reproduce results or to play with a toy model are in the directory `script`. The packages `dataset` and `compound_poisson` will need to be `import`-ed in order to run scripts.
 
 Please see `README.md` files in the packages for further information.
 
@@ -95,6 +95,15 @@ The following examples are provided:
     * Does 400 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
 
 Results are saved in the `result` directory. Delete it if you wish to restart the sampling process from the start.
+
+## Other Single Location Scripts
+* `script/cardiff_era/era5.py`
+    * IFS prediction on the test set: 2000-2019 inclusive
+* `script/cardiff_plot/plot.py`
+    * Training set: 1999
+    * Test set: 2000-2019 inclusive
+* `script/cardiff_plot/plot_dist.py`
+
 
 ## Multiple Locations Scripts
 * `script/isle_of_man`

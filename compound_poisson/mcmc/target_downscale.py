@@ -12,8 +12,8 @@ Downscale
 
 Target
     <>1- Downscale
-This allows the communication between Target distributions owned by
-    Downscale
+This allows the communication between Target distributions owned by MultiSeries
+    or Downscale
 
 Mcmc
     <>1- Target
@@ -179,13 +179,15 @@ class TargetLogPrecision(target.Target):
     """Target implementation for the log precision for the parameters
 
     Each location has 2 log precisions, one for regression and constant terms,
-        the other for ARMA. They have a iid prior.
+        the other for ARMA. They have a iid prior. Use the methods
+        get_sub_state(), get_reg_state() or get_arma_state() to get the log
+        precision for either the regression or ARMA terms.
 
     Attributes:
         downscale: pointer to parent downscale object
         area_unmask: number of spatial points on land
         prior: dictionary of distributions
-        state: numpy array of log precisions
+        state: numpy array of log precisions, of length 2*area_unmask
         state_before: deep copy of state after calling save_state()
     """
 
@@ -279,13 +281,15 @@ class TargetLogPrecisionGp(TargetLogPrecision):
         extension has a GP prior on the log precision for each location.
 
     Each location has 2 log precisions, one for regression and constant terms,
-        the other for ARMA. They have a GP prior.
+        the other for ARMA. They have a GP prior. Use the methods
+        get_sub_state(), get_reg_state() or get_arma_state() to get the log
+        precision for either the regression or ARMA terms.
 
     Attributes:
         downscale: pointer to parent downscale object
         area_unmask: number of spatial points on land
         prior: dictionary of distributions
-        state: numpy array of log precisions
+        state: numpy array of log precisions, of length 2*area_unmask
         state_before: deep copy of state after calling save_state()
     """
 
@@ -333,15 +337,16 @@ class TargetLogPrecisionGp(TargetLogPrecision):
         return state
 
 class TargetGp(target.Target):
-    """Contains density information for the GP precision parameters
+    """Contains density information for the GP precision parameters, to be
+        paired with a TargetDeepGp object.
 
     Attributes:
         downscale: pointer to parent Downscale object
         prior: scipy.stats prior distributions
-        state: gp precision
+        state: gp precision, scalar
         state_before: copy of state when doing mcmc (for reverting after
             rejection)
-        cov_chol: kernel matrix, cholesky
+        cov_chol: kernel matrix, cholesky decomposed
         cov_chol_before: copy of cov_chol when doing mcmc (for reverting after
             rejection)
         square_error: matrix (area_unmask x area_unmask) containing square error
@@ -351,8 +356,6 @@ class TargetGp(target.Target):
     def __init__(self, downscale):
         super().__init__()
         self.downscale = downscale
-        #keys for prior and state are in order:
-            #precision_reg, precision_arma, gp_precision
         self.prior = target.get_gp_precision_prior()
         self.state = self.prior.mean()
         self.state_before = None
@@ -360,7 +363,7 @@ class TargetGp(target.Target):
         self.cov_chol_before = None
         #square_error does not change so points to the copy owned by Downscale
         self.square_error = downscale.square_error
-
+        #use median as inital state as inverse gamma may not have finite mean
         self.state = self.prior.median()
 
     #implemented
@@ -413,7 +416,8 @@ class TargetGp(target.Target):
         self.cov_chol = cov_chol
 
 class TargetDeepGp(TargetGp):
-    """Target implementation of GP precision for the log precision prior
+    """Target implementation of GP precision for the log precision prior, to be
+        paired with a TargetLogPrecisionGp object.
     """
 
     def __init__(self, downscale):

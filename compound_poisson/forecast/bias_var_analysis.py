@@ -69,12 +69,13 @@ class BiasVarAnalyser(object):
         if not cycler is None:
             ax.set_prop_cycle(cycler)
         plt.plot(
-            np.sqrt(self.binned_variance), np.sqrt(self.binned_square_bias))
+            np.sqrt(self.binned_variance), np.sqrt(self.binned_square_bias),
+            '.-')
 
         max_axis = np.max([ax.get_xlim()[1], ax.get_ylim()[1]])
         plt.plot([0, max_axis], [0, max_axis], 'k--')
-        plt.xlabel("root mean variance (mm)")
-        plt.ylabel("root mean square bias (mm)")
+        plt.xlabel("RMS spread (mm)")
+        plt.ylabel("RMS error (mm)")
         plt.savefig(path_to_figure, bbox_inches="tight")
         plt.close()
 

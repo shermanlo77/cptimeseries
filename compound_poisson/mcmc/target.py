@@ -142,8 +142,7 @@ def get_precision_prior():
 
 def get_log_precision_prior():
     """Return the default prior distribution for the log precision of the
-        compound-Poisson parameter (beta in the literature). ie precision has
-        log-Normal distribution
+        compound-Poisson parameter. ie precision has log-Normal distribution
 
     Return:
         array containing 2 normal distributions, first one for the parameter,
@@ -156,6 +155,9 @@ def get_log_precision_prior():
     return prior
 
 def get_gp_precision_prior():
+    """Return the default prior distribution for the precision prior for the
+        Gaussian process
+    """
     return stats.invgamma(a=1, scale=556)
 
 def get_arma_index(parameter_name_array):

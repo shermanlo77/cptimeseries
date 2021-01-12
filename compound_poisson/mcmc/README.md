@@ -27,19 +27,20 @@ References to these MCMC algorithms are included at the bottom.
 
 ## Target Distributions
 - `target.Target`
-  - `target.time_series.TargetParameter`
-  - `target.time_series.TargetZ`
-  - `target.time_series.TargetPrecision`
+  - `target_time_series.TargetParameter`
+  - `target_time_series.TargetZ`
+  - `target_time_series.TargetPrecision`
 
 The base abstract class is `target.Target`. For `TimeSeries`, the implementations are `target.time_series.TargetParameter`, `TargetZ` and `TargetPrecision`. They represent the posterior distribution (up to a constant) of the regression parameters beta, latent variables z and hyper parameters tau (tuning or smoothing parameters in frequentist literature) respectively.
 
 - `target.Target`
-  - `target.downscale.TargetParameter`
-  - `target.downscale.TargetLogPrecision`
-  - `target.downscale.TargetGp`
-  - `target.downscale.TargetDeepGp`
+  - `target_downscale.TargetParameter`
+  - `target_downscale.TargetLogPrecision`
+  - `target_downscale.TargetLogPrecisionGp`
+  - `target_downscale.TargetGp`
+  - `target_downscale.TargetDeepGp`
 
-For `Downscale`, the implementations are `target.downscale.TargetParameter`, `TargetLogPrecision` and `TargetGp`. They represent the posterior distribution (up to a constant) of the regression parameters beta, hyper parameters tau (tuning or smoothing parameters in frequentist literature) and the Gaussian process precision parameter respectively.
+For `Downscale`, the implementations are `target_downscale.TargetParameter`, `TargetLogPrecision` and `TargetGp`. They represent the posterior distribution (up to a constant) of the regression parameters beta, precision tau (tuning or smoothing parameters in frequentist literature) and the Gaussian process precision parameter respectively.
 
 Default priors and hyper parameters are in `target`. See functions:
   - `get_parameter_mean_prior()`

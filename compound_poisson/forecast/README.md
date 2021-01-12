@@ -36,14 +36,15 @@ For multiple locations, multiple instances of `compound_poisson.downscale.TimeSe
 
 ## Assessing the Forecast
 
-Comparing the forecast with the observed. All figures are produced in the module `compound_poisson.forecast.print` which uses the following modules:
-- `compound_poisson.forecast.coverage_analysis` counts the number of days from the daily forecasts which are captured by a specified credible interval and records the width of that interval,
-- `compound_poisson.forecast.distribution_compare` compares the empirical distribution of the forecast with the observed,
-- `compound_poisson.forecast.loss` compares the forecast with the observed using loss functions,
-- `compound_poisson.forecast.residual_analysis` investigates any trends with the residuals using graphs,
-- `compound_poisson.forecast.roc` plot ROC curves,
-- `compound_poisson.forecast.time_segmentation` splits the forecast into segments such as yearly segments or for every season,
-- `compound_poisson.forecast.loss_segmentation` obtains the loss function for specified segments of the forecast.
+Comparing the forecast with the observed. All figures are produced in the module `forecast.print` which uses the following modules:
+- `coverage_analysis` counts the number of days from the daily forecasts which are captured by a specified credible interval and records the width of that interval,
+- `distribution_compare` compares the empirical distribution of the forecast with the observed,
+- `loss` compares the forecast with the observed using loss functions,
+- `residual_analysis` investigates any trends with the residuals using graphs,
+- `roc` plot ROC curves,
+- `time_segmentation` splits the forecast into segments such as yearly segments or for every season,
+- `loss_segmentation` obtains the loss function for specified segments of the forecast.
+- `bias_var_analysis` does a bias variance analysis.
 
 ## Notes for Developers
 
