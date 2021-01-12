@@ -100,10 +100,9 @@ Results are saved in the `result` directory. Delete it if you wish to restart th
 * `script/cardiff_era/era5.py`
     * IFS prediction on the test set: 2000-2019 inclusive
 * `script/cardiff_plot/plot.py`
-    * Training set: 1999
-    * Test set: 2000-2019 inclusive
+    * Compare the AUC, bias loss and residuals of the MCMC forecast with IFS.
 * `script/cardiff_plot/plot_dist.py`
-
+    * Compare the distribution of the MCMC forecast with IFS.
 
 ## Multiple Locations Scripts
 * `script/isle_of_man`

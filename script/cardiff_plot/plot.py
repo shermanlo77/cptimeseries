@@ -2,7 +2,7 @@
 
 Plots AUC for different precipitation and different size training sets
     x-axis: precipitation
-    y-axos: AUC
+    y-axis: AUC
     different lines for different size training sets
 
 Table of bias loss
