@@ -97,7 +97,7 @@ The following examples are provided:
 Results are saved in the `result` directory. Delete it if you wish to restart the sampling process from the start.
 
 ## Other Single Location Scripts
-* `script/cardiff_era/era5.py`
+* `script/cardiff_era5/era5.py`
     * IFS prediction on the test set: 2000-2019 inclusive
 * `script/cardiff_plot/plot.py`
     * Compare the AUC, bias loss and residuals of the MCMC forecast with IFS.
@@ -149,11 +149,23 @@ pool = multiprocess.Pool()
 ```
 so that [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) is used instead of [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html).
 
-## Notes for Developers
+## Other Multiple Locations Scripts
+* `script/wales_era5/era5.py`
+    * IFS prediction on the test set: 2000-2019 inclusive
+* `script/wales_plot/plot.py`
+    * Compare the AUC, bias loss and residuals of the MCMC forecast with IFS.
+* `script/wales_plot/plot_dist.py`
+    * Compare the distribution of the MCMC forecast with IFS.
+* `script/wales_plot/plot_spatial.py`
+    * Compare the cross correlation of the MCMC and IFS forecast as well as the observed.
+
+## Further Documentation
 * Please see the packages [`compound_poisson`](./compound_poisson/) and [`dataset`](./dataset/) for further documentations.
 
 ## Notes on Development and Sustainability
 - The author has a background in Java so there is a frequent use of classes and inheritance structure.
 - The author attempted to keep to the [Google Python style guide](https://google.github.io/styleguide/pyguide.html). There are a few omission such as underscores for denoting private and protected methods, variables and classes.
-- Documentation suitable for `pydoc` is on the `TODO` list.
-- Testing is on the `TODO` list.
+- `TODO` list:
+  - Documentation suitable for `pydoc`
+  - Provide a simpler example as an introduction
+  - Testing
