@@ -237,20 +237,27 @@ class ForecasterGp(Forecaster):
             trained model
     """
 
-    def __init__(self,
-                 downscale,
-                 memmap_dir):
+    def __init__(self, downscale, memmap_dir, topo_key):
+        """Constructor
+
+        Args:
+            topo_key: array of topography keys to use as gp inputs, eg
+                ["latitude", "longitude"]
+        """
         super().__init__(downscale, memmap_dir)
         self.gp_input = []
 
-        #get the input variables of the GP (latitude, longitude) from the
-            #training
-        latitude_array = downscale.topography["latitude"][:,0]
-        longitude_array = downscale.topography["longitude"][0]
+        #get the input variables of the GP from the topography information
+        topo_dic = downscale.topography
+        #get topography information for each location
         for time_series_i in downscale.generate_unmask_time_series():
-            latitude_i = latitude_array[time_series_i.id[0]]
-            longitude_i = longitude_array[time_series_i.id[1]]
-            self.gp_input.append([latitude_i, longitude_i])
+            coordinates = time_series_i.id
+            #input_array is array of topography information for this location
+            input_array = []
+            for key in topo_key:
+                input_array.append(
+                    topo_dic[key][coordinates[0], coordinates[1]])
+            self.gp_input.append(input_array)
             time_series_i.set_from_mcmc = False
 
     #override

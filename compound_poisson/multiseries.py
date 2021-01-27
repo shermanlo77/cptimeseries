@@ -317,7 +317,12 @@ class MultiSeries(object):
                 parameter_name_3d[np.logical_not(self.mask), i].flatten())
         return np.asarray(parameter_name_array).flatten()
 
-    def forecast(self, data, n_simulation, pool=None, use_gp=False):
+    def forecast(self,
+                 data,
+                 n_simulation,
+                 pool=None,
+                 use_gp=False,
+                 topo_key=["latitude", "longitude"]):
         """Do forecast, updates the member variable forecaster
 
         Args:
@@ -326,6 +331,8 @@ class MultiSeries(object):
             pool: optional, a pool object to do parallel tasks
             use_gp: optional, True if to use post-sampling GP smoothing,
                 defaults to False
+            topo_key: optional, to be used if use_gp is True, array of
+                topography keys to use as gp inputs
         """
         if pool is None:
             pool = multiprocess.Serial()
@@ -334,25 +341,30 @@ class MultiSeries(object):
         self.scatter_mcmc_sample()
 
         if self.forecaster is None:
-            self.forecaster = self.instantiate_forecaster(use_gp)
+            self.forecaster = self.instantiate_forecaster(use_gp, topo_key)
             self.forecaster.start_forecast(n_simulation, data)
         else:
             self.forecaster.resume_forecast(n_simulation)
 
         self.del_memmap()
 
-    def instantiate_forecaster(self, use_gp=False):
+    def instantiate_forecaster(self, use_gp=False, topo_key=None):
         """Instantiate a Forecaster object and return it
 
         Args:
             use_gp: optional, True if to use post-sampling GP smoothing,
                 defaults to False
+            topo_key: optional, to be used if use_gp is True, array of
+                topography keys to use as gp inputs
 
         Return:
             instantiated Forecaster object
+            topo_key: optional, to be used if use_gp is True, array of
+                topography keys to use as gp inputs
         """
         if use_gp:
-            forecaster = forecast.downscale.ForecasterGp(self, self.memmap_dir)
+            forecaster = forecast.downscale.ForecasterGp(
+                self, self.memmap_dir, topo_key)
         else:
             forecaster = forecast.downscale.Forecaster(self, self.memmap_dir)
         return forecaster
