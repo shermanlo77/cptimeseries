@@ -5,8 +5,8 @@ from compound_poisson.fit import fitter
 
 class Fitter(fitter.Fitter):
 
-    def __init__(self, downscale_class, directory=""):
-        super().__init__(downscale_class, directory)
+    def __init__(self, downscale_class, directory="", suffix=None):
+        super().__init__(downscale_class, directory, suffix)
         self.use_gp = False
         self.topo_key = None
 
@@ -46,15 +46,15 @@ class Fitter(fitter.Fitter):
 
 class FitterDownscale(Fitter):
 
-    def __init__(self, directory=""):
-        super().__init__(compound_poisson.Downscale, directory)
+    def __init__(self, directory="", suffix=None):
+        super().__init__(compound_poisson.Downscale, directory, suffix)
 
 class FitterMultiSeries(Fitter):
 
-    def __init__(self, directory=""):
-        super().__init__(compound_poisson.MultiSeries, directory)
+    def __init__(self, directory="", suffix=None):
+        super().__init__(compound_poisson.MultiSeries, directory, suffix)
 
 class FitterDownscaleDeepGp(Fitter):
 
-    def __init__(self, directory=""):
-        super().__init__(compound_poisson.DownscaleDeepGp, directory)
+    def __init__(self, directory="", suffix=None):
+        super().__init__(compound_poisson.DownscaleDeepGp, directory, suffix)

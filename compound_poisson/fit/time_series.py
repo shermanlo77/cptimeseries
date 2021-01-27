@@ -11,8 +11,8 @@ from compound_poisson import forecast
 
 class Fitter(fitter.Fitter):
 
-    def __init__(self, time_series_class, directory=""):
-        super().__init__(time_series_class, directory)
+    def __init__(self, time_series_class, directory="", suffix=None):
+        super().__init__(time_series_class, directory, suffix)
 
     def initial_fit(self, dataset, seed, n_sample=None, pool=None):
         #dataset contains training set
@@ -62,15 +62,16 @@ class Fitter(fitter.Fitter):
 
 class FitterMcmc(Fitter):
 
-    def __init__(self, directory=""):
-        super().__init__(compound_poisson.TimeSeriesMcmc, directory)
+    def __init__(self, directory="", suffix=None):
+        super().__init__(compound_poisson.TimeSeriesMcmc, directory, suffix)
 
 class FitterSlice(Fitter):
 
-    def __init__(self, directory=""):
-        super().__init__(compound_poisson.TimeSeriesSlice, directory)
+    def __init__(self, directory="", suffix=None):
+        super().__init__(ompound_poisson.TimeSeriesSlice, directory, suffix)
 
 class FitterHyperSlice(Fitter):
 
-    def __init__(self, directory=""):
-        super().__init__(compound_poisson.TimeSeriesHyperSlice, directory)
+    def __init__(self, directory="", suffix=None):
+        super().__init__(
+            compound_poisson.TimeSeriesHyperSlice, directory, suffix)

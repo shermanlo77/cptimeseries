@@ -13,13 +13,17 @@ class Fitter(object):
         figure_dir: directory to store figures
     """
 
-    def __init__(self, model_class, directory):
+    def __init__(self, model_class, directory, suffix=None):
         """
         Args:
             model_class: class to use
             directory: location to store results and figures
+            suffix: string to attach to the end of the member variable name,
+                allows for a non-default .gz file to be loaded or saved.
         """
         self.name = model_class.__name__
+        if not suffix is None:
+            self.name += "_" + suffix
         self.model_class = model_class
         self.result_dir = path.join(directory, "result")
         self.figure_dir = path.join(directory, "figure")
