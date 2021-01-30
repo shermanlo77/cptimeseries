@@ -80,19 +80,19 @@ The following examples are provided:
 * `python3 hyper_slice.py`
     * Does the default number of MCMC samples
     * If MCMC samples are detected from a previous run, only print out figures
-* `python3 hyper_slice.py --sample 400`
-    * Does 400 MCMC samples
-* `python3 hyper_slice.py --sample 400` followed by `python3 hyper_slice.py --sample 800`
-    * Does 400 MCMC samples, save the samples, then does 400 more MCMC samples
+* `python3 hyper_slice.py --sample 10000`
+    * Does 10000 MCMC samples
+* `python3 hyper_slice.py --sample 10000` followed by `python3 hyper_slice.py --sample 20000`
+    * Does 10000 MCMC samples, save the samples, then does 20000 more MCMC samples
 * `python3 hyper_slice_forecast.py`
     * Does the default number of forecast samples
     * If forecast samples are detected from a previous run, only print out figures
-* `python3 hyper_slice_forecast.py --sample 400`
-    * Does 400 forecast samples
-* `python3 hyper_slice_forecast.py --sample 400` followed by `python3 hyper_slice_forecast.py --sample 800`
-    * Does 400 forecast samples, save the samples, then does 400 more forecast samples
-* `python3 hyper_slice_forecast.py --sample 400 --burnin 100`
-    * Does 400 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
+* `python3 hyper_slice_forecast.py --sample 500`
+    * Does 500 forecast samples
+* `python3 hyper_slice_forecast.py --sample 500` followed by `python3 hyper_slice_forecast.py --sample 1000`
+    * Does 500 forecast samples, save the samples, then does 1000 more forecast samples
+* `python3 hyper_slice_forecast.py --sample 500 --burnin 100`
+    * Does 500 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
 
 Results are saved in the `result` directory. Delete it if you wish to restart the sampling process from the start.
 
@@ -108,46 +108,54 @@ Results are saved in the `result` directory. Delete it if you wish to restart th
 * `script/isle_of_man`
     * Training set: 1990-1999 inclusive
     * Test set: 2000-2009 inclusive
-    * Uses [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) for parallel computation by default
 * `script/wales_5_20`
     * Training set: 1995-1999 inclusive
     * Test set: 2000-2019 inclusive
-    * Uses [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) for parallel computation by default
 
-Run the script `downscale.py` to do MCMC sampling. Afterwards, run the script `downscale_forecast.py` to do forecast.
+Run the script `multiseries.py` to do MCMC sampling. Afterwards, run the script `multiseries_forecast.py` to do forecast.
 
-Both scripts use parallel computation. For the the Isle of Man, the use of `python3` on its own is fine. For the Wales dataset which uses [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html), use `mpiexec -n 8 python3 -m mpi4py.futures downscale.py` to use 8 threads for example.
-
-The options may be provided which may be useful for development or debugging purposes. The following examples are provided:
-
-* `python3 downscale.py`
-    * Does the default number of MCMC samples
-    * If MCMC samples are detected from a previous run, only print out figures
-* `python3 downscale.py --sample 400`
-    * Does 400 MCMC samples
-* `python3 downscale.py --sample 400` followed by `python3 downscale.py --sample 800`
-    * Does 400 MCMC samples, save the samples, then does 400 more MCMC samples
-* `python3 downscale_forecast.py`
-    * Does the default number of forecast samples
-    * If forecast samples are detected from a previous run, only print out figures
-* `python3 downscale_forecast.py --sample 400`
-    * Does 400 forecast samples
-* `python3 downscale_forecast.py --sample 400` followed by `python3 downscale_forecast.py --sample 800`
-    * Does 400 forecast samples, save the samples, then does 400 more forecast samples
-* `python3 downscale_forecast.py --sample 400 --burnin 100`
-    * Does 400 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
-* `python3 downscale_forecast.py --noprint`
-    * Does not print forecast figures
-
-The code uses multiple threads so using a multi-core processor(s) is recommended. Changing what parallel computation package to use can be done by modifying the code. For example, one can modify
-```
-pool = multiprocess.MPIPoolExecutor()
-```
-to
+These scripts uses multiple threads so using a multi-core processor(s) is recommended. By default, [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) is used. Changing what parallel computation package to use can be done by modifying the code. For example, one can modify
 ```
 pool = multiprocess.Pool()
 ```
-so that [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) is used instead of [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html).
+to
+```
+pool = multiprocess.MPIPoolExecutor()
+```
+so that [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) is used. In addition, the module `-m mpi4py.futures` and the script should be run using MPI, for example `mpiexec` and `sbatch`.
+
+Options are provided which may be useful for development, debugging or check-pointing purposes.
+
+- `python3 [-m mpi4py.futures] multiseries.py [--sample [nsample]]`
+    - `--sample nsample`: Run MCMC until `nsample` posterior samples are obtained.
+    - `-m mpi4py.futures` required only if using `MPIPoolExecutor`
+
+- `python3 [-m mpi4py.futures] multiseries_forecast.py [--sample [nsample]] [--burnin [burnin]] [--noprint]`
+    - `--sample nsample`: Run posterior predictions until `nsample` predictive samples are obtained.
+    - `--burnin burnin`: Set the burn-in to `burnin`. Otherwise, uses the default value.
+    - `--noprint`: Do not print figures.
+    - `-m mpi4py.futures` required only if using `MPIPoolExecutor`
+
+The following examples are provided:
+
+* `python3 multiseries.py`
+    * Does the default number of MCMC samples
+    * If MCMC samples are detected from a previous run, only print out figures
+* `python3 multiseries.py --sample 10000`
+    * Does 10000 MCMC samples
+* `python3 multiseries.py --sample 10000` followed by `python3 multiseries.py --sample 20000`
+    * Does 10000 MCMC samples, save the samples, then does 20000 more MCMC samples
+* `python3 multiseries_forecast.py`
+    * Does the default number of forecast samples
+    * If forecast samples are detected from a previous run, only print out figures
+* `python3 multiseries_forecast.py --sample 500`
+    * Does 500 forecast samples
+* `python3 multiseries_forecast.py --sample 500` followed by `python3 multiseries_forecast.py --sample 1000`
+    * Does 500 forecast samples, save the samples, then does 1000 more forecast samples
+* `python3 multiseries_forecast.py --sample 500 --burnin 100`
+    * Does 500 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
+
+Results are saved in the `result` directory. Delete it if you wish to restart the sampling process from the start.
 
 ## Other Multiple Locations Scripts
 * `script/wales_era5/era5.py`
