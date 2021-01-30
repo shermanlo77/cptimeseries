@@ -65,6 +65,8 @@ Please see `README.md` files in the packages for further information.
 
 To reproduce the results, run the script `hyper_slice.py` followed by `hyper_slice_forecast.py`. Figures are plotted and saved in the `figure` directory.
 
+Results are saved in the `result` directory. When results from previous runs are detected, it will resume the run up to the provided number of samples. Delete the directory if you wish to restart the sampling process from the start.
+
 Options are provided which may be useful for development, debugging or check-pointing purposes.
 
 - `python3 hyper_slice.py [--sample [nsample]]`
@@ -94,8 +96,6 @@ The following examples are provided:
 * `python3 hyper_slice_forecast.py --sample 500 --burnin 100`
     * Does 500 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
 
-Results are saved in the `result` directory. Delete it if you wish to restart the sampling process from the start.
-
 ## Other Single Location Scripts
 * `script/cardiff_era5/era5.py`
     * IFS prediction on the test set: 2000-2019 inclusive
@@ -113,6 +113,8 @@ Results are saved in the `result` directory. Delete it if you wish to restart th
     * Test set: 2000-2019 inclusive
 
 Run the script `multiseries.py` to do MCMC sampling. Afterwards, run the script `multiseries_forecast.py` to do forecast.
+
+Results are saved in the `result` directory. When results from previous runs are detected, it will resume the run up to the provided number of samples. Delete the directory if you wish to restart the sampling process from the start.
 
 These scripts uses multiple threads so using a multi-core processor(s) is recommended. By default, [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) is used. Changing what parallel computation package to use can be done by modifying the code. For example, one can modify
 ```
@@ -154,8 +156,6 @@ The following examples are provided:
     * Does 500 forecast samples, save the samples, then does 1000 more forecast samples
 * `python3 multiseries_forecast.py --sample 500 --burnin 100`
     * Does 500 forecast samples with a burn in of 100. If `--burnin` is not provided, the default burn in is used.
-
-Results are saved in the `result` directory. Delete it if you wish to restart the sampling process from the start.
 
 ## Other Multiple Locations Scripts
 * `script/wales_era5/era5.py`
