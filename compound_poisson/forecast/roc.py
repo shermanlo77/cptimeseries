@@ -12,6 +12,7 @@ class Roc(object):
             p_rain_warning: forecasted probability of precipitation more than
                 rain_warning, array, for each time point
             rain_true: actual observed precipitation, array, for each time point
+            pool: optional, an object which can map() for parallel processing
         """
         self.rain_warning = rain_warning
         self.true_positive_array = None
