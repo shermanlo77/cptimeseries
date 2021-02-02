@@ -235,55 +235,101 @@ class ForecasterGp(Forecaster):
     Attributes:
         gp_input: array of spatial points (latitude, longitude) of the
             trained model
+        gp_array: array of GaussianProcessRegressor() objects, one for each
+            parameter
     """
 
     def __init__(self, downscale, memmap_dir, topo_key):
         """Constructor
 
         Args:
+            downscale: parent Downscale object
+            memmap_dir: location of the forecast memmap
             topo_key: array of topography keys to use as gp inputs, eg
                 ["latitude", "longitude"]
         """
         super().__init__(downscale, memmap_dir)
         self.gp_input = []
+        self.gp_array = []
+
+        area_unmask = downscale.area_unmask
+
+        n_sample = 10 #number of posterior samples to use
+        #each location has multiple samples of beta, fit gp onto a sample of
+            #samples
+        #gp_input: dim 0: for each location and sample, dim 1: for each topo key
+        gp_input = []
+        #gp_output: dim 0: for each parameter (eg reg for temperature),
+            #dim 1: for each location and sample
+        gp_output = [] #array of array
 
         #get the input variables of the GP from the topography information
         topo_dic = downscale.topography
-        #get topography information for each location
-        for time_series_i in downscale.generate_unmask_time_series():
-            coordinates = time_series_i.id
-            #input_array is array of topography information for this location
-            input_array = []
-            for key in topo_key:
-                input_array.append(
-                    topo_dic[key][coordinates[0], coordinates[1]])
-            self.gp_input.append(input_array)
-            time_series_i.set_from_mcmc = False
+
+        for i_sample in range(n_sample):
+            #get topography information for each location
+            #repeated n_sample times because we have n_sample lots of samples
+                #of beta to fit onto
+            for time_series_i in downscale.generate_unmask_time_series():
+                coordinates = time_series_i.id
+                #input_array is array of topography information for this
+                    #location
+                input_array = []
+                for key in topo_key:
+                    input_array.append(
+                        topo_dic[key][coordinates[0], coordinates[1]])
+                gp_input.append(input_array)
+                #ensure time_series does not set from the posterior sample
+                time_series_i.set_from_mcmc = False
+
+        #select random mcmc samples
+        rng = downscale.rng
+        mcmc_index_array = rng.choice(
+            range(downscale.burn_in, downscale.n_sample), n_sample)
+
+        for i_parameter in range(downscale.n_parameter):
+            gp_output.append([])
+
+        #extract parameters to fit onto
+        for mcmc_index in mcmc_index_array:
+            #set mcmc sample
+            for time_series_i in downscale.generate_unmask_time_series():
+                time_series_i.read_memmap()
+                time_series_i.set_parameter_from_sample_i(mcmc_index)
+                time_series_i.del_memmap()
+            #extract parameter and save it to the array
+            parameter_vector = downscale.get_parameter_vector().copy()
+            for i_parameter in range(downscale.n_parameter):
+                slice_index = slice(
+                    i_parameter*area_unmask, (i_parameter+1)*area_unmask)
+                parameter_i = parameter_vector[slice_index]
+                gp_output[i_parameter].extend(parameter_i.tolist())
+
+        #fit gp for each parameter
+        gp_input = np.asarray(gp_input)
+        gp_output = np.asarray(gp_output)
+        for i_parameter in range(downscale.n_parameter):
+            gp = gaussian_process.GaussianProcessRegressor()
+            gp.fit(gp_input, gp_output[i_parameter])
+            self.gp_array.append(gp)
+
+        #save the gp_input
+        self.gp_input = gp_input[0:area_unmask]
 
     #override
     def simulate_forecasts(self, index_range):
         #loop: get mcmc sample, forecast, ..etc
         #the forecast is done in parallel
         area_unmask = self.downscale.area_unmask
+        n_parameter = self.downscale.n_parameter
         for i_forecast in index_range:
 
-            #all time series set mcmc sample
-            mcmc_index = self.downscale.rng.randint(
-                self.downscale.burn_in, self.downscale.n_sample)
-            for time_series_i in self.downscale.generate_unmask_time_series():
-                time_series_i.read_memmap()
-                time_series_i.set_parameter_from_sample_i(mcmc_index)
-                time_series_i.del_memmap()
-
             #get the parameter and smooth it using GP
-            parameter_vector = self.downscale.get_parameter_vector()
-            for i_parameter in range(self.downscale.n_parameter):
+            parameter_vector = np.zeros(area_unmask * n_parameter)
+            for i_parameter in range(n_parameter):
                 slice_index = slice(
                     i_parameter*area_unmask, (i_parameter+1)*area_unmask)
-                parameter_i = parameter_vector[slice_index]
-                gp = gaussian_process.GaussianProcessRegressor()
-                gp.fit(self.gp_input, parameter_i)
-                parameter_i = gp.sample_y(
+                parameter_i = self.gp_array[i_parameter].sample_y(
                     self.gp_input, random_state=self.downscale.rng)
                 parameter_vector[slice_index] = parameter_i.flatten()
 
