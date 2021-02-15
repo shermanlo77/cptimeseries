@@ -235,13 +235,13 @@ class ForecasterGp(Forecaster):
     Attributes:
         gp_input: array of spatial points (latitude, longitude) of the
             trained model
-        gp: GaussianProcessRegressor object, able to sample_y() which returns
-            a sample from the Gaussian process, suitable to be used as
-            parameters for each location
+        gp_array: array of GaussianProcessRegressor() objects, one for each
+            parameter
     """
 
     def __init__(self, downscale, memmap_dir, topo_key):
-        """
+        """Constructor
+
         Args:
             downscale: parent Downscale object
             memmap_dir: location of the forecast memmap
@@ -250,22 +250,17 @@ class ForecasterGp(Forecaster):
         """
         super().__init__(downscale, memmap_dir)
         self.gp_input = []
-        self.gp = gaussian_process.GaussianProcessRegressor()
-
-        #in the constructor, the gp is fitted and then used for forecasting
+        self.gp_array = []
 
         area_unmask = downscale.area_unmask
 
-        n_sample = 100 #number of posterior samples to use
+        n_sample = 10 #number of posterior samples to use
         #each location has multiple samples of beta, fit gp onto a sample of
             #samples
-        #gp_input
-            #dim 0: for each location and sample
-            #dim 1: for each topo key
+        #gp_input: dim 0: for each location and sample, dim 1: for each topo key
         gp_input = []
-        #gp_output
-            #dim 0: for each location and sample
-            #dim 1: for each parameter (eg reg for temperature)
+        #gp_output: dim 0: for each parameter (eg reg for temperature),
+            #dim 1: for each location and sample
         gp_output = [] #array of array
 
         #get the input variables of the GP from the topography information
@@ -292,6 +287,9 @@ class ForecasterGp(Forecaster):
         mcmc_index_array = rng.choice(
             range(downscale.burn_in, downscale.n_sample), n_sample)
 
+        for i_parameter in range(downscale.n_parameter):
+            gp_output.append([])
+
         #extract parameters to fit onto
         for mcmc_index in mcmc_index_array:
             #set mcmc sample
@@ -301,17 +299,19 @@ class ForecasterGp(Forecaster):
                 time_series_i.del_memmap()
             #extract parameter and save it to the array
             parameter_vector = downscale.get_parameter_vector().copy()
-            for i_location in range(area_unmask):
+            for i_parameter in range(downscale.n_parameter):
                 slice_index = slice(
-                    i_location, len(parameter_vector), area_unmask)
+                    i_parameter*area_unmask, (i_parameter+1)*area_unmask)
                 parameter_i = parameter_vector[slice_index]
-                gp_output.append(parameter_i)
+                gp_output[i_parameter].extend(parameter_i.tolist())
 
         #fit gp for each parameter
         gp_input = np.asarray(gp_input)
         gp_output = np.asarray(gp_output)
-        #note: self.gp will make a deep copy of gp_input and gp_output
-        self.gp.fit(gp_input, gp_output)
+        for i_parameter in range(downscale.n_parameter):
+            gp = gaussian_process.GaussianProcessRegressor()
+            gp.fit(gp_input, gp_output[i_parameter])
+            self.gp_array.append(gp)
 
         #save the gp_input
         self.gp_input = gp_input[0:area_unmask]
@@ -320,25 +320,22 @@ class ForecasterGp(Forecaster):
     def simulate_forecasts(self, index_range):
         #loop: get mcmc sample, forecast, ..etc
         #the forecast is done in parallel
+        area_unmask = self.downscale.area_unmask
+        n_parameter = self.downscale.n_parameter
         for i_forecast in index_range:
-            #keep sampling from gp until a valid sample is obtained
-                #note: rejects samples are rare, try catch is a precaution
-            found_parameter = False
-            while not found_parameter:
-                #sample_y returns:
-                    #dim 0: for each location
-                    #dim 1: for each parameter
-                parameter_i = self.gp.sample_y(
-                    self.gp_input, random_state=self.downscale.rng)
 
-                #set the smoothed parameter
-                parameter_i = parameter_i.T
-                self.downscale.set_parameter_vector(parameter_i.flatten())
-                try:
-                    self.downscale.update_all_cp_parameters()
-                    found_parameter = True
-                except(ValueError, OverflowError):
-                    pass
+            #get the parameter and smooth it using GP
+            parameter_vector = np.zeros(area_unmask * n_parameter)
+            for i_parameter in range(n_parameter):
+                slice_index = slice(
+                    i_parameter*area_unmask, (i_parameter+1)*area_unmask)
+                parameter_i = self.gp_array[i_parameter].sample_y(
+                    self.gp_input, random_state=self.downscale.rng)
+                parameter_vector[slice_index] = parameter_i.flatten()
+
+            #set the smoothed parameter
+            self.downscale.set_parameter_vector(parameter_vector)
+            self.downscale.update_all_cp_parameters()
 
             #do one sample
                 #hack: set the member variable n_simulation to do only one
