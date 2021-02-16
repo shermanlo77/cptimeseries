@@ -8,7 +8,8 @@ Note to future developers: only forecasting of the test set (future) has been
     for test set
 
 compound_poisson.forecast.forecast_abstract.Forecaster
-    <- compound_poisson.forecast.downscale.Forecaster
+    <- Forecaster
+        <- ForecasterGp
 
 compound_poisson.forecast.time_series.Forecaster
     <- compound_poisson.forecast.downscale.TimeSeriesForecaster
@@ -230,7 +231,10 @@ class Forecaster(forecast_abstract.Forecaster):
 
 class ForecasterGp(Forecaster):
     """
-    Do GP smoothing on the parameters before every forecast
+    Do GP smoothing on the parameters for every forecast
+
+    Take samples from the MCMC to construct a GP. For each forecast, the GP is
+        sampled from and be used as parameters for the compound-Poisson model.
 
     Attributes:
         gp_input: array of spatial points (latitude, longitude) of the
@@ -249,72 +253,66 @@ class ForecasterGp(Forecaster):
                 ["latitude", "longitude"]
         """
         super().__init__(downscale, memmap_dir)
-        self.gp_input = []
+        self.gp_input = None
         self.gp_array = []
 
         area_unmask = downscale.area_unmask
-
-        n_sample = 10 #number of posterior samples to use
-        #each location has multiple samples of beta, fit gp onto a sample of
-            #samples
-        #gp_input: dim 0: for each location and sample, dim 1: for each topo key
-        gp_input = []
-        #gp_output: dim 0: for each parameter (eg reg for temperature),
-            #dim 1: for each location and sample
-        gp_output = [] #array of array
-
         #get the input variables of the GP from the topography information
         topo_dic = downscale.topography
 
-        for i_sample in range(n_sample):
-            #get topography information for each location
-            #repeated n_sample times because we have n_sample lots of samples
-                #of beta to fit onto
-            for time_series_i in downscale.generate_unmask_time_series():
-                coordinates = time_series_i.id
-                #input_array is array of topography information for this
-                    #location
-                input_array = []
-                for key in topo_key:
-                    input_array.append(
-                        topo_dic[key][coordinates[0], coordinates[1]])
-                gp_input.append(input_array)
-                #ensure time_series does not set from the posterior sample
-                time_series_i.set_from_mcmc = False
+        n_sample = 100 #number of posterior samples to use
+        #each location has multiple samples of beta, fit gp onto a sample of
+            #samples
+        #gp_input:
+            #dim 0: for each location
+            #dim 1: for each topo key
+        self.gp_input = np.zeros((area_unmask, len(topo_key)))
+        #gp_output: array of numpy for each parameter (eg reg for temperature),
+            #each element has dimensions, dim 0: for each location, dim 1: for
+                #each gp sample
+        gp_output = []
+        for i_parameter in range(downscale.n_parameter):
+            gp_output.append(np.zeros((area_unmask, n_sample)))
+
+        #get topography information for each location
+        for i_location, time_series_i in enumerate(
+            downscale.generate_unmask_time_series()):
+            coordinates = time_series_i.id
+            for i_key, key in enumerate(topo_key):
+                self.gp_input[i_location, i_key] = (
+                    topo_dic[key][coordinates[0], coordinates[1]])
+            #ensure time_series does not set from the posterior sample, these
+                #are set manually from the gp
+            time_series_i.set_from_mcmc = False
 
         #select random mcmc samples
         rng = downscale.rng
         mcmc_index_array = rng.choice(
             range(downscale.burn_in, downscale.n_sample), n_sample)
 
-        for i_parameter in range(downscale.n_parameter):
-            gp_output.append([])
-
         #extract parameters to fit onto
-        for mcmc_index in mcmc_index_array:
+        for i_mcmc, mcmc_index in enumerate(mcmc_index_array):
             #set mcmc sample
             for time_series_i in downscale.generate_unmask_time_series():
                 time_series_i.read_memmap()
                 time_series_i.set_parameter_from_sample_i(mcmc_index)
                 time_series_i.del_memmap()
-            #extract parameter and save it to the array
+            #extract parameter and save it to gp_output
             parameter_vector = downscale.get_parameter_vector().copy()
             for i_parameter in range(downscale.n_parameter):
                 slice_index = slice(
                     i_parameter*area_unmask, (i_parameter+1)*area_unmask)
                 parameter_i = parameter_vector[slice_index]
-                gp_output[i_parameter].extend(parameter_i.tolist())
+                gp_output[i_parameter][:, i_mcmc] = parameter_i
 
         #fit gp for each parameter
-        gp_input = np.asarray(gp_input)
-        gp_output = np.asarray(gp_output)
         for i_parameter in range(downscale.n_parameter):
-            gp = gaussian_process.GaussianProcessRegressor()
-            gp.fit(gp_input, gp_output[i_parameter])
+            gp = GaussianProcessRegressor()
+            gp.fit(self.gp_input, gp_output[i_parameter])
+            #do not save x_train, this is set in forecasting, prevents saving
+                #duplicates of this variable onto disk
+            gp.delete_x_train()
             self.gp_array.append(gp)
-
-        #save the gp_input
-        self.gp_input = gp_input[0:area_unmask]
 
     #override
     def simulate_forecasts(self, index_range):
@@ -322,6 +320,12 @@ class ForecasterGp(Forecaster):
         #the forecast is done in parallel
         area_unmask = self.downscale.area_unmask
         n_parameter = self.downscale.n_parameter
+
+        #set x_train for each gp, they all point to self.gp_input, prevents
+            #deep copies
+        for gp_i in self.gp_array:
+            gp_i.set_x_train(self.gp_input)
+
         for i_forecast in index_range:
 
             #get the parameter and smooth it using GP
@@ -329,21 +333,85 @@ class ForecasterGp(Forecaster):
             for i_parameter in range(n_parameter):
                 slice_index = slice(
                     i_parameter*area_unmask, (i_parameter+1)*area_unmask)
-                parameter_i = self.gp_array[i_parameter].sample_y(
-                    self.gp_input, random_state=self.downscale.rng)
+                parameter_i = self.gp_array[i_parameter].sample_y_at_train(
+                    self.downscale.rng)
                 parameter_vector[slice_index] = parameter_i.flatten()
 
             #set the smoothed parameter
             self.downscale.set_parameter_vector(parameter_vector)
             self.downscale.update_all_cp_parameters()
-
             #do one sample
                 #hack: set the member variable n_simulation to do only one
-                    #forecast
+                    #forecast (could be improved here)
             self.n_simulation = i_forecast + 1
             super().simulate_forecasts([i_forecast], False)
 
             print("Predictive sample", i_forecast)
+
+        #remove x_train so that duplicates are not saved
+        for gp_i in self.gp_array:
+            gp_i.delete_x_train()
+
+class GaussianProcessRegressor(gaussian_process.GaussianProcessRegressor):
+    """Modification of sklearn.gaussian_process.GaussianProcessRegressor
+
+    Custom modification of sklearn.gaussian_process.GaussianProcessRegressor to
+        accept multiple independent samples of the output for a given input.
+        In other words, multiple observations of the response for a given
+        explanatory variable. It is designed to reduce the size of the kernel
+        matrix compared to stacking multiple observations.
+    How to use: pass a design matrix X (n_sample x n_features) and a response
+        design matrix (n_sample x n_observations) to the method fit(). Methods
+        as such predict() and sample_y() now return a response vector, merging
+        the n_targets (using notation in the orginial source in the method
+        fit()) together.
+
+    Modifications:
+        - The method fit() uses the parameters differently
+        - The method fit() modifies the member variables further
+        - The member variable copy_X_train = False by default
+        - Aims to elimate the member variable y_train_ because it appears it is
+            not used anywhere in prediction
+        - Added new methods
+
+    Unmodified copyright notices from the originial source:
+        Authors: Jan Hendrik Metzen <jhm@informatik.uni-bremen.de>
+        Modified by: Pete Green <p.l.green@liverpool.ac.uk>
+        License: BSD 3 clause
+    See https://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcessRegressor.html#sklearn.gaussian_process.GaussianProcessRegressor
+        for further information on the orginial source
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.copy_X_train = False
+
+    #override
+    def fit(self, X, y):
+        super().fit(X, y)
+        self.alpha_ = np.mean(self.alpha_, axis=1)
+        self.y_train_ = None
+
+    def delete_x_train(self):
+        """Set the member variable X_train_ to be none, this prevents saving
+             duplicates of this member variable (there are multiple gps using
+             the same trainig set) to disk. Designed as a precaution.
+        """
+        self.X_train_ = None
+
+    def set_x_train(self, x_train):
+        """Set the member variable X_train_ to something after calling
+            delete_x_train(). X_train_ has dimensions, dim 0: each location,
+            dim 1: each feature
+        """
+        self.X_train_ = x_train
+
+    def sample_y_at_train(self, rng):
+        """Sample the GP at the training set
+        """
+        if self.X_train_ is None:
+            raise Exception("Must set X_train_")
+        return super().sample_y(self.X_train_, random_state=rng)
 
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
