@@ -42,7 +42,7 @@ class Fitter(object):
         """
         return path.join(self.result_dir, self.name + ".gz")
 
-    def fit(self, dataset, seed, n_sample=None, pool=None):
+    def fit(self, dataset, seed, n_sample=None, pool=None, is_print=True):
         """Fit model onto data
 
         Call to do MCMC, call again to resume. Reproducible if forecast() is not
@@ -55,6 +55,7 @@ class Fitter(object):
             seed: numpy.random.SeedSequence object
             n_sample: number of samples, default value used if None is passed
             pool: required by downscale
+            is_print: boolean, True if to print out MCMC trace plots
         """
         result_file = self.get_result_path()
         #check if this is the initial fit() call by checking the results files
@@ -72,7 +73,9 @@ class Fitter(object):
                 else:
                     model.resume_fitting(n_sample, pool)
                 joblib.dump(model, result_file)
-        self.print_mcmc(model, dataset, pool)
+
+        if is_print:
+            self.print_mcmc(model, dataset, pool)
 
     def initial_fit(self, dataset, seed, n_sample=None, pool=None):
         """Initial fit

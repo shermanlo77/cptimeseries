@@ -53,8 +53,8 @@ class Pool(Serial):
         None which uses the default number of workers
     """
 
-    def __init__(self):
-        self.pool = multiprocessing.Pool(N_PROCESSESS)
+    def __init__(self, n_process=None):
+        self.pool = multiprocessing.Pool(n_process)
 
     def map(self, function, parameters):
         results = self.pool.map(function, parameters)
