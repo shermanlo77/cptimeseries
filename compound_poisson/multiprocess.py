@@ -7,9 +7,6 @@ from abcpy import backends
 from mpi4py import MPI
 from mpi4py import futures
 
-N_PROCESSESS = None
-CHUNKSIZE = 1
-
 class Serial(object):
     """Does tasks in serial (for debugging purposes)
     """

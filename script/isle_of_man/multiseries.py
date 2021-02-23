@@ -6,9 +6,9 @@ from compound_poisson.fit import wrapper
 import dataset
 
 def main():
-    fitter = fit.downscale.FitterDownscale()
+    fitter = fit.downscale.FitterMultiSeries()
     data = dataset.IsleOfManTraining()
-    seed = random.SeedSequence(41597761383904719560264433323691455830)
+    seed = random.SeedSequence(275033816910622348579815457010957489899)
     Pool = multiprocess.Pool
     wrapper.downscale_fit(fitter, data, seed, Pool)
 

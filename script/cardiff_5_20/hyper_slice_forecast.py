@@ -1,23 +1,13 @@
-import argparse
-
-import joblib
-
 from compound_poisson import fit
+from compound_poisson.fit import wrapper
 import dataset
 
 def main():
-    parser = argparse.ArgumentParser(description="Forecasting options")
-    parser.add_argument("--sample", help="number of simulations", type=int)
-    parser.add_argument("--burnin", help="burn in", type=int)
-    n_simulation = parser.parse_args().sample
-    burn_in = parser.parse_args().burnin
-    if burn_in is None:
-        burn_in = 15000
-
     fitter = fit.time_series.FitterHyperSlice()
-    fitter.forecast((dataset.Cardiff5Training(), dataset.CardiffTest()),
-                    n_simulation,
-                    burn_in)
+    training = dataset.Cardiff5Training()
+    test = dataset.CardiffTest()
+    default_burn_in = 15000
+    wrapper.time_series_forecast(fitter, training, test, default_burn_in)
 
 if __name__ == "__main__":
     main()

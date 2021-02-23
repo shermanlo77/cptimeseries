@@ -4,7 +4,7 @@ from compound_poisson.fit import wrapper
 import dataset
 
 def main():
-    fitter = fit.downscale.FitterDownscale()
+    fitter = fit.downscale.FitterDownscaleDeepGp()
     test = dataset.WalesTest()
     default_burn_in = 15000
     Pool = multiprocess.Pool

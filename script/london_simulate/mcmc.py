@@ -1,18 +1,14 @@
-import argparse
-
 from numpy import random
 
 from compound_poisson import fit
+from compound_poisson.fit import wrapper
 import dataset
 
 def main():
-    parser = argparse.ArgumentParser(description="Sample size")
-    parser.add_argument("--sample", help="number of mcmc samples", type=int)
-    n_sample = parser.parse_args().sample
-
-    seed = random.SeedSequence(199862391501461976584157354151760167878)
     fitter = fit.time_series.FitterMcmc()
-    fitter.fit(dataset.LondonSimulatedTraining(), seed, n_sample)
+    training = dataset.LondonSimulatedTraining()
+    seed = random.SeedSequence(199862391501461976584157354151760167878)
+    wrapper.time_series_fit(fitter, training, seed)
 
 if __name__ == "__main__":
     main()

@@ -68,7 +68,7 @@ class FitterMcmc(Fitter):
 class FitterSlice(Fitter):
 
     def __init__(self, directory="", suffix=None):
-        super().__init__(ompound_poisson.TimeSeriesSlice, directory, suffix)
+        super().__init__(compound_poisson.TimeSeriesSlice, directory, suffix)
 
 class FitterHyperSlice(Fitter):
 

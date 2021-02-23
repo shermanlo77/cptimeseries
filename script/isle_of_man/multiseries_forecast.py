@@ -4,9 +4,9 @@ from compound_poisson.fit import wrapper
 import dataset
 
 def main():
-    fitter = fit.downscale.FitterDownscale()
-    test = dataset.WalesTest()
-    default_burn_in = 15000
+    fitter = fit.downscale.FitterMultiSeries()
+    test = dataset.IsleOfManTest()
+    default_burn_in = 0
     Pool = multiprocess.Pool
     wrapper.downscale_forecast(fitter, test, default_burn_in, Pool)
 
