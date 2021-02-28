@@ -6,7 +6,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
-import pandas as pd
 from statsmodels.tsa import stattools
 
 import compound_poisson

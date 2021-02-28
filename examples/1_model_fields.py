@@ -2,12 +2,12 @@
     fields and no ARMA terms. Illustrate seasonal nature of this model with a
     plot of the time series and the autocorrelation.
 """
+
 import math
 
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
-import pandas as pd
 from statsmodels.tsa import stattools
 
 import compound_poisson
