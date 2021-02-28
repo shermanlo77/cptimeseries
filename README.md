@@ -112,17 +112,17 @@ The following examples are provided:
     * Training set: 1995-1999 inclusive
     * Test set: 2000-2019 inclusive
 
-Run the script `multiseries.py` to do MCMC sampling. Afterwards, run the script `multiseries_forecast.py` to do forecast.
+To reproduce the results, run the script `multiseries.py` to do MCMC sampling. 20,000 MCMC samples are required to reproduce the results, this is not programmed to be the default. Afterwards, run the script `multiseries_forecast.py` to do forecasting. Figures are plotted and saved in the `figure` directory.
 
 Results are saved in the `result` directory. When results from previous runs are detected, it will resume the run up to the provided number of samples. Delete the directory if you wish to restart the sampling process from the start.
 
 These scripts uses multiple threads so using a multi-core processor(s) is recommended. By default, [`multiprocessing.Pool`](https://docs.python.org/3/library/multiprocessing.html) is used. Changing what parallel computation package to use can be done by modifying the code. For example, one can modify
 ```
-pool = multiprocess.Pool()
+pool = multiprocess.Pool
 ```
 to
 ```
-pool = multiprocess.MPIPoolExecutor()
+pool = multiprocess.MPIPoolExecutor
 ```
 so that [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) is used. In addition, the module `-m mpi4py.futures` and the script should be run using MPI, for example `mpiexec` and `sbatch`.
 
