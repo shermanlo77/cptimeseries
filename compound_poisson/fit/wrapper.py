@@ -14,7 +14,7 @@ import argparse
 def time_series_fit(fitter, data, seed):
     """Do a fit for a given Fitter (for time series)
     """
-    n_sample, is_print = get_fit_parser()
+    n_sample, is_print, n_thread = get_fit_parser()
     fitter.fit(data, seed, n_sample, is_print=is_print)
 
 def time_series_forecast(fitter, training, test, default_burn_in):
