@@ -58,6 +58,7 @@ class TargetParameter(target.Target):
 
         parameter_name_array = self.downscale.get_parameter_vector_name()
         self.prior_mean = target.get_parameter_mean_prior(parameter_name_array)
+        self.small_covariance = 1e-5
 
     #implemented
     def get_n_dim(self):
@@ -84,7 +85,7 @@ class TargetParameter(target.Target):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
-        #required when doing mcmc on the gp precision parameters
+        #required when doing mcmc on the gp scale parameters
         #evaluate the multivariate Normal distribution
         z = self.get_state()
         z -= self.prior_mean
@@ -147,13 +148,15 @@ class TargetParameter(target.Target):
 
             #calculate the cholesky of the gram matrix (sometimes referred to as
                 #the kernel matrix)
-            cov_chol = self.downscale.square_error.copy()
-            gp_precision = gp_target.precision_gp_state[i]
-            cov_chol *= -gp_precision / 2
+            cov_chol = -self.downscale.square_error.copy()
+            gp_scale = gp_target.scale_gp_state[i]
+            cov_chol /= 2 * math.pow(gp_scale, 2)
             cov_chol = np.exp(cov_chol)
+            cov_chol += np.identity(self.area_unmask) * self.small_covariance
             cov_chol = linalg.cholesky(cov_chol, True)
             #scale the cholesky matrix by a precision
-            cov_chol *= np.exp(-0.5*log_precision_target.log_precision_state[i])
+            cov_chol *= math.exp(
+                -0.5*log_precision_target.log_precision_state[i])
             self.cov_chol_array[i] = cov_chol
 
 class TargetLogPrecision(target.Target):
@@ -184,7 +187,9 @@ class TargetLogPrecision(target.Target):
         prior = target.get_log_precision_prior()
         self.log_precision_reg_prior = prior["log_precision_reg"]
         self.log_precision_arma_prior = prior["log_precision_arma"]
-        parameter_name_array = self.downscale.get_parameter_vector_name()
+
+        parameter_name_array = (
+            downscale.time_series_array[0][0].get_parameter_vector_name())
         self.arma_index = target.get_arma_index(parameter_name_array)
         self.log_precision_state = self.get_prior_mean()
 
@@ -219,7 +224,7 @@ class TargetLogPrecision(target.Target):
             else:
                 log_pdf_terms.append(
                     self.log_precision_reg_prior.logpdf(parameter_i))
-        return np.asarray(log_pdf_terms)
+        return np.sum(log_pdf_terms)
 
     #implemented
     def get_prior_mean(self):
@@ -267,8 +272,8 @@ class TargetGp(target.Target):
             state vector
         cov_chol_array_before: numpy array, used for temporarily storing the
             covariance matrix
-        precision_gp_prior: prior distribution for the Gaussian kernel parameter
-        precision_gp_state: numpy vector, gaussian kernel parameter for each
+        scale_gp_prior: prior distribution for the Gaussian kernel parameter
+        scale_gp_state: numpy vector, gaussian kernel parameter for each
             parameter
     """
 
@@ -279,17 +284,17 @@ class TargetGp(target.Target):
         self.state_before = None
         self.cov_chol_array_before = None
 
-        self.precision_gp_prior = target.get_gp_precision_prior()
-        self.precision_gp_state = np.zeros(self.downscale.n_parameter)
-        self.precision_gp_state[:] = self.precision_gp_prior.median()
+        self.scale_gp_prior = target.get_gp_scale_prior()
+        self.scale_gp_state = np.zeros(self.downscale.n_parameter)
+        self.scale_gp_state[:] = self.scale_gp_prior.median()
 
     #implemented
     def get_n_dim(self):
-        return self.precision_gp_state.size
+        return self.scale_gp_state.size
 
     #implemented
     def get_state(self):
-        return self.precision_gp_state
+        return self.scale_gp_state
 
     #implemented
     def update_state(self, state):
@@ -297,7 +302,7 @@ class TargetGp(target.Target):
         self.update_cov_chol()
 
     def update_state_vector(self, state):
-        self.precision_gp_state = state
+        self.scale_gp_state = state
 
     #implemented
     def get_log_likelihood(self):
@@ -308,7 +313,7 @@ class TargetGp(target.Target):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
-        log_pdf_terms = self.precision_gp_prior.logpdf(self.precision_gp_state)
+        log_pdf_terms = self.scale_gp_prior.logpdf(self.scale_gp_state)
         return np.sum(log_pdf_terms)
 
     #implemented
@@ -326,10 +331,10 @@ class TargetGp(target.Target):
 
     #implemented
     def simulate_from_prior(self, rng):
-        self.precision_gp_prior.random_state = rng
+        self.scale_gp_prior.random_state = rng
         downscale = self.downscale
-        precision_gp = self.precision_gp_prior.rvs(downscale.n_parameter)
-        return precision_gp
+        scale_gp = self.scale_gp_prior.rvs(downscale.n_parameter)
+        return scale_gp
 
     def update_cov_chol(self):
         """Calculate and save the Cholesky decomposition of the covariance

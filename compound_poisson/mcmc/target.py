@@ -149,16 +149,13 @@ def get_log_precision_prior():
             second for ARMA terms.
     """
     prior = {
-        "log_precision_reg": stats.norm(loc=1.7, scale=0.36),
-        "log_precision_arma": stats.norm(loc=4.3, scale=0.55),
+        "log_precision_reg": stats.norm(loc=1.7, scale=1.3),
+        "log_precision_arma": stats.norm(loc=4.4, scale=1.4),
     }
     return prior
 
-def get_gp_precision_prior():
-    """Return the default prior distribution for the precision prior for the
-        Gaussian process
-    """
-    return stats.invgamma(a=1, scale=556)
+def get_gp_scale_prior():
+    return stats.invgamma(a=1, scale=0.12)
 
 def get_arma_index(parameter_name_array):
     """Check which parameters are ARMA terms

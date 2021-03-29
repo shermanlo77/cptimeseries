@@ -48,7 +48,7 @@ class Downscale(multiseries.MultiSeries):
         self.parameter_log_precision_mcmc = None
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
-        self.gibbs_weight = [0.003*len(self), 1, 0.1, 0.5]
+        self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.5]
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
 
         if not data.model_field is None:
@@ -137,7 +137,7 @@ class Downscale(multiseries.MultiSeries):
         self.parameter_gp_mcmc = mcmc.Rwmh(
             self.parameter_gp_target, self.rng, self.n_sample, self.memmap_dir)
         self.parameter_gp_mcmc.proposal_covariance_small = (
-            1e2 / self.parameter_gp_mcmc.n_dim)
+            1e-4 / self.parameter_gp_mcmc.n_dim)
         #all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
@@ -194,8 +194,8 @@ class Downscale(multiseries.MultiSeries):
         plt.figure()
         plt.plot(self.parameter_gp_mcmc[:])
         plt.xlabel("sample number")
-        plt.ylabel("gp_precision")
-        plt.savefig(path.join(directory, "gp_precision.pdf"))
+        plt.ylabel("gp_scale")
+        plt.savefig(path.join(directory, "gp_scale.pdf"))
         plt.close()
 
         chain = []
