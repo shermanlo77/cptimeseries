@@ -48,7 +48,7 @@ class Downscale(multiseries.MultiSeries):
         self.parameter_log_precision_mcmc = None
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
-        self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.5]
+        self.gibbs_weight = [0.01*len(self), 1, 0.2, 0.5]
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
 
         if not data.model_field is None:
@@ -154,6 +154,20 @@ class Downscale(multiseries.MultiSeries):
             self.parameter_gp_mcmc,
         ]
         return mcmc_array
+
+    #override
+    def instantiate_forecaster(self, use_gp=False, topo_key=None):
+        """Instantiate a Forecaster object and return it
+
+        Args:
+            All unused
+
+        Return:
+            instantiated Forecaster object
+        """
+        #forecaster.downscale.Forecaster may be used instead for asynch version
+        forecaster = forecast.downscale.ForecasterSynch(self, self.memmap_dir)
+        return forecaster
 
     #override
     def print_mcmc(self, directory, pool):

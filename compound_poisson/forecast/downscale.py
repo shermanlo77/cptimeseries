@@ -229,6 +229,51 @@ class Forecaster(forecast_abstract.Forecaster):
         comparer.compare(self, n_linspace)
         return comparer
 
+class ForecasterSynch(Forecaster):
+    """Each forecast sample share the same MCMC sample
+
+    Current implementation is RAM intensive. Could do with a bit of work...
+
+    Attributes:
+        rng: a single rng which draws random integer for selecting with mcmc
+            sample to use
+    """
+
+    def __init__(self, downscale, memmap_dir):
+        self.rng = downscale.spawn_rng(1)
+        super().__init__(downscale, memmap_dir)
+        for time_series_i in downscale.generate_unmask_time_series():
+            #this class shall set from the mcmc manually, synchronously
+            time_series_i.set_from_mcmc = False
+
+    #override
+    def simulate_forecasts(self, index_range, is_print=False):
+        """Each location shares the same posterior sample
+        """
+
+        #for each forecast, all time series set mcmc sample
+        for i_forecast in index_range:
+
+            #set parameters and model fields from a mcmc sample
+                #the setting of the parameters is done in the super class method
+            mcmc_index = self.rng.randint(
+                self.downscale.burn_in, self.downscale.n_sample)
+
+            for time_series_i in self.downscale.generate_unmask_time_series():
+                time_series_i.read_memmap()
+                time_series_i.set_parameter_from_sample_i(mcmc_index)
+                time_series_i.del_memmap()
+
+            self.downscale.update_all_cp_parameters()
+
+            #do one sample
+                #hack: set the member variable n_simulation to do only one
+                    #forecast (could be improved here)
+            self.n_simulation = i_forecast + 1
+            super().simulate_forecasts([i_forecast], False)
+
+            print("Predictive sample", i_forecast)
+
 class ForecasterGp(Forecaster):
     """
     Do GP smoothing on the parameters for every forecast
