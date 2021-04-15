@@ -1,6 +1,4 @@
-import math
 from os import path
-import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +6,7 @@ import numpy as np
 from compound_poisson import mcmc
 from compound_poisson import time_series
 from compound_poisson.mcmc import target_time_series
+
 
 class TimeSeriesMcmc(time_series.TimeSeries):
     """Fit Compound Poisson time series using Rwmh from a Bayesian setting
@@ -19,15 +18,15 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     For more attributes, see the superclass
     Attributes:
         n_sample: number of MCMC samples
-        parameter_target: wrapper Target object to evaluate the posterior of the
-            parameters
+        parameter_target: wrapper Target object to evaluate the posterior of
+            the parameters
         parameter_mcmc: Mcmc object which does MCMC using parameter_target
         z_target: wrapper Target object to evaluate the posterior of z
         z_mcmc: Mcmc object which does MCMC using z_target
         gibbs_weight: up to a constant, probability of sampling each mcmc in
             self.get_mcmc_array()
-        burn_in: integer, which samples to discard when doing posterior sampling
-            which is used for forecasting
+        burn_in: integer, which samples to discard when doing posterior
+            sampling which is used for forecasting
         memmap_dir: directory to store the MCMC samples
         set_from_mcmc: boolean, True if to automatically randomly set from
             MCMC samples
@@ -76,7 +75,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
             mcmc_array = self.get_mcmc_array()
             for mcmc_i in mcmc_array:
                 mcmc_i.extend_memmap(n_sample)
-            #in resume, do not use initial value as sample (False in arg 3)
+            # in resume, do not use initial value as sample (False in arg 3)
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng,
                 self.gibbs_weight, False)
@@ -86,21 +85,21 @@ class TimeSeriesMcmc(time_series.TimeSeries):
     def initalise_z(self):
         """Initalise all z in self.z_array and update all parameters
 
-        Initalise all z in self.z_array using e_step() and update all parameters
-            using update_all_cp_parameters(). Required for e.g. likelihood
-            evaluation because z=0 if and only if y=0.
+        Initalise all z in self.z_array using e_step() and update all
+            parameters using update_all_cp_parameters(). Required for e.g.
+            likelihood evaluation because z=0 if and only if y=0.
         """
-        self.e_step() #initalise the z using the E step
-        self.z_array = self.z_array.round() #round it to get integer
-        #z cannot be 0 if y is not 0
-        self.z_array[np.logical_and(self.z_array==0, self.y_array>0)] = 1
-        self.update_all_cp_parameters() #initalse cp parameters
+        self.e_step()  # initalise the z using the E step
+        self.z_array = self.z_array.round()  # round it to get integer
+        # z cannot be 0 if y is not 0
+        self.z_array[np.logical_and(self.z_array == 0, self.y_array > 0)] = 1
+        self.update_all_cp_parameters()  # initalse cp parameters
 
     def instantiate_mcmc(self):
         """Instantiate all MCMC objects
 
-        Instantiate all MCMC objects by passing the corresponding Target objects
-            and random number generators
+        Instantiate all MCMC objects by passing the corresponding Target
+            objects and random number generators
         """
         self.parameter_mcmc = mcmc.Rwmh(
             self.parameter_target, self.rng, self.n_sample, self.memmap_dir)
@@ -138,8 +137,8 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.set_parameter_vector(self.parameter_mcmc[index])
         self.z_array = self.z_mcmc[index]
 
+    # override
     def forecast_self(self, n_simulation):
-        #override
         self.read_memmap()
         super().forecast_self(n_simulation)
         self.del_memmap()
@@ -152,13 +151,13 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         forecast = super().instantiate_forecast_self()
         return forecast
 
-    #override
+    # override
     def forecast(self, x, n_simulation):
         self.read_memmap()
         super().forecast(x, n_simulation)
         self.del_memmap()
 
-    #override
+    # override
     def instantiate_forecast(self, x):
         """Override - Set the parameter from the MCMC sample
         """
@@ -174,15 +173,15 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         Replaces the parameter with a sample from the prior. The prior mean and
             prior covariance unmodified.
         """
-        #keep sampling until the sampled parameter does not have numerical
-            #problems
+        # keep sampling until the sampled parameter does not have numerical
+        # problems
         while True:
             try:
-                #sample from the prior and set it
+                # sample from the prior and set it
                 prior_parameter = self.simulate_parameter_from_prior()
                 self.set_parameter_vector(prior_parameter)
                 self.simulate()
-                #check if any of the parameters are not nan
+                # check if any of the parameters are not nan
                 if np.any(np.isnan(self.poisson_rate.value_array)):
                     pass
                 elif np.any(np.isnan(self.gamma_mean.value_array)):
@@ -191,7 +190,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
                     pass
                 else:
                     break
-            #try again if there are numerical problems
+            # try again if there are numerical problems
             except(ValueError, OverflowError):
                 pass
 
@@ -225,10 +224,10 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         self.read_memmap()
         chain = np.asarray(self.parameter_mcmc[:])
         for i in range(self.n_parameter):
-            chain_i = chain[:,i]
+            chain_i = chain[:, i]
             plt.figure()
             plt.plot(chain_i)
-            if not true_parameter is None:
+            if true_parameter is not None:
                 plt.hlines(true_parameter[i], 0, len(chain)-1)
             plt.ylabel(parameter_name[i])
             plt.xlabel("Sample number")
@@ -263,6 +262,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
         plt.xlabel("Latent variable sample number")
         plt.savefig(path.join(directory, "accept_z.pdf"))
         plt.close()
+
 
 class TimeSeriesSlice(TimeSeriesMcmc):
     """Fit Compound Poisson time series using slice sampling from a Bayesian
@@ -315,14 +315,15 @@ class TimeSeriesSlice(TimeSeriesMcmc):
         plt.savefig(path.join(directory, "slice_width_z.pdf"))
         plt.close()
 
+
 class TimeSeriesHyperSlice(TimeSeriesSlice):
-    """Fit Compound Poisson time series using slice sampling with a prior on the
-    precision
+    """Fit Compound Poisson time series using slice sampling with a prior on
+        the precision
 
     Method uses slice within Gibbs. Uniform prior on z, Normal prior on the
-        regression parameters, Gamma prior on the precision of the covariance of
-        the Normal prior. Gibbs sample either z, regression parameters or the
-        precision. Sample z using slice sampling (Neal, 2003). Sampling the
+        regression parameters, Gamma prior on the precision of the covariance
+        of the Normal prior. Gibbs sample either z, regression parameters or
+        the precision. Sample z using slice sampling (Neal, 2003). Sampling the
         parameters using elliptical slice sampling (Murray 2010).
 
     For more attributes, see the superclass
@@ -344,7 +345,7 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
                          gamma_mean_n_arma,
                          cp_parameter_array)
         self.precision_target = target_time_series.TargetPrecision(self)
-        #mcmc object evaluated at instantiate_mcmc
+        # mcmc object evaluated at instantiate_mcmc
         self.precision_mcmc = None
         self.gibbs_weight = [0.003*len(self), 1, 0.2]
 
@@ -393,6 +394,9 @@ class TimeSeriesHyperSlice(TimeSeriesSlice):
         plt.savefig(path.join(directory, "accept_precision.pdf"))
         plt.close()
 
+
 def static_initalise_z(time_series):
+    """Static version of initalise_z(). Used for parallel programming.
+    """
     time_series.initalise_z()
     return time_series
