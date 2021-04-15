@@ -19,13 +19,11 @@ Mcmc
     <>1- Target
 """
 
-import math
-
 import numpy as np
 from scipy import linalg
-from scipy import stats
 
 from compound_poisson.mcmc import target
+
 
 class TargetParameter(target.Target):
     """Target object for MCMC to sample the parameters for a collection of
@@ -56,37 +54,37 @@ class TargetParameter(target.Target):
         self.prior_mean = target.get_parameter_mean_prior(parameter_name_array)
         self.arma_index = target.get_arma_index(parameter_name_array)
 
-    #implemented
+    # implemented
     def get_n_dim(self):
         return self.n_total_parameter
 
-    #implemented
+    # implemented
     def get_state(self):
         return self.downscale.get_parameter_vector()
 
-    #implemented
+    # implemented
     def update_state(self, state):
-        #set all time series parameters and update them so that the likelihood
-            #can be evaluated
+        # set all time series parameters and update them so that the likelihood
+        # can be evaluated
         self.downscale.set_parameter_vector(state)
         self.downscale.update_all_cp_parameters()
 
-    #implemented
+    # implemented
     def get_log_likelihood(self):
-        #a self.downscale.update_all_cp_parameters() is required beforehand
+        # a self.downscale.update_all_cp_parameters() is required beforehand
         return self.downscale.get_log_likelihood()
 
-    #implemented
+    # implemented
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
-        #required when doing mcmc on the gp precision parameters
-        #evaluate the multivariate Normal distribution
+        # required when doing mcmc on the gp precision parameters
+        # evaluate the multivariate Normal distribution
         z = self.get_state()
         z -= self.prior_mean
         ln_prior_term = []
-        #retrive covariance information from parameter_gp_target
+        # retrive covariance information from parameter_gp_target
         gp_target = self.downscale.parameter_gp_target
         log_precision_target = self.downscale.parameter_log_precision_target
         chol = gp_target.cov_chol
@@ -104,16 +102,16 @@ class TargetParameter(target.Target):
         ln_det_cov_reg = 2*np.sum(np.log(np.diagonal(chol_reg)))
         ln_det_cov_arma = 2*np.sum(np.log(np.diagonal(chol_arma)))
 
-        #evaluate the Normal density for each parameter, each parameter has a
-            #covariance matrix which represent the correlation in space. There
-            #is no correlation between different parameters. In other words,
-            #if a vector contains all parameters for all points in space, the
-            #covariance matrix has a block diagonal structure. Evaluating
-            #the density with a block digonal covariance matrix can be done
-            #using a for loop
+        # evaluate the Normal density for each parameter, each parameter has a
+        # covariance matrix which represent the correlation in space. There
+        # is no correlation between different parameters. In other words,
+        # if a vector contains all parameters for all points in space, the
+        # covariance matrix has a block diagonal structure. Evaluating
+        # the density with a block digonal covariance matrix can be done
+        # using a for loop
         for i in range(self.n_parameter):
-            #z is the parameter - mean
-            z_i = z[i*self.area_unmask : (i+1)*self.area_unmask]
+            # z is the parameter - mean
+            z_i = z[i*self.area_unmask: (i+1)*self.area_unmask]
 
             chol_i = None
             ln_det_cov_i = None
@@ -123,31 +121,32 @@ class TargetParameter(target.Target):
             else:
                 chol_i = chol_reg
                 ln_det_cov_i = ln_det_cov_reg
-            #reminder: det(cX) = c^d det(X)
-            #reminder: det(L*L) = det(L) * det(L)
-            #reminder: 1/sqrt(precision) = standard deviation or scale
+            # reminder: det(cX) = c^d det(X)
+            # reminder: det(L*L) = det(L) * det(L)
+            # reminder: 1/sqrt(precision) = standard deviation or scale
             z_i = linalg.solve_triangular(chol_i, z_i, lower=True)
             ln_prior_term.append(-0.5 * (np.dot(z_i, z_i) + ln_det_cov_i))
 
         return np.sum(ln_prior_term)
 
-    #implemented
+    # implemented
     def save_state(self):
         self.parameter_before = self.get_state()
 
-    #implemented
+    # implemented
     def revert_state(self):
         self.update_state(self.parameter_before)
 
-    #implemented
+    # implemented
     def simulate_from_prior(self, rng):
-        #required for study of prior distribution and elliptical slice sampling
+        # required for study of prior distribution and elliptical slice
+        # sampling
         parameter_vector = self.get_prior_mean()
         log_precision_target = self.downscale.parameter_log_precision_target
-        #cholesky of kernel matrix
+        # cholesky of kernel matrix
         chol = self.downscale.parameter_gp_target.cov_chol
-        #simulate each parameter, correlation only in space, not between
-            #parameters
+        # simulate each parameter, correlation only in space, not between
+        # parameters
         std_reg = np.exp(-0.5*log_precision_target.get_reg_state())
         std_arma = np.exp(-0.5*log_precision_target.get_arma_state())
 
@@ -172,8 +171,9 @@ class TargetParameter(target.Target):
         return parameter_vector
 
     def get_prior_mean(self):
-        #implemented
+        # implemented
         return self.prior_mean.copy()
+
 
 class TargetLogPrecision(target.Target):
     """Target implementation for the log precision for the parameters
@@ -204,11 +204,11 @@ class TargetLogPrecision(target.Target):
                 self.state.append(prior.mean())
         self.state = np.asarray(self.state)
 
-    #implemented
+    # implemented
     def get_n_dim(self):
         return self.downscale.area_unmask * 2
 
-    #implemented
+    # implemented
     def get_state(self):
         return self.state
 
@@ -218,7 +218,7 @@ class TargetLogPrecision(target.Target):
         for i, key in enumerate(self.prior):
             if key == prior_key:
                 state_i = self.state[
-                    i*self.area_unmask : (i+1)*self.area_unmask]
+                    i*self.area_unmask: (i+1)*self.area_unmask]
                 return state_i.copy()
 
     def get_reg_state(self):
@@ -231,11 +231,11 @@ class TargetLogPrecision(target.Target):
         """
         return self.get_sub_state("log_precision_arma")
 
-    #implemented
+    # implemented
     def update_state(self, state):
         self.state = state.copy()
 
-    #implemented
+    # implemented
     def get_log_likelihood(self):
         return self.downscale.parameter_target.get_log_prior()
 
@@ -247,19 +247,19 @@ class TargetLogPrecision(target.Target):
                 ln_prior.append(prior.logpdf(state_i))
         return np.sum(ln_prior)
 
-    #implemented
+    # implemented
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
 
-    #implemented
+    # implemented
     def save_state(self):
         self.state_before = self.state.copy()
 
-    #implemented
+    # implemented
     def revert_state(self):
         self.state = self.state_before
 
-    #implemented
+    # implemented
     def simulate_from_prior(self, rng):
         state = []
         for prior in self.prior.values():
@@ -268,13 +268,14 @@ class TargetLogPrecision(target.Target):
                 state.append(prior.rvs())
         return np.asarray(state)
 
-    #implemented
+    # implemented
     def get_prior_mean(self):
         state = []
         for prior in self.prior.values():
             for i_location in range(self.area_unmask):
                 state.append(prior.mean())
         return np.asarray(state)
+
 
 class TargetLogPrecisionGp(TargetLogPrecision):
     """Target implementation for the log precision for the parameters. This
@@ -296,7 +297,7 @@ class TargetLogPrecisionGp(TargetLogPrecision):
     def __init__(self, downscale):
         super().__init__(downscale)
 
-    #override
+    # override
     def get_log_prior(self):
         ln_prior = []
         cov_chol = self.downscale.parameter_log_precision_gp_target.cov_chol
@@ -308,18 +309,18 @@ class TargetLogPrecisionGp(TargetLogPrecision):
             ln_det_cov_i = 2*np.sum(np.log(np.diagonal(cov_chol_i)))
 
             z_i = self.state[
-                i_prior*self.area_unmask : (i_prior+1)*self.area_unmask].copy()
+                i_prior*self.area_unmask: (i_prior+1)*self.area_unmask].copy()
             z_i -= prior.mean()
 
-            #reminder: det(cX) = c^d det(X)
-            #reminder: det(L*L) = det(L) * det(L)
-            #reminder: 1/sqrt(precision) = standard deviation or scale
+            # reminder: det(cX) = c^d det(X)
+            # reminder: det(L*L) = det(L) * det(L)
+            # reminder: 1/sqrt(precision) = standard deviation or scale
             z_i = linalg.solve_triangular(cov_chol_i, z_i, lower=True)
             ln_prior.append(-0.5 * (np.dot(z_i, z_i) + ln_det_cov_i))
 
         return np.sum(ln_prior)
 
-    #override
+    # override
     def simulate_from_prior(self, rng):
         state = self.get_prior_mean()
         cov_chol = self.downscale.parameter_log_precision_gp_target.cov_chol
@@ -336,6 +337,7 @@ class TargetLogPrecisionGp(TargetLogPrecision):
             state[i*self.area_unmask:(i+1)*self.area_unmask] += parameter_i
         return state
 
+
 class TargetGp(target.Target):
     """Contains density information for the GP precision parameters, to be
         paired with a TargetDeepGp object.
@@ -349,8 +351,8 @@ class TargetGp(target.Target):
         cov_chol: kernel matrix, cholesky decomposed
         cov_chol_before: copy of cov_chol when doing mcmc (for reverting after
             rejection)
-        square_error: matrix (area_unmask x area_unmask) containing square error
-            of topography between each point in space.
+        square_error: matrix (area_unmask x area_unmask) containing square
+            error of topography between each point in space.
     """
 
     def __init__(self, downscale):
@@ -361,47 +363,47 @@ class TargetGp(target.Target):
         self.state_before = None
         self.cov_chol = None
         self.cov_chol_before = None
-        #square_error does not change so points to the copy owned by Downscale
+        # square_error does not change so points to the copy owned by Downscale
         self.square_error = downscale.square_error
-        #use median as inital state as inverse gamma may not have finite mean
+        # use median as inital state as inverse gamma may not have finite mean
         self.state = self.prior.median()
 
-    #implemented
+    # implemented
     def get_n_dim(self):
         return 1
 
-    #implemented
+    # implemented
     def get_state(self):
         return np.asarray([self.state])
 
-    #implemented
+    # implemented
     def update_state(self, state):
         self.state = state[0]
         self.save_cov_chol()
 
-    #implemented
+    # implemented
     def get_log_likelihood(self):
         return self.downscale.parameter_target.get_log_prior()
 
-    #implemented
+    # implemented
     def get_log_target(self):
         return self.get_log_likelihood() + self.get_log_prior()
 
     def get_log_prior(self):
         return self.prior.logpdf(self.state)
 
-    #implemented
+    # implemented
     def save_state(self):
-        #make a deep copy of the state and the covariance matrix
+        # make a deep copy of the state and the covariance matrix
         self.state_before = self.state
         self.cov_chol_before = self.cov_chol.copy()
 
-    #implemented
+    # implemented
     def revert_state(self):
         self.state = self.state_before
         self.cov_chol = self.cov_chol_before
 
-    #implemented
+    # implemented
     def simulate_from_prior(self, rng):
         self.prior.random_state = rng
         return np.asarray([self.prior.rvs()])
@@ -415,6 +417,7 @@ class TargetGp(target.Target):
         cov_chol = linalg.cholesky(cov_chol, True)
         self.cov_chol = cov_chol
 
+
 class TargetDeepGp(TargetGp):
     """Target implementation of GP precision for the log precision prior, to be
         paired with a TargetLogPrecisionGp object.
@@ -423,6 +426,6 @@ class TargetDeepGp(TargetGp):
     def __init__(self, downscale):
         super().__init__(downscale)
 
-    #override
+    # override
     def get_log_likelihood(self):
         return self.downscale.parameter_log_precision_target.get_log_prior()

@@ -1,6 +1,6 @@
 """
-TODO: Suggestion, rewrite the methods get_parameter_3d(), get_parameter_vector()
-    set_parameter_vector() to make use of newer code
+TODO: Suggestion, rewrite the methods get_parameter_3d(),
+    get_parameter_vector(), set_parameter_vector() to make use of newer code
 """
 
 import os
@@ -16,6 +16,7 @@ from compound_poisson import mcmc
 from compound_poisson import multiprocess
 from compound_poisson import time_series_mcmc
 
+
 class MultiSeries(object):
     """Collection of multiple TimeSeries objects
 
@@ -24,8 +25,8 @@ class MultiSeries(object):
 
     Attributes:
         n_arma: 2-tuple, containing number of AR and MA terms
-        time_series_array: 2d array containing TimeSeries objects, correspond to
-            the fine grid
+        time_series_array: 2d array containing TimeSeries objects, correspond
+            to the fine grid
         time_array: array containing time stamp for each time step
         model_field_units: dictionary containing units for each model field,
             keys are strings describing the model field
@@ -51,12 +52,12 @@ class MultiSeries(object):
             field
     """
 
-    def __init__(self, data, n_arma=(0,0)):
+    def __init__(self, data, n_arma=(0, 0)):
         """
         Args:
             data: DataDualGrid object containing the training set
         """
-        #note: data can have no model fields (eg ERA5)
+        # note: data can have no model fields (eg ERA5)
         self.n_arma = n_arma
         self.time_series_array = []
         self.time_array = data.time_array
@@ -81,43 +82,44 @@ class MultiSeries(object):
         self.model_field_shift = []
         self.model_field_scale = []
 
-        #instantiate time series for every point in space
-        #unmasked points have rain, provide it to the constructor to TimeSeries
-        #masked points do not have rain, cannot provide it
+        # instantiate time series for every point in space
+        # unmasked points have rain, provide it to the constructor to
+        # TimeSeries
+        #
+        # masked points do not have rain, cannot provide it
         time_series_array = self.time_series_array
         TimeSeries = self.get_time_series_class()
         for lat_i in range(self.shape[0]):
             time_series_array.append([])
             for long_i in range(self.shape[1]):
-                #TimeSeries object to be appended to time_series_array
+                # TimeSeries object to be appended to time_series_array
                 time_series = None
-                #empty constructor for TimeSeries is non data
+                # empty constructor for TimeSeries is non data
                 if data.model_field is None:
                     time_series = TimeSeries()
                 else:
                     x_i, rain_i = data.get_data(lat_i, long_i)
                     is_mask = self.mask[lat_i, long_i]
                     if is_mask:
-                        #provide no rain if this space is masked
+                        # provide no rain if this space is masked
                         time_series = TimeSeries(x_i,
                                                  poisson_rate_n_arma=n_arma,
                                                  gamma_mean_n_arma=n_arma)
                     else:
-                        #provide rain
+                        # provide rain
                         time_series = TimeSeries(
                             x_i, rain_i.data, n_arma, n_arma)
-                    #
                     for i in range(time_series.n_parameter):
                         self.parameter_mask_vector.append(is_mask)
                     self.n_parameter = time_series.n_parameter
 
-                #provide information to time_series
+                # provide information to time_series
                 time_series.id = [lat_i, long_i]
                 time_series.time_array = self.time_array
                 time_series_array[lat_i].append(time_series)
 
-        if not data.model_field is None:
-            #set other member variables
+        if data.model_field is not None:
+            # set other member variables
             self.model_field_units = data.model_field_units
             self.n_model_field = len(data.model_field)
             self.set_seed_seq(random.SeedSequence())
@@ -125,9 +127,10 @@ class MultiSeries(object):
             self.parameter_mask_vector = np.asarray(self.parameter_mask_vector)
             self.n_total_parameter = self.area_unmask * self.n_parameter
 
-            #get normalising info for model fields using mean and standard
-                #deviation over all space and time
-            #all locations share the same normalisation constants
+            # get normalising info for model fields using mean and standard
+            # deviation over all space and time
+            #
+            # all locations share the same normalisation constants
             for model_field in data.model_field.values():
                 self.model_field_shift.append(np.mean(model_field))
                 self.model_field_scale.append(np.std(model_field, ddof=1))
@@ -155,7 +158,7 @@ class MultiSeries(object):
         self.initalise_z()
         self.instantiate_mcmc()
         self.scatter_mcmc_sample()
-        #parallel fit over locations
+        # parallel fit over locations
         message_array = []
         for time_series_i in self.generate_unmask_time_series():
             message_array.append(FitMessage(time_series_i))
@@ -201,8 +204,8 @@ class MultiSeries(object):
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
-        #do not provide memmap so that when instantiating mcmc for each time
-            #series, it does not create a memmap file
+        # do not provide memmap so that when instantiating mcmc for each time
+        # series, it does not create a memmap file
         for time_series_i in self.generate_unmask_time_series():
             time_series_i.instantiate_mcmc()
         self.mcmc = MultiMcmc(self)
@@ -210,8 +213,8 @@ class MultiSeries(object):
     def initalise_z(self):
         """Initalise z for all time series
         """
-        #all time series initalise z, needed so that the likelihood can be
-            #evaluated, eg y=0 if and only if x=0
+        # all time series initalise z, needed so that the likelihood can be
+        # evaluated, eg y=0 if and only if x=0
         method = time_series_mcmc.static_initalise_z
         time_series_array = self.pool.map(
             method, self.generate_unmask_time_series())
@@ -241,7 +244,7 @@ class MultiSeries(object):
         """Return log likelihood
         """
         method = (compound_poisson.time_series.TimeSeries
-            .get_joint_log_likelihood)
+                  .get_joint_log_likelihood)
         ln_l_array = self.pool.map(method, self.generate_unmask_time_series())
         return np.sum(ln_l_array)
 
@@ -286,7 +289,7 @@ class MultiSeries(object):
             (self.shape[0], self.shape[1], self.n_parameter))
         for i in range(self.n_parameter):
             parameter_i = parameter_vector[
-                i*self.area_unmask : (i+1)*self.area_unmask]
+                i*self.area_unmask: (i+1)*self.area_unmask]
             parameter_3d[np.logical_not(self.mask), i] = parameter_i
         for lat_i in range(self.shape[0]):
             for long_i in range(self.shape[1]):
@@ -386,7 +389,7 @@ class MultiSeries(object):
         self.scatter_mcmc_sample()
         position_index_array = self.get_random_position_index()
 
-        #pick random locations and plot their mcmc chains
+        # pick random locations and plot their mcmc chains
         for j, name in enumerate(self.mcmc.mcmc_name_array):
             chain = self.mcmc.mcmc_array[j].sample_array
             chain_dim = self.mcmc.n_dim_array[j]
@@ -428,10 +431,10 @@ class MultiSeries(object):
                 plt.savefig(path.join(directory, "z.pdf"))
                 plt.close()
 
-        #plot each chain for each location
+        # plot each chain for each location
         message_array = []
         for i_space, time_series in enumerate(
-            self.generate_unmask_time_series()):
+                self.generate_unmask_time_series()):
             message = PlotMcmcMessage(
                 self, chain, time_series, i_space, location_directory)
             message_array.append(message)
@@ -529,15 +532,16 @@ class MultiSeries(object):
     def discard_sample(self, n_keep):
         """For debugging: Discard initial mcmc samples to save hard disk space
 
-        For each mcmc, make a new memmap and store the last n_keep mcmc samples.
+        For each mcmc, make a new memmap and store the last n_keep mcmc
+            samples.
             For saftey reasons, you will have to delete the old memmap file
             yourself.
 
         Args:
             n_keep: number of mcmc samples to keep (from the end of the chain)
         """
-        for mcmc in self.get_mcmc_array():
-            mcmc.discard_sample(n_keep)
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.discard_sample(n_keep)
         self.n_sample = n_keep
 
     def set_seed_seq(self, seed_sequence):
@@ -565,8 +569,8 @@ class MultiSeries(object):
             the seed sequence
 
         Return:
-            array of numpy.random.RandomState objects if n > 1, or just a single
-                object if n == 1
+            array of numpy.random.RandomState objects if n > 1, or just a
+                single object if n == 1
         """
         seed_spawn = self.seed_seq.spawn(n)
         rng_array = []
@@ -581,10 +585,11 @@ class MultiSeries(object):
         return len(self.time_array)
 
     def __getstate__(self):
-        #required as multiprocessing cannot pickle multiprocessing.Pool
+        # required as multiprocessing cannot pickle multiprocessing.Pool
         self_dict = self.__dict__.copy()
         self_dict['pool'] = None
         return self_dict
+
 
 class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
     """Modify TimeSeriesSlice so that it shares a memmap with all other
@@ -600,12 +605,13 @@ class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
                          rainfall,
                          poisson_rate_n_arma,
                          gamma_mean_n_arma)
-        #set these to None to ensure a memmap is not allocated at instantiation
-            #allocation is done using MultiMcmc
+        # set these to None to ensure a memmap is not allocated at
+        # instantiation
+        # allocation is done using MultiMcmc
         self.n_sample = None
         self.memmap_dir = None
 
-    #override
+    # override
     def fit(self):
         """Overridden to use the common memmap between locations
 
@@ -622,9 +628,9 @@ class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
             is_print=False)
         self.del_memmap()
         print("Location " + str(self.id) + " " + str(self.n_sample)
-            + " samples")
+              + " samples")
 
-    #override
+    # override
     def resume_fitting(self, n_sample):
         """Overridden to use the common memmap between locations
 
@@ -637,16 +643,16 @@ class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
         if n_sample > self.n_sample:
             self.read_to_write_memmap()
             mcmc_array = self.get_mcmc_array()
-            #in resume, do not use initial value as sample (False in arg 3)
+            # in resume, do not use initial value as sample (False in arg 3)
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng,
                 self.gibbs_weight, False, is_print=False)
             self.n_sample = n_sample
             self.del_memmap()
             print("Location " + str(self.id) + " " + str(self.n_sample)
-                + " samples")
+                  + " samples")
 
-    #override
+    # override
     def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
         """Overridden to use the common memmap between locations
 
@@ -668,6 +674,7 @@ class TimeSeriesMultiSeries(time_series_mcmc.TimeSeriesHyperSlice):
             self.forecaster.memmap_path = memmap_path
             self.forecaster.resume_forecast(n_simulation, memmap_shape)
         self.del_memmap()
+
 
 class MultiMcmc(object):
     """For handling Mcmc objects for each Gibbs component. Each Mcmc object is
@@ -699,7 +706,7 @@ class MultiMcmc(object):
         for time_series_i in self.multi_series.generate_unmask_time_series():
             time_series_i.n_sample = self.n_sample
 
-        #look at the first time series, extract MCMC information
+        # look at the first time series, extract MCMC information
         self.n_dim_array = []
         self.n_dim_total_array = []
         iter = multi_series.generate_unmask_time_series()
@@ -709,12 +716,12 @@ class MultiMcmc(object):
             self.mcmc_array.append(mcmc.Mcmc(mcmc_i.dtype, mcmc_i.target))
             self.mcmc_name_array.append(mcmc_i.get_target_class())
 
-        #assume each location has the same MCMC, get n_dim
+        # assume each location has the same MCMC, get n_dim
         self.n_dim_array = np.asarray(self.n_dim_array, dtype=np.int32)
         self.n_dim_total_array = (
             self.n_dim_array * self.multi_series.area_unmask)
 
-        #instantiate the memmap for each component
+        # instantiate the memmap for each component
         for i, mcmc_i in enumerate(self.mcmc_array):
             mcmc_i.instantiate_memmap(
                 self.memmap_dir, self.n_sample, self.n_dim_total_array[i])
@@ -755,9 +762,8 @@ class MultiMcmc(object):
         """Make each Mcmc in the array of TimeSeries to have access the memmap
             in self.mcmc_array
         """
-        area_unmask = self.multi_series.area_unmask
         for i, time_series_i in enumerate(
-            self.multi_series.generate_unmask_time_series()):
+                self.multi_series.generate_unmask_time_series()):
             mcmc_array = time_series_i.get_mcmc_array()
             for j, mcmc_j in enumerate(mcmc_array):
                 n_dim = self.n_dim_total_array[j]
@@ -768,42 +774,54 @@ class MultiMcmc(object):
                                         self.mcmc_array[j].memmap_path,
                                         slice_index)
 
+
 class FitMessage(object):
     """Message for fitting for each location in parallel
     """
+
     def __init__(self, time_series):
         self.time_series = time_series
+
     def fit(self):
         self.time_series.fit()
         return self.time_series
 
+
 class ResumeFittingMessage(object):
     """Message for resuming fitting for each location in parallel
     """
+
     def __init__(self, time_series, n_sample):
         self.time_series = time_series
         self.n_sample = n_sample
+
     def fit(self):
         self.time_series.resume_fitting(self.n_sample)
         return self.time_series
 
+
 class ForecastMessage(object):
     """Message for forecasting each location in parallel
     """
+
     def __init__(self, time_series, model_field, n_simulation):
         self.time_series = time_series
         self.model_field = model_field
         self.n_simulation = n_simulation
+
     def forecast(self):
         return self.time_series.forecast(self.model_field, self.n_simulation)
+
 
 class PlotMcmcMessage(object):
     """Message for printing the mcmc figures for each location in parallel
     """
+
     def __init__(self, downscale, chain, time_series, i_space, directory):
         self.time_series = time_series
         self.sub_directory = path.join(directory, str(time_series.id))
         if not path.isdir(self.sub_directory):
             os.mkdir(self.sub_directory)
+
     def print(self):
         self.time_series.print_mcmc(self.sub_directory)

@@ -4,8 +4,8 @@
 import multiprocessing
 
 from abcpy import backends
-from mpi4py import MPI
 from mpi4py import futures
+
 
 class Serial(object):
     """Does tasks in serial (for debugging purposes)
@@ -26,10 +26,12 @@ class Serial(object):
     def join(self):
         pass
 
+
 class MPIPoolExecutor(Serial):
     """Uses mpi4py.futures.MPIPoolExecutor
 
-    To call, use, for example,: mpiexec -n 8 python3 -m mpi4py.futures script.py
+    To call, use, for example,: mpiexec -n 8 python3 -m mpi4py.futures
+        script.py
     """
 
     def __init__(self):
@@ -42,6 +44,7 @@ class MPIPoolExecutor(Serial):
 
     def join(self):
         self.pool.shutdown()
+
 
 class Pool(Serial):
     """Uses multiprocessing.Pool
@@ -61,6 +64,7 @@ class Pool(Serial):
         self.pool.close()
         self.pool.join()
 
+
 class BackendMPI(Serial):
     """Uses abcpy.backends.BackendMPI
 
@@ -79,9 +83,11 @@ class BackendMPI(Serial):
     def broadcast(self, value):
         return self.pool.broadcast(value)
 
+
 class Broadcast(object):
     """Dummy Broadcast object
     """
+
     def __init__(self, value):
         self._value = value
 

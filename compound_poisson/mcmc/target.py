@@ -14,6 +14,7 @@ Target
 import numpy as np
 from scipy import stats
 
+
 class Target(object):
     """Abstract class for evaluating the posterior distribution for MCMC and
         keeping track of the state of the model so that it can evalaute the

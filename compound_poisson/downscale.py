@@ -12,6 +12,7 @@ from compound_poisson import multiseries
 from compound_poisson import time_series_mcmc
 from compound_poisson.mcmc import target_downscale
 
+
 class Downscale(multiseries.MultiSeries):
     """Collection of multiple TimeSeries objects
 
@@ -31,14 +32,15 @@ class Downscale(multiseries.MultiSeries):
             parameter_log_precision_target
         parameter_gp_mcmc: Mcmc object wrapping around parameter_gp_target
         z_mcmc: ZMcmcArray object
-        gibbs_weight: probability of sampling each mcmc in self.get_mcmc_array()
-        square_error: matrix (area_unmask x area_unmask) containing square error
-            of topography between each point in space
+        gibbs_weight: probability of sampling each mcmc in
+            self.get_mcmc_array()
+        square_error: matrix (area_unmask x area_unmask) containing square
+            error of topography between each point in space
     """
 
-    def __init__(self, data, n_arma=(0,0)):
-        #data is compatible with era5 as well by assuming data.model_field is
-            #None
+    def __init__(self, data, n_arma=(0, 0)):
+        # data is compatible with era5 as well by assuming data.model_field is
+        # None
         super().__init__(data, n_arma)
         self.topography_normalise = None
         self.parameter_target = None
@@ -51,11 +53,11 @@ class Downscale(multiseries.MultiSeries):
         self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2]
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
 
-        if not data.model_field is None:
+        if data.model_field is not None:
             self.topography_normalise = data.topography_normalise
 
-            #get the square error matrix used for GP
-            #only use longitude and latitude
+            # get the square error matrix used for GP
+            # only use longitude and latitude
             unmask = np.logical_not(self.mask).flatten()
             for topo_i_key in ["longitude", "latitude"]:
                 topo_i = self.topography_normalise[topo_i_key]
@@ -63,12 +65,12 @@ class Downscale(multiseries.MultiSeries):
                 topo_i = topo_i[unmask]
                 for i in range(self.area_unmask):
                     for j in range(i+1, self.area_unmask):
-                        self.square_error[i,j] += math.pow(
+                        self.square_error[i, j] += math.pow(
                             topo_i[i] - topo_i[j], 2)
-                        self.square_error[j,i] = self.square_error[i,j]
+                        self.square_error[j, i] = self.square_error[i, j]
 
-        if not data.model_field is None:
-            #set target
+        if data.model_field is not None:
+            # set target
             self.parameter_target = target_downscale.TargetParameter(self)
             self.parameter_log_precision_target = (
                 target_downscale.TargetLogPrecision(self))
@@ -77,11 +79,11 @@ class Downscale(multiseries.MultiSeries):
         for time_series_i in self.generate_unmask_time_series():
             time_series_i.memmap_dir = self.memmap_dir
 
-    #override
+    # override
     def get_time_series_class(self):
         return TimeSeriesDownscale
 
-    #override
+    # override
     def fit(self, pool=None):
         """Fit using Gibbs sampling
 
@@ -95,12 +97,12 @@ class Downscale(multiseries.MultiSeries):
         self.instantiate_mcmc()
         mcmc_array = self.get_mcmc_array()
         mcmc.do_gibbs_sampling(mcmc_array, self.n_sample, self.rng,
-                self.gibbs_weight)
+                               self.gibbs_weight)
         self.scatter_mcmc_sample()
         self.del_memmap()
         self.pool = None
 
-    #override
+    # override
     def resume_fitting(self, n_sample, pool=None):
         """Run more MCMC samples
 
@@ -114,7 +116,7 @@ class Downscale(multiseries.MultiSeries):
             mcmc_array = self.get_mcmc_array()
             for mcmc_i in mcmc_array:
                 mcmc_i.extend_memmap(n_sample)
-            #in resume, do not use initial value as sample (False in arg 3)
+            # in resume, do not use initial value as sample (False in arg 3)
             mcmc.do_gibbs_sampling(
                 mcmc_array, n_sample - self.n_sample, self.rng,
                 self.gibbs_weight, False)
@@ -124,7 +126,7 @@ class Downscale(multiseries.MultiSeries):
         self.del_memmap()
         self.pool = None
 
-    #override
+    # override
     def instantiate_mcmc(self):
         """Instantiate MCMC objects
         """
@@ -135,7 +137,7 @@ class Downscale(multiseries.MultiSeries):
             self.memmap_dir)
         self.parameter_gp_mcmc = mcmc.Rwmh(
             self.parameter_gp_target, self.rng, self.n_sample, self.memmap_dir)
-        #all time series objects instantiate mcmc objects to store the z chain
+        # all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
             time_series.instantiate_mcmc()
@@ -153,7 +155,7 @@ class Downscale(multiseries.MultiSeries):
         ]
         return mcmc_array
 
-    #override
+    # override
     def print_mcmc(self, directory, pool):
         """Print the mcmc chains
         """
@@ -167,7 +169,7 @@ class Downscale(multiseries.MultiSeries):
         self.scatter_mcmc_sample()
         position_index_array = self.get_random_position_index()
 
-        #pick random locations and plot their mcmc chains
+        # pick random locations and plot their mcmc chains
         chain = np.asarray(self.parameter_mcmc[:])
         area_unmask = self.area_unmask
         parameter_name = (
@@ -214,10 +216,10 @@ class Downscale(multiseries.MultiSeries):
         plt.savefig(path.join(directory, "z.pdf"))
         plt.close()
 
-        #plot each chain for each location
+        # plot each chain for each location
         message_array = []
         for i_space, time_series in enumerate(
-            self.generate_unmask_time_series()):
+                self.generate_unmask_time_series()):
             message = multiseries.PlotMcmcMessage(
                 self, chain, time_series, i_space, location_directory)
             message_array.append(message)
@@ -225,7 +227,7 @@ class Downscale(multiseries.MultiSeries):
 
         self.del_memmap()
 
-    #override
+    # override
     def scatter_mcmc_sample(self):
         self.scatter_z_mcmc_sample()
         self.scatter_parameter_mcmc_sample()
@@ -250,24 +252,25 @@ class Downscale(multiseries.MultiSeries):
                                               slice_index)
             time_series.parameter_mcmc = parameter_mcmc_i
 
-    #override
+    # override
     def read_memmap(self):
         """Set memmap objects to read from file
 
         Required when loading saved object from joblib
         """
-        for mcmc in self.get_mcmc_array():
-            mcmc.read_memmap()
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.read_memmap()
 
-    #override
+    # override
     def del_memmap(self):
-        for mcmc in self.get_mcmc_array():
-            mcmc.del_memmap()
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.del_memmap()
 
-    #override
+    # override
     def delete_old_memmap(self):
-        for mcmc in self.get_mcmc_array():
-            mcmc.delete_old_memmap()
+        for mcmc_i in self.get_mcmc_array():
+            mcmc_i.delete_old_memmap()
+
 
 class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
     """Modify TimeSeriesSlice to only sample z
@@ -296,7 +299,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         self.z_mcmc = mcmc.ZSlice(self.z_target, self.rng)
 
     def forecast(self, x, n_simulation, memmap_path, memmap_shape, i_space):
-        #override to include MCMC samples
+        # override to include MCMC samples
         self.read_memmap()
         if self.forecaster is None:
             self.forecaster = forecast.downscale.TimeSeriesForecaster(
@@ -314,6 +317,7 @@ class TimeSeriesDownscale(time_series_mcmc.TimeSeriesSlice):
         """
         pass
 
+
 class DownscaleDeepGp(Downscale):
     """Extension of Downscale by putting a GP prior on the log precision
         parameters. The GP precision has an inverse Gamma prior.
@@ -325,18 +329,18 @@ class DownscaleDeepGp(Downscale):
             parameter_log_precision_gp_target
     """
 
-    def __init__(self, data, n_arma=(0,0)):
+    def __init__(self, data, n_arma=(0, 0)):
         self.parameter_log_precision_gp_target = None
         self.parameter_log_precision_gp_mcmc = None
         super().__init__(data, n_arma)
-        if not data.model_field is None:
+        if data.model_field is not None:
             self.parameter_log_precision_target = (
                 target_downscale.TargetLogPrecisionGp(self))
             self.parameter_log_precision_gp_target = (
                 target_downscale.TargetDeepGp(self))
         self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2, 0.2]
 
-    #override
+    # override
     def instantiate_mcmc(self):
         super().instantiate_mcmc()
         self.parameter_log_precision_gp_mcmc = mcmc.Rwmh(
@@ -344,13 +348,13 @@ class DownscaleDeepGp(Downscale):
             self.memmap_dir)
         self.parameter_log_precision_gp_target.save_cov_chol()
 
-    #override
+    # override
     def get_mcmc_array(self):
         mcmc_array = super().get_mcmc_array()
         mcmc_array.append(self.parameter_log_precision_gp_mcmc)
         return mcmc_array
 
-    #override
+    # override
     def print_mcmc(self, directory, pool):
         super().print_mcmc(directory, pool)
 
