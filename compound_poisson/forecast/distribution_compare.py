@@ -2,8 +2,8 @@
 
 The distribution of the forecast is obtained by evaluating get_prob_rain(x) for
     each time point and taking the average over time. This is the same with the
-    observed (each time point would either give 0.0 or 1.0). This would work for
-    ERA5 as well.
+    observed (each time point would either give 0.0 or 1.0). This would work
+    for ERA5 as well.
 There are methods for plotting the survival functions, pp plots and qq plots.
 
 How to use:
@@ -19,6 +19,7 @@ import math
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy import interpolate
+
 
 class TimeSeries(object):
     """
@@ -50,10 +51,10 @@ class TimeSeries(object):
             n_linspace: number of points to evaluate between 0 mm and max
                 observed rain
         """
-        #range of observed precipitation to plot in the qq plot
+        # range of observed precipitation to plot in the qq plot
         self.observed_array = np.linspace(0, observed_rain.max(), n_linspace)
 
-        #get prob(precipitation > rain) for each rain in observed_array
+        # get prob(precipitation > rain) for each rain in observed_array
         self.prob_forecast_array = []
         self.prob_observed_array = []
         for rain in self.observed_array:
@@ -74,7 +75,7 @@ class TimeSeries(object):
         plt.plot(self.observed_array, self.prob_observed_array, label=label)
 
     def adjust_survival_plot(self):
-        plt.xlim([0,self.observed_array[len(self.qq_observe)-1]])
+        plt.xlim([0, self.observed_array[len(self.qq_observe)-1]])
         plt.xlabel("x (mm)")
         plt.ylabel("probability of precipitation > x")
 
@@ -108,15 +109,16 @@ class TimeSeries(object):
             plot for comparing distribution of precipitation of the forecast
             with the observed
         """
-        #inverse of the probability using interpolation (switch x and y)
+        # inverse of the probability using interpolation (switch x and y)
         prob_forecast_inverse = interpolate.interp1d(
             self.prob_forecast_array, self.observed_array)
 
-        #for each probability in prob_observed_array, evaluate the inverse of
-            #prob_forecast_array using prob_forecast_invers
-        #caution when handling 0 mm
-        #return nan when ValueError caught, eg when outside the interpolation
-            #zone
+        # for each probability in prob_observed_array, evaluate the inverse of
+        # prob_forecast_array using prob_forecast_invers
+        #
+        # caution when handling 0 mm
+        # return nan when ValueError caught, eg when outside the interpolation
+        # zone
         self.qq_forecast = []
         for prob_observed in self.prob_observed_array:
             forecast_i = None
@@ -139,12 +141,13 @@ class TimeSeries(object):
         self.qq_forecast = self.qq_forecast[is_finite]
         self.qq_observe = self.observed_array[is_finite]
 
+
 class Downscale(TimeSeries):
 
     def __init__(self):
         super().__init__()
 
-    #override
+    # override
     def compare(self, forecaster, n_linspace):
         """
         Args:

@@ -11,38 +11,34 @@ Downscale:
         PrintForecastSeriesMessage
 """
 
-import datetime
-import math
 import os
 from os import path
 
 from cartopy import crs
 import cycler
-import joblib
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ma
 import pandas.plotting
-from scipy import stats
 
-import compound_poisson
 from compound_poisson.forecast import bias_var_analysis
 from compound_poisson.forecast import coverage_analysis
-from compound_poisson.forecast import loss
 from compound_poisson.forecast import loss_segmentation
 from compound_poisson.forecast import residual_analysis
-from compound_poisson.forecast import roc
 from compound_poisson.forecast import time_segmentation
 import dataset
 
-RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15] #rain to consider for yearly ROC
-RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 15, 25] #rain to consider for total ROC
+RAIN_THRESHOLD_ARRAY = [0, 5, 10, 15]  # rain to consider for yearly ROC
+RAIN_THRESHOLD_EXTREME_ARRAY = [0, 5, 15, 25]  # rain to consider for total ROC
 LINESTYLE = ['-', '--', '-.', ':']
 
+
 def get_monochrome_cycler():
-    #return cycler for monochrome plotting
-    return cycler.cycler('color', ['k']) * cycler.cycler('linestyle', LINESTYLE)
+    # return cycler for monochrome plotting
+    return cycler.cycler(
+        'color', ['k']) * cycler.cycler('linestyle', LINESTYLE)
+
 
 class Printer(object):
     """Abstract class for printing out figures for TimeSeries and Downscale
@@ -98,35 +94,36 @@ class Printer(object):
         autumn_segmentator = time_segmentation.AutumnSegmentator(time_array)
         winter_segmentator = time_segmentation.WinterSegmentator(time_array)
 
-        #main forecasts plot
+        # main forecasts plot
         self.print_forecast()
 
-        #####-----BIAS VARIANCE ANALYSIS-----######
+        # -----BIAS VARIANCE ANALYSIS-----
         bias_var_analyser = self.get_bias_var_analyser()
         bias_var_analyser.analyse()
         bias_var_analyser.plot(
-            path.join(self.directory, self.prefix + "bias_var.pdf"), monochrome)
+            path.join(
+                self.directory, self.prefix + "bias_var.pdf"), monochrome)
 
-        #####-----ROC ANALYSIS-----######
+        # -----ROC ANALYSIS-----
 
         date_array = year_segmentator.get_time_array()
-        #dictionary of AUC for different thresholds:
-            #key: amount of rain,
-            #value: array containing AUC for each year
+        # dictionary of AUC for different thresholds:
+        #     key: amount of rain,
+        #     value: array containing AUC for each year
         auc_array = {}
         for rain in RAIN_THRESHOLD_ARRAY:
             auc_array[rain] = []
-        #plot roc curves for each year
+        # plot roc curves for each year
         for date, index in year_segmentator:
             year = date.year
-            #plot ROC curve, save AUC in auc_array
+            # plot ROC curve, save AUC in auc_array
             plt.figure()
             ax = plt.gca()
             ax.set_prop_cycle(monochrome)
             roc_curve_array = self.get_roc_curve_array(
                 RAIN_THRESHOLD_ARRAY, index)
             for i_rain, roc_curve in enumerate(roc_curve_array):
-                if not roc_curve is None:
+                if roc_curve is not None:
                     roc_curve.plot()
                     auc = roc_curve.area_under_curve
                 else:
@@ -139,7 +136,7 @@ class Printer(object):
                 bbox_inches="tight")
             plt.close()
 
-        #plot auc for each year
+        # plot auc for each year
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
@@ -158,24 +155,25 @@ class Printer(object):
                     bbox_inches="tight")
         plt.close()
 
-        #plot roc curve for the entire test set
-        roc_curve_array = self.get_roc_curve_array(RAIN_THRESHOLD_EXTREME_ARRAY)
+        # plot roc curve for the entire test set
+        roc_curve_array = self.get_roc_curve_array(
+            RAIN_THRESHOLD_EXTREME_ARRAY)
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
         for roc_curve in roc_curve_array:
-            if not roc_curve is None:
+            if roc_curve is not None:
                 roc_curve.plot()
         plt.legend(loc="lower right")
         plt.savefig(path.join(self.directory, self.prefix + "roc_all.pdf"),
                     bbox_inches="tight")
         plt.close()
 
-        #####-----DISTIBUTION ANALYSIS-----######
+        # -----DISTIBUTION ANALYSIS-----
 
         comparer = self.get_distribution_comparer()
 
-        #survival plot
+        # survival plot
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
@@ -187,7 +185,7 @@ class Printer(object):
             bbox_inches="tight")
         plt.close()
 
-        #pp plot
+        # pp plot
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
@@ -198,7 +196,7 @@ class Printer(object):
             bbox_inches="tight")
         plt.close()
 
-        #qq plot
+        # qq plot
         plt.figure()
         ax = plt.gca()
         ax.set_prop_cycle(monochrome)
@@ -209,8 +207,8 @@ class Printer(object):
             bbox_inches="tight")
         plt.close()
 
-        #####-----BIAS LOSS-----######
-        #plot the loss for each time segment
+        # -----BIAS LOSS-----
+        # plot the loss for each time segment
         loss_segmentator = self.get_loss_segmentator()
         loss_segmentator.evaluate_loss(year_segmentator)
         loss_segmentator.plot_loss(
@@ -228,10 +226,10 @@ class Printer(object):
         loss_segmentator.plot_loss(
             self.directory, self.prefix+"winter_", monochrome)
 
-        #####-----RESIDUAL ANLYSIS-----######
+        # -----RESIDUAL ANLYSIS-----
         residual_plot = self.get_residual_analyser()
 
-        #residual vs observed
+        # residual vs observed
         residual_plot.plot_heatmap(cmap="Greys")
         plt.savefig(path.join(self.directory,
                               self.prefix + "residual_hist.pdf"),
@@ -244,7 +242,7 @@ class Printer(object):
                     bbox_inches="tight")
         plt.close()
 
-        #forecast vs observed
+        # forecast vs observed
         residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
         residual_plot.plot_heatmap(cmap="Greys")
         plt.savefig(path.join(self.directory,
@@ -258,9 +256,9 @@ class Printer(object):
                     bbox_inches="tight")
         plt.close()
 
-        #####-----COVERAGE AND SPREAD ANLYSIS-----######
+        # -----COVERAGE AND SPREAD ANLYSIS-----
 
-        #coverage vs year
+        # coverage vs year
         coverage = self.get_coverage_analyser()
         plt.figure()
         ax = plt.gca()
@@ -278,7 +276,7 @@ class Printer(object):
                     bbox_inches="tight")
         plt.close()
 
-        #spread vs coverage
+        # spread vs coverage
         coverage = self.get_spread_analyser()
         plt.figure()
         ax = plt.gca()
@@ -292,7 +290,7 @@ class Printer(object):
                     bbox_inches="tight")
         plt.close()
 
-        #####-----CLEAN UP-----######
+        # -----CLEAN UP-----
         self.forecaster.del_memmap()
 
     def print_forecast(self):
@@ -304,7 +302,8 @@ class Printer(object):
         """Return array of ROC curves for different precipitation
 
         Args:
-            rain_warning_array: array of precipitation to evaluate the ROC curve
+            rain_warning_array: array of precipitation to evaluate the ROC
+                curve
             index: optional, slice object to point which time points to use
 
         Return:
@@ -353,6 +352,7 @@ class Printer(object):
         """
         raise NotImplementedError
 
+
 class TimeSeries(Printer):
     """For plotting forecast figures for TimeSeries
 
@@ -371,7 +371,7 @@ class TimeSeries(Printer):
         super().__init__(forecaster, directory, prefix)
         self.observed_rain = observed_rain
 
-    #implemented
+    # implemented
     def print_forecast(self):
         """Print figures for the forecasts
 
@@ -405,12 +405,12 @@ class TimeSeries(Printer):
                 else:
                     label += "Q34"
 
-                #slice the current forecast and observation for this year
+                # slice the current forecast and observation for this year
                 forecast_sliced = self.forecaster[index]
                 observed_rain_i = self.observed_rain[index]
 
-                #get the forecasts
-                    #era5 won't have a sigma, handle accordingly
+                # get the forecasts
+                # era5 won't have a sigma, handle accordingly
                 forecast_i = forecast_sliced.forecast
                 forecast_median_i = forecast_sliced.forecast_median
                 if forecast_sliced.forecast_sigma:
@@ -425,7 +425,7 @@ class TimeSeries(Printer):
                     forecast_upper_error_2 = forecast_median_i
                 time_array_i = forecast_sliced.time_array
 
-                #plot forecast and observation time series
+                # plot forecast and observation time series
                 plt.figure()
                 ax = plt.gca()
                 ax.set_prop_cycle(cycle_forecast)
@@ -445,7 +445,7 @@ class TimeSeries(Printer):
                     bbox_inches="tight")
                 plt.close()
 
-                #plot forecast using median instead
+                # plot forecast using median instead
                 plt.figure()
                 ax = plt.gca()
                 ax.set_prop_cycle(cycle_forecast)
@@ -465,7 +465,7 @@ class TimeSeries(Printer):
                     bbox_inches="tight")
                 plt.close()
 
-                #plot forecast using median instead
+                # plot forecast using median instead
                 plt.figure()
                 ax = plt.gca()
                 ax.set_prop_cycle(monochrome)
@@ -492,7 +492,7 @@ class TimeSeries(Printer):
                     bbox_inches="tight")
                 plt.close()
 
-                #plot residual
+                # plot residual
                 plt.figure()
                 ax = plt.gca()
                 ax.set_prop_cycle(monochrome)
@@ -506,7 +506,7 @@ class TimeSeries(Printer):
                     bbox_inches="tight")
                 plt.close()
 
-                #plot probability of more than rain precipitation
+                # plot probability of more than rain precipitation
                 for rain in RAIN_THRESHOLD_ARRAY:
                     plt.figure()
                     ax = plt.gca()
@@ -516,32 +516,33 @@ class TimeSeries(Printer):
                     plt.xlabel("time")
                     plt.ylabel("forecasted probability of > "+str(rain)+" mm")
                     plt.savefig(
-                        path.join(self.directory,
-                                  self.prefix+"prob_"+str(rain)+"_"+label
-                                    +".pdf"),
+                        path.join(
+                            self.directory,
+                            self.prefix+"prob_"+str(rain)+"_"+label+".pdf"),
                         bbox_inches="tight")
                     plt.close()
 
-    #implemented
+    # implemented
     def get_roc_curve_array(self, rain_warning_array, index=None):
         return self.forecaster.get_roc_curve_array(
             rain_warning_array, self.observed_rain, index)
 
-    #implemented
+    # implemented
     def get_distribution_comparer(self):
         return self.forecaster.compare_dist_with_observed(self.observed_rain)
 
-    #implemented
+    # implemented
     def get_loss_segmentator(self):
-        return loss_segmentation.TimeSeries(self.forecaster, self.observed_rain)
+        return loss_segmentation.TimeSeries(
+            self.forecaster, self.observed_rain)
 
-    #implemented
+    # implemented
     def get_residual_analyser(self):
         residual_plot = residual_analysis.ResidualBaPlotter()
         residual_plot.add_data(self.forecaster, self.observed_rain)
         return residual_plot
 
-    #implemented
+    # implemented
     def get_coverage_analyser(self):
         year_segmentator = time_segmentation.YearSegmentator(
             self.forecaster.time_array)
@@ -549,7 +550,7 @@ class TimeSeries(Printer):
         coverage.add_data(self.forecaster, self.observed_rain)
         return coverage
 
-    #implemented
+    # implemented
     def get_spread_analyser(self):
         all_inclusive = time_segmentation.AllInclusive(
             self.forecaster.time_array)
@@ -558,9 +559,11 @@ class TimeSeries(Printer):
         coverage.add_data(self.forecaster, self.observed_rain)
         return coverage
 
-    #implemented
+    # implemented
     def get_bias_var_analyser(self):
-        return bias_var_analysis.TimeSeries(self.forecaster, self.observed_rain)
+        return bias_var_analysis.TimeSeries(
+            self.forecaster, self.observed_rain)
+
 
 class Downscale(Printer):
     """For plotting forecast figures for TimeSeries
@@ -580,7 +583,7 @@ class Downscale(Printer):
         self.pool = pool
         super().__init__(forecaster, directory, prefix)
 
-    #implemented
+    # implemented
     def print_forecast(self):
         """Print figures for the forecasts
 
@@ -592,7 +595,8 @@ class Downscale(Printer):
 
         test_set = self.forecaster.data
         angle_resolution = dataset.ANGLE_RESOLUTION
-        longitude_grid = test_set.topography["longitude"] - angle_resolution / 2
+        longitude_grid = (test_set.topography["longitude"]
+                          - angle_resolution / 2)
         latitude_grid = test_set.topography["latitude"] + angle_resolution / 2
         rain_units = test_set.rain_units
 
@@ -603,21 +607,20 @@ class Downscale(Printer):
         if not path.isdir(map_dir):
             os.mkdir(map_dir)
 
-        #forecast map, 3 dimensions, same as test_set.rain
-            #prediction of precipitation for each point in space and time
-            #0th dimension is time, remaining is space
+        # forecast map, 3 dimensions, same as test_set.rain
+        # prediction of precipitation for each point in space and time
+        # 0th dimension is time, remaining is space
         forecast_map = ma.empty_like(test_set.rain)
-        #array of dictionaries, one for each loss class
-            #each element contains a dictionary of loss maps
+        # array of dictionaries, one for each loss class
+        # each element contains a dictionary of loss maps
         loss_map_array = []
-        quantile_array = stats.norm.cdf([-1, 0, 1])
         for i_loss in range(len(loss_segmentation.LOSS_CLASSES)):
             dic = {}
             dic["bias_mean"] = ma.empty_like(test_set.rain[0])
             dic["bias_median"] = ma.empty_like(test_set.rain[0])
             loss_map_array.append(dic)
 
-        #get forecast (median) and losses for the maps
+        # get forecast (median) and losses for the maps
         for forecaster_i, observed_rain_i in (
             zip(self.forecaster.generate_time_series_forecaster(),
                 test_set.generate_unmask_rain())):
@@ -625,7 +628,7 @@ class Downscale(Printer):
             long_i = forecaster_i.time_series.id[1]
             forecast_map[:, lat_i, long_i] = forecaster_i.forecast_median
 
-            #get the value for each loss (to produce a map)
+            # get the value for each loss (to produce a map)
             for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
                 loss_i = Loss(self.forecaster.n_simulation)
                 loss_i.add_data(forecaster_i, observed_rain_i)
@@ -637,7 +640,7 @@ class Downscale(Printer):
 
             forecaster_i.del_memmap()
 
-        #plot the losses map
+        # plot the losses map
         for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
             for metric, loss_map in loss_map_array[i_loss].items():
                 plt.figure()
@@ -652,11 +655,11 @@ class Downscale(Printer):
                 plt.savefig(
                     path.join(self.directory,
                               self.prefix+Loss.get_short_name()+"_"+metric
-                                +"_map.pdf"),
+                              + "_map.pdf"),
                     bbox_inches="tight")
                 plt.close()
 
-        #plot the spatial forecast for each time (in parallel)
+        # plot the spatial forecast for each time (in parallel)
         message_array = []
         for i, time in enumerate(test_set.time_array):
             title = "precipitation (" + rain_units + ") : " + str(time)
@@ -669,7 +672,7 @@ class Downscale(Printer):
             message_array.append(message)
         self.pool.map(PrintForecastMapMessage.print, message_array)
 
-        #plot the forecast (time series) for each location (in parallel)
+        # plot the forecast (time series) for each location (in parallel)
         message_array = []
         for forecaster_i, observed_rain_i in (
             zip(self.forecaster.generate_forecaster_no_memmap(),
@@ -679,26 +682,26 @@ class Downscale(Printer):
             message_array.append(message)
         self.pool.map(PrintForecastSeriesMessage.print, message_array)
 
-    #implemented
+    # implemented
     def get_roc_curve_array(self, rain_warning_array, index=None):
         return self.forecaster.get_roc_curve_array(
             rain_warning_array, index, self.pool)
 
-    #implemented
+    # implemented
     def get_distribution_comparer(self):
         return self.forecaster.compare_dist_with_observed()
 
-    #implemented
+    # implemented
     def get_loss_segmentator(self):
         return loss_segmentation.Downscale(self.forecaster)
 
-    #implemented
+    # implemented
     def get_residual_analyser(self):
         residual_plot = residual_analysis.ResidualBaPlotter()
         residual_plot.add_downscale(self.forecaster)
         return residual_plot
 
-    #implemented
+    # implemented
     def get_coverage_analyser(self):
         year_segmentator = time_segmentation.YearSegmentator(
             self.forecaster.time_array)
@@ -706,7 +709,7 @@ class Downscale(Printer):
         coverage.add_data(self.forecaster)
         return coverage
 
-    #implemented
+    # implemented
     def get_spread_analyser(self):
         all_inclusive = time_segmentation.AllInclusive(
             self.forecaster.time_array)
@@ -715,9 +718,10 @@ class Downscale(Printer):
         coverage.add_data(self.forecaster)
         return coverage
 
-    #implemented
+    # implemented
     def get_bias_var_analyser(self):
         return bias_var_analysis.Downscale(self.forecaster)
+
 
 class PrintForecastMapMessage(object):
     """For printing forecast over space for a given time point (in parallel)
@@ -736,7 +740,7 @@ class PrintForecastMapMessage(object):
         self.file_path = file_path
 
     def print(self):
-        #treat 0 mm as masked data
+        # treat 0 mm as masked data
         self.forecast_i.mask[self.forecast_i == 0] = True
 
         plt.figure()
@@ -754,12 +758,13 @@ class PrintForecastMapMessage(object):
         plt.savefig(self.file_path, bbox_inches="tight")
         plt.close()
 
+
 class PrintForecastSeriesMessage(object):
     """For printing forecasts for each spatial point (in parallel)
     """
 
     def __init__(self, series_dir, forecaster, observed_rain_i):
-        self.series_sub_dir =  path.join(
+        self.series_sub_dir = path.join(
             series_dir, str(forecaster.time_series.id))
         self.forecaster = forecaster
         self.observed_rain_i = observed_rain_i
@@ -769,6 +774,6 @@ class PrintForecastSeriesMessage(object):
     def print(self):
         printer = TimeSeries(
             self.forecaster, self.observed_rain_i, self.series_sub_dir)
-        #printer be responsible for load_memmap() and del_memmap() when print()
-            #is called
+        # printer be responsible for load_memmap() and del_memmap() when
+        # print() is called
         printer.print()

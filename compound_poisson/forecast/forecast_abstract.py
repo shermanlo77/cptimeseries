@@ -14,6 +14,7 @@ from os import path
 
 import numpy as np
 
+
 class Forecaster(object):
     """Contains and simulate Monte Carlo forecasts
 
@@ -41,7 +42,8 @@ class Forecaster(object):
         https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
 
     Attributes:
-        time_array: array, containing time stamps for each point in the forecast
+        time_array: array, containing time stamps for each point in the
+            forecast
         forecast_array: memmap of forecasts, shape depends on subclass
             implementation
         n_time: length of forecast or number of time points
@@ -75,7 +77,7 @@ class Forecaster(object):
         datetime_id = datetime_id.replace(" ", "")
         datetime_id = datetime_id[0:14]
         file_name = ("_" + type(self).__name__ + description
-            + datetime_id + ".dat")
+                     + datetime_id + ".dat")
         self.memmap_path = path.join(self.memmap_dir, file_name)
 
     def start_forecast(self, n_simulation):
@@ -104,7 +106,7 @@ class Forecaster(object):
         """
         if n_simulation > self.n_simulation:
             n_simulation_old = self.n_simulation
-            #transfer forecasts from old file to new file
+            # transfer forecasts from old file to new file
             memmap_path_old = self.memmap_path
             self.load_memmap("r")
             forecast_array_old = self.forecast_array
@@ -113,7 +115,7 @@ class Forecaster(object):
             self.load_memmap("w+")
             self.copy_to_memmap(forecast_array_old)
             del forecast_array_old
-            #simulate more forecasts
+            # simulate more forecasts
             self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
             if path.exists(memmap_path_old):
                 os.remove(memmap_path_old)
@@ -154,7 +156,7 @@ class Forecaster(object):
         raise NotImplementedError
 
     def get_roc_curve_array(
-        self, rain_warning_array, rain_observed, time_index=None):
+            self, rain_warning_array, rain_observed, time_index=None):
         """Get array of ROC curves
 
         Evaluate the ROC curve for different amounts of precipitation

@@ -21,13 +21,14 @@ import pandas.plotting
 
 from compound_poisson.forecast import loss
 
-#list of all the errors to plot
+# list of all the errors to plot
 LOSS_CLASSES = [
     loss.RootMeanSquareError,
     loss.RootMeanSquare10Error,
     loss.MeanAbsoluteError,
     loss.MeanAbsolute10Error,
 ]
+
 
 class TimeSeries(object):
     """
@@ -67,13 +68,13 @@ class TimeSeries(object):
         self.time_array = []
         self.loss_all_array = []
         self.loss_segment_array = []
-        #init loss objects and variables
+        # init loss objects and variables
         for Loss in LOSS_CLASSES:
             self.loss_all_array.append(Loss(self.forecaster.n_simulation))
             self.loss_segment_array.append([])
-        #for each segmentation
+        # for each segmentation
         for date, index in time_segmentator:
-            self.time_array.append(date) #get the date of this segmentation
+            self.time_array.append(date)  # get the date of this segmentation
             self.evaluate_loss_segment(index)
 
     def evaluate_loss_segment(self, index):
@@ -84,15 +85,15 @@ class TimeSeries(object):
         Args:
             index: slice object pointing to a time segment
         """
-        #slice the data to capture this segmentation
+        # slice the data to capture this segmentation
         forecaster_slice = self.forecaster[index]
         observed_rain_slice = self.observed_rain[index]
-        #add data from this segmentation for each loss
+        # add data from this segmentation for each loss
         for i_error, Loss in enumerate(LOSS_CLASSES):
-            #add data to the loss objects which cover all time segments
+            # add data to the loss objects which cover all time segments
             self.loss_all_array[i_error].add_data(
                 forecaster_slice, observed_rain_slice)
-            #new loss for this segment
+            # new loss for this segment
             loss_i = Loss(forecaster_slice.n_simulation)
             loss_i.add_data(forecaster_slice, observed_rain_slice)
             self.loss_segment_array[i_error].append(loss_i)
@@ -103,17 +104,17 @@ class TimeSeries(object):
             losses and expectation bias and median bias are considered. Figures
             are saved.
         """
-        #it is possible for the time_array to be empty, for example, r10 would
-            #be empty is it never rained more than 10 mm
+        # it is possible for the time_array to be empty, for example, r10 would
+        # be empty is it never rained more than 10 mm
         if self.time_array:
-            #plot for each loss
+            # plot for each loss
             pandas.plotting.register_matplotlib_converters()
             for i_loss, Loss in enumerate(LOSS_CLASSES):
 
                 bias_loss_plot, bias_median_loss_plot = self.get_bias_plot(
                     i_loss)
 
-                #bias of the mean
+                # bias of the mean
                 self.plot(bias_loss_plot,
                           self.loss_all_array[i_loss].get_bias_loss(),
                           Loss.get_axis_bias_label(),
@@ -122,7 +123,7 @@ class TimeSeries(object):
                                         + "_mean.pdf")),
                           cycler)
 
-                #bias of the median
+                # bias of the median
                 self.plot(bias_median_loss_plot,
                           self.loss_all_array[i_loss].get_bias_median_loss(),
                           Loss.get_axis_bias_label(),
@@ -142,7 +143,7 @@ class TimeSeries(object):
             bias_median_loss_plot: array of bias loss (using the median) for
                 each time segment.
         """
-        #bias loss for each segment
+        # bias loss for each segment
         bias_loss_plot = []
         bias_median_loss_plot = []
         for loss_i in self.loss_segment_array[i_loss]:
@@ -154,14 +155,15 @@ class TimeSeries(object):
         """A basic plot method
 
         Args:
-            plot_array: array of values to plot for each time in self.time_array
+            plot_array: array of values to plot for each time in
+                self.time_array
             h_line: horizontal line to plot
             label_axis: parameter for plt.ylabel
             path_to_fig: where to save the figure:
             cycler: optional cycler to use when plotting
         """
         plt.figure()
-        if not cycler is None:
+        if cycler is not None:
             ax = plt.gca()
             ax.set_prop_cycle(cycler)
         plt.plot(self.time_array, plot_array)
@@ -174,6 +176,7 @@ class TimeSeries(object):
         plt.ylabel(label_axis)
         plt.savefig(path_to_fig, bbox_inches="tight")
         plt.close()
+
 
 class Downscale(TimeSeries):
     """
@@ -188,13 +191,13 @@ class Downscale(TimeSeries):
         Args:
             forecaster: forecast.downscale.Forecaster object
         """
-        #test set already lives in forecaster
+        # test set already lives in forecaster
         super().__init__(forecaster, None)
 
-    #override
+    # override
     def evaluate_loss_segment(self, index):
-        #observed_rain unused
-        #add data for this segmentation
+        # observed_rain unused
+        # add data for this segmentation
         for i_loss, Loss in enumerate(LOSS_CLASSES):
             self.loss_all_array[i_loss].add_downscale_forecaster(
                 self.forecaster, index)

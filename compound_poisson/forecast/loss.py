@@ -1,6 +1,6 @@
-"""Classes for evaluating the bias loss where the bias is (expectation[forecast]
-    - observed) and the loss is some function, eg square. The expectation can be
-    replaced with the median.
+"""Classes for evaluating the bias loss where the bias is
+    (expectation[forecast] - observed) and the loss is some function,
+    eg square. The expectation can be replaced with the median.
 
 The 10 means only consider observed precipitation above 10 mm.
 
@@ -12,6 +12,7 @@ import math
 
 import numpy as np
 
+
 class Loss(object):
     """For evaluating the prediction performance when comparing the forecast
         with the observed precipitation
@@ -21,8 +22,9 @@ class Loss(object):
         get_risk() or get_loss_quantile() to get statistics of the losses.
 
     NOT IMPLEMENTED:
-        loss_array, get_risk() and get_loss_quantile() are not implemented. Only
-            the bias is considered here.
+        loss_array, get_risk() and get_loss_quantile() are not implemented.
+            Only
+        the bias is considered here.
 
     How to implement:
         Implement the methods loss_function(), set_to_orginial_units().
@@ -34,8 +36,8 @@ class Loss(object):
         bias_loss_sum: the sum of bias loss
         bias_median_loss_sum: the sum of bias loss where the expectation is
             replaced with the median
-        n_time_points: number of time points (x spatial points) considered after
-            one or more calls to add_data()
+        n_time_points: number of time points (x spatial points) considered
+            after one or more calls to add_data()
     """
 
     def __init__(self, n_simulation):
@@ -49,8 +51,9 @@ class Loss(object):
         self.n_time_points = 0
 
     def add_data(self, forecast, observed_data, index=None):
-        """Update member variables (eg bias_loss_sum) with new data for a single
-            location. For multiple locations, see add_downscale_forecaster()
+        """Update member variables (eg bias_loss_sum) with new data for a
+            single location. For multiple locations, see
+            add_downscale_forecaster()
 
         Args:
             forecast: forecaster.time_series.TimeSeries object
@@ -61,7 +64,7 @@ class Loss(object):
 
         forecast_expectation = None
         forecast_median = None
-        #use index to get a subset of the forecast and data
+        # use index to get a subset of the forecast and data
         if index is None:
             forecast_expectation = forecast.forecast
             forecast_median = forecast.forecast_median
@@ -87,7 +90,7 @@ class Loss(object):
         for forecaster_i, observed_rain_i in (
             zip(forecaster.generate_forecaster_no_memmap(),
                 forecaster.data.generate_unmask_rain())):
-            if not index is None:
+            if index is not None:
                 forecaster_i = forecaster_i[index]
                 observed_rain_i = observed_rain_i[index]
             self.add_data(forecaster_i, observed_rain_i)
@@ -158,119 +161,123 @@ class Loss(object):
         """
         raise NotImplementedError
 
+
 class RootMeanSquareError(Loss):
 
-    def __init__(self,n_simulation):
+    def __init__(self, n_simulation):
         super().__init__(n_simulation)
 
-    #implemented
+    # implemented
     def loss_function(self, prediction, observe):
         """The sum of squared loss
         """
         return np.sum(np.square(prediction - observe))
 
-    #implemented
+    # implemented
     def set_to_orginial_units(self, loss):
-        #square root (mean of squared loss), aka root mean square
+        # square root (mean of squared loss), aka root mean square
         return np.sqrt(loss)
 
-    #implemented
+    # implemented
     def get_short_name():
         return "rmse"
 
-    #implemented
+    # implemented
     def get_short_bias_name():
         return "rmsb"
 
-    #implemented
+    # implemented
     def get_axis_label():
         return "root mean square error (mm)"
 
-    #implemented
+    # implemented
     def get_axis_bias_label():
         return "root mean square bias (mm)"
+
 
 class RootMeanSquare10Error(RootMeanSquareError):
 
     def __init__(self, n_simulation):
         super().__init__(n_simulation)
 
-    #override
+    # override
     def add_data(self, forecast, observed_data):
-        #only consider observed data with precipitation greater than 10 mm
+        # only consider observed data with precipitation greater than 10 mm
         is_above_10 = observed_data >= 10
         if np.any(is_above_10):
             super().add_data(forecast, observed_data, is_above_10)
 
-    #override
+    # override
     def get_short_name():
         return "rmse10"
 
-    #override
+    # override
     def get_short_bias_name():
         return "rmsb10"
 
-    #override
+    # override
     def get_axis_label():
         return "root mean square error 10 (mm)"
 
-    #override
+    # override
     def get_axis_bias_label():
         return "root mean square bias 10 (mm)"
+
 
 class MeanAbsoluteError(Loss):
 
     def __init__(self, n_simulation):
         super().__init__(n_simulation)
 
-    #implemented
+    # implemented
     def loss_function(self, prediction, observe):
         return np.sum(np.absolute(prediction - observe))
 
-    #implemented
+    # implemented
     def set_to_orginial_units(self, loss):
         return loss
 
-    #implemented
+    # implemented
     def get_short_name():
         return "mae"
 
-    #implemented
+    # implemented
     def get_short_bias_name():
         return "mab"
 
-    #implemented
+    # implemented
     def get_axis_label():
         return "mean absolute error (mm)"
 
-    #implemented
+    # implemented
     def get_axis_bias_label():
         return "mean absolute bias (mm)"
+
 
 class MeanAbsolute10Error(MeanAbsoluteError):
 
     def __init__(self, n_simulation):
         super().__init__(n_simulation)
 
-    #override
+    # override
     def add_data(self, forecast, observed_data):
-        #only consider observed data with precipitation greater than 10 mm
+        # only consider observed data with precipitation greater than 10 mm
         is_above_10 = observed_data >= 10
         if np.any(is_above_10):
             super().add_data(forecast, observed_data, is_above_10)
 
-    #override
+    # override
     def get_short_name():
         return "mae10"
 
-    #override
+    # override
     def get_short_bias_name():
         return "mab10"
 
-    #override
+    # override
     def get_axis_label():
         return "mean absolute error 10 (mm)"
 
-    #override
+    # override
     def get_axis_bias_label():
         return "mean absolute bias 10 (mm)"

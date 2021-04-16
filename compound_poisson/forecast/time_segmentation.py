@@ -20,6 +20,7 @@ TimeSegmentator <- AllInclusive
 
 import datetime
 
+
 class TimeSegmentator(object):
     """Abstract class for splitting array of dates into divisions
 
@@ -66,17 +67,18 @@ class TimeSegmentator(object):
         return time_array
 
     def __iter__(self):
-        """Yield a two-array, containing the date used to represent the division
-            and a slice object pointing to the elements of the time_array
+        """Yield a two-array, containing the date used to represent the
+            division and a slice object pointing to the elements of the
+            time_array
         """
         index_start = 0
         is_in_season = False
-        delta = datetime.timedelta(1) #delta of 1 day
+        delta = datetime.timedelta(1)  # delta of 1 day
         for i, time in enumerate(self.time_array):
             if is_in_season:
                 time_add_one = time + delta
                 if (time_add_one.month == self.end_month
-                    and time_add_one.day == self.end_day):
+                        and time_add_one.day == self.end_day):
                     is_in_season = False
                     index = slice(index_start, i+1)
                     season_date = self.get_date_for_segement(index)
@@ -84,9 +86,10 @@ class TimeSegmentator(object):
                     index_start = None
             else:
                 if (time.month == self.start_month
-                    and time.day == self.start_day):
+                        and time.day == self.start_day):
                     is_in_season = True
                     index_start = i
+
 
 class AllInclusive(TimeSegmentator):
     """Dummy implementation which treats the entire time_array as one division
@@ -95,9 +98,10 @@ class AllInclusive(TimeSegmentator):
     def __init__(self, time_array):
         super().__init__(time_array, None, None, None, None)
 
-    #override
+    # override
     def __iter__(self):
         yield (None, slice(0, len(self.time_array)))
+
 
 class YearSegmentator(TimeSegmentator):
     """Divide the time_array into calander years
@@ -106,7 +110,7 @@ class YearSegmentator(TimeSegmentator):
     def __init__(self, time_array):
         super().__init__(time_array, 1, 1, 1, 1)
 
-    #override
+    # override
     def get_date_for_segement(self, index):
         """Return datetime to represent a division
 
@@ -119,26 +123,38 @@ class YearSegmentator(TimeSegmentator):
         year = datetime.date(year, 1, 1)
         return year
 
+
 class Q12Segmentator(TimeSegmentator):
+
     def __init__(self, time_array):
         super().__init__(time_array, 1, 1, 7, 1)
 
+
 class Q34Segmentator(TimeSegmentator):
+
     def __init__(self, time_array):
         super().__init__(time_array, 7, 1, 1, 1)
 
+
 class SpringSegmentator(TimeSegmentator):
+
     def __init__(self, time_array):
         super().__init__(time_array, 3, 1, 6, 1)
 
+
 class SummerSegmentator(TimeSegmentator):
+
     def __init__(self, time_array):
         super().__init__(time_array, 6, 1, 9, 1)
 
+
 class AutumnSegmentator(TimeSegmentator):
+
     def __init__(self, time_array):
         super().__init__(time_array, 9, 1, 12, 1)
 
+
 class WinterSegmentator(TimeSegmentator):
+
     def __init__(self, time_array):
         super().__init__(time_array, 12, 1, 3, 1)

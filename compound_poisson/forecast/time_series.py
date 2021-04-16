@@ -14,6 +14,7 @@ from compound_poisson.forecast import distribution_compare
 from compound_poisson.forecast import forecast_abstract
 from compound_poisson.forecast import roc
 
+
 class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts
 
@@ -27,7 +28,8 @@ class Forecaster(forecast_abstract.Forecaster):
             dim 1: for each time point
         forecast: expectation of all forecasts, array
         forecast_median: median of all forecasts
-        forecast_sigma: dictionary of sigma errors (quantiles) of all forecasts,
+        forecast_sigma: dictionary of sigma errors (quantiles) of all
+            forecasts,
             keys are [-3, -2, -1, 0, 1, 2, 3] which correspond to the sigma
             level
         forecast_quartile: 3 array, each containing array of 25%, 50%, 75%
@@ -43,12 +45,12 @@ class Forecaster(forecast_abstract.Forecaster):
         self.forecast_quartile = [[], [], []]
         super().__init__(memmap_dir)
 
-    #override
+    # override
     def make_memmap_path(self):
         super().make_memmap_path(type(self.time_series).__name__)
 
-    #override
-        #additional parameter model_field to store the test set
+    # override
+    # additional parameter model_field to store the test set
     def start_forecast(self, n_simulation, model_field=None):
         self.model_field = model_field
         if model_field is None:
@@ -57,11 +59,11 @@ class Forecaster(forecast_abstract.Forecaster):
             self.n_time = len(model_field)
         super().start_forecast(n_simulation)
 
-    #implemented
+    # implemented
     def copy_to_memmap(self, memmap_to_copy):
         self.forecast_array[0:len(memmap_to_copy)] = memmap_to_copy[:]
 
-    #implemented
+    # implemented
     def simulate_forecasts(self, index_range, is_print=True):
         for i in index_range:
             forecast_i = self.get_simulated_forecast()
@@ -71,7 +73,7 @@ class Forecaster(forecast_abstract.Forecaster):
         self.time_array = forecast_i.time_array
         self.get_forecast()
 
-    #implemented
+    # implemented
     def get_prob_rain(self, rain):
         """Get the probability if it will rain at least of a certian amount
 
@@ -84,8 +86,8 @@ class Forecaster(forecast_abstract.Forecaster):
         p_rain = np.mean(self.forecast_array > rain, 0)
         return p_rain
 
-    #override
-        #shape for memmap provided
+    # override
+    # shape for memmap provided
     def load_memmap(self, mode, memmap_shape=None):
         """Load the memmap file for forecast_array
 
@@ -110,8 +112,8 @@ class Forecaster(forecast_abstract.Forecaster):
         """Calculate statistics over all the provided forecasts
         """
         self.forecast = np.mean(self.forecast_array, 0)
-        sigma_array = range(-3,4)
-        #work out quantiles for forecast_sigma and forecast_quartile together
+        sigma_array = range(-3, 4)
+        # work out quantiles for forecast_sigma and forecast_quartile together
         quantiles = np.concatenate((stats.norm.cdf(sigma_array), [0.25, 0.75]))
         forecast_quantile = np.quantile(self.forecast_array, quantiles, 0)
         for i in range(len(sigma_array)):
@@ -121,7 +123,7 @@ class Forecaster(forecast_abstract.Forecaster):
         self.forecast_quartile[1] = self.forecast_median
         self.forecast_quartile[2] = forecast_quantile[len(sigma_array)+1]
 
-    #implemented
+    # implemented
     def get_roc_curve(self, rain_warning, rain_true, time_index=None):
         """Return a ROC curve
 
@@ -136,7 +138,7 @@ class Forecaster(forecast_abstract.Forecaster):
         """
         if np.any(rain_true > rain_warning):
             p_rain_warning = self.get_prob_rain(rain_warning)
-            if not time_index is None:
+            if time_index is not None:
                 p_rain_warning = p_rain_warning[time_index]
                 rain_true = rain_true[time_index]
             roc_curve = roc.Roc(rain_warning, p_rain_warning, rain_true)
@@ -144,9 +146,9 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_curve = None
         return roc_curve
 
-    #implemented
+    # implemented
     def get_roc_curve_array(
-        self, rain_warning_array, rain_observed, time_index=None):
+            self, rain_warning_array, rain_observed, time_index=None):
         """Get array of ROC curves
 
         Evaluate the ROC curve for different amounts of precipitation
@@ -168,8 +170,9 @@ class Forecaster(forecast_abstract.Forecaster):
             roc_array.append(roc_curve)
         return roc_array
 
-    #implemented
-    def compare_dist_with_observed(self, observed_rain, n_linspace=500):
+    # implemented
+    def compare_dist_with_observed(
+            self, observed_rain, n_linspace=500):
         """Return an object from distribution_compare, used to compare the
             distribution of the precipitation of the forecast and the observed
 
@@ -204,8 +207,8 @@ class Forecaster(forecast_abstract.Forecaster):
         Args:
             index: slice object
         """
-        #only to be used for plotting purposes
-        #does not copy model fields
+        # only to be used for plotting purposes
+        # does not copy model fields
         slice_copy = Forecaster(self.time_series, self.memmap_dir)
         slice_copy.time_array = self.time_array[index]
         if self.forecast_array is None:
@@ -225,6 +228,7 @@ class Forecaster(forecast_abstract.Forecaster):
         slice_copy.memmap_path = self.memmap_path
         return slice_copy
 
+
 class SelfForecaster(Forecaster):
     """For forecasting the training set
 
@@ -234,12 +238,12 @@ class SelfForecaster(Forecaster):
     def __init__(self, time_series, memmap_dir):
         super().__init__(time_series, memmap_dir)
 
-    #override
+    # override
     def start_forecast(self, n_simulation):
-        #implemented in such a way it passes no model fields
+        # implemented in such a way it passes no model fields
         super().start_forecast(n_simulation)
 
-    #override
+    # override
     def get_simulated_forecast(self):
         """Return a TimeSeries object with simulated values, with z known
         """

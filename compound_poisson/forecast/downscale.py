@@ -30,6 +30,7 @@ from compound_poisson.forecast import forecast_abstract
 from compound_poisson.forecast import roc
 from compound_poisson.forecast import time_series
 
+
 class Forecaster(forecast_abstract.Forecaster):
     """Contain Monte Carlo forecasts for Downscale
 
@@ -64,12 +65,12 @@ class Forecaster(forecast_abstract.Forecaster):
         self.data = None
         super().__init__(memmap_dir)
 
-    #override
+    # override
     def make_memmap_path(self):
         super().make_memmap_path(type(self.downscale).__name__)
 
-    #override
-        #additional parameter data
+    # override
+    # additional parameter data
     def start_forecast(self, n_simulation, data):
         """Start forecast simulations, to be called initially
 
@@ -82,26 +83,24 @@ class Forecaster(forecast_abstract.Forecaster):
         self.time_array = data.time_array
         super().start_forecast(n_simulation)
 
-    #implemented
+    # implemented
     def copy_to_memmap(self, memmap_to_copy):
         for i in range(len(self.forecast_array)):
             memmap_to_copy_i = memmap_to_copy[i]
             self.forecast_array[i, 0:len(memmap_to_copy_i)] = memmap_to_copy_i
 
-    #implemented
+    # implemented
     def simulate_forecasts(self, index_range, is_print=True):
-        area_unmask = self.downscale.area_unmask
-
         forecast_message = []
-        for i_space, time_series in enumerate(
-            self.downscale.generate_unmask_time_series()):
+        for i_space, time_series_i in enumerate(
+                self.downscale.generate_unmask_time_series()):
 
-            #extract model fields for each unmasked time_series
-            lat_i = time_series.id[0]
-            long_i = time_series.id[1]
+            # extract model fields for each unmasked time_series
+            lat_i = time_series_i.id[0]
+            long_i = time_series_i.id[1]
             x_i = self.data.get_model_field(lat_i, long_i)
 
-            message = ForecastMessage(time_series,
+            message = ForecastMessage(time_series_i,
                                       x_i,
                                       self.n_simulation,
                                       self.memmap_path,
@@ -114,7 +113,7 @@ class Forecaster(forecast_abstract.Forecaster):
             ForecastMessage.forecast, forecast_message)
         self.downscale.replace_unmask_time_series(time_series_array)
 
-    #implemented
+    # implemented
     def get_prob_rain(self, rain, index=None):
         """Get the probability if it will rain at least of a certian amount
 
@@ -128,15 +127,15 @@ class Forecaster(forecast_abstract.Forecaster):
         """
         if index is None:
             index = slice(self.n_time)
-        #for forecast_array...
-            #dim 0 is location
-            #dim 1 is for each simulation
-            #dim 2 is for each time point
+        # for forecast_array...
+        #     dim 0 is location
+        #     dim 1 is for each simulation
+        #     dim 2 is for each time point
         p_rain = np.mean(self.forecast_array[:, :, index] > rain, 1)
         return p_rain
 
-    #override
-        #to provide the shape of the memmap
+    # override
+    # to provide the shape of the memmap
     def load_memmap(self, mode):
         super().load_memmap(
             mode, (self.downscale.area_unmask, self.n_simulation, self.n_time))
@@ -144,37 +143,36 @@ class Forecaster(forecast_abstract.Forecaster):
     def load_locations_memmap(self, mode):
         """Call load_memmap() for each forecaster in self.downscale
         """
-        for time_series in self.downscale.generate_unmask_time_series():
-            time_series.forecaster.load_memmap(mode)
+        for time_series_i in self.downscale.generate_unmask_time_series():
+            time_series_i.forecaster.load_memmap(mode)
 
     def del_locations_memmap(self):
         """Call del_memmap() for each forecaster in self.downscale
         """
-        for time_series in self.downscale.generate_unmask_time_series():
-            time_series.forecaster.del_memmap()
+        for time_series_i in self.downscale.generate_unmask_time_series():
+            time_series_i.forecaster.del_memmap()
 
     def generate_time_series_forecaster(self):
-        """Generate the forecaster for every unmasked time series. Also load the
-            memmap. Caution: ensure to call del_memmap() for each of the
+        """Generate the forecaster for every unmasked time series. Also load
+            the memmap. Caution: ensure to call del_memmap() for each of the
             forecaster after use
         """
-        for time_series in self.downscale.generate_unmask_time_series():
-            forecaster = time_series.forecaster
+        for time_series_i in self.downscale.generate_unmask_time_series():
+            forecaster = time_series_i.forecaster
             forecaster.load_memmap("r")
-            yield time_series.forecaster
+            yield time_series_i.forecaster
 
     def generate_forecaster_no_memmap(self):
         """Generate the forecaster for every unmasked time series, do not load
             memmap, used for parallel computation by delaying the calling of
             load_memap() at a later stage
         """
-        for time_series in self.downscale.generate_unmask_time_series():
-            forecaster = time_series.forecaster
-            yield time_series.forecaster
+        for time_series_i in self.downscale.generate_unmask_time_series():
+            yield time_series_i.forecaster
 
-    #implemented
+    # implemented
     def get_roc_curve_array(
-        self, rain_warning_array, time_index=None, pool=None):
+            self, rain_warning_array, time_index=None, pool=None):
         """Get array of ROC curves
 
         Evaluate the ROC curve for different amounts of precipitation
@@ -193,17 +191,17 @@ class Forecaster(forecast_abstract.Forecaster):
             time_index = slice(len(self.data))
         mask = self.data.mask
         observed_rain = self.data.rain[time_index, np.logical_not(mask)]
-        #swap axes so that...
-            #dim 0: for each location
-            #dim 1: for each time point
+        # swap axes so that...
+        #     dim 0: for each location
+        #     dim 1: for each time point
         observed_rain = np.swapaxes(observed_rain, 0, 1)
-        #when flatten, this is comparable with the return value from
-            #self.get_prob_rain()
+        # when flatten, this is comparable with the return value from
+        # self.get_prob_rain()
         observed_rain = observed_rain.flatten()
 
         roc_array = []
-        #get roc curve for every rain_warning, else None if that amount of rain
-            #was never observed in the test set
+        # get roc curve for every rain_warning, else None if that amount of
+        # rain was never observed in the test set
         for rain_warning in rain_warning_array:
             if np.any(rain_warning < observed_rain):
                 p_rain = self.get_prob_rain(rain_warning, time_index).flatten()
@@ -213,7 +211,7 @@ class Forecaster(forecast_abstract.Forecaster):
                 roc_array.append(None)
         return roc_array
 
-    #implemented
+    # implemented
     def compare_dist_with_observed(self, n_linspace=100):
         """Return an object from distribution_compare, used to compare the
             distribution of the precipitation of the forecast and the observed
@@ -228,6 +226,7 @@ class Forecaster(forecast_abstract.Forecaster):
         comparer = distribution_compare.Downscale()
         comparer.compare(self, n_linspace)
         return comparer
+
 
 class ForecasterGp(Forecaster):
     """
@@ -257,47 +256,47 @@ class ForecasterGp(Forecaster):
         self.gp_array = []
 
         area_unmask = downscale.area_unmask
-        #get the input variables of the GP from the topography information
+        # get the input variables of the GP from the topography information
         topo_dic = downscale.topography
 
-        n_sample = 100 #number of posterior samples to use
-        #each location has multiple samples of beta, fit gp onto a sample of
-            #samples
-        #gp_input:
-            #dim 0: for each location
-            #dim 1: for each topo key
+        n_sample = 100  # number of posterior samples to use
+        # each location has multiple samples of beta, fit gp onto a sample of
+        # samples
+        # gp_input:
+        #     dim 0: for each location
+        #     dim 1: for each topo key
         self.gp_input = np.zeros((area_unmask, len(topo_key)))
-        #gp_output: array of numpy for each parameter (eg reg for temperature),
-            #each element has dimensions, dim 0: for each location, dim 1: for
-                #each gp sample
+        # gp_output: array of numpy for each parameter (eg reg for temperature)
+        # each element has dimensions, dim 0: for each location, dim 1: for
+        # each gp sample
         gp_output = []
         for i_parameter in range(downscale.n_parameter):
             gp_output.append(np.zeros((area_unmask, n_sample)))
 
-        #get topography information for each location
+        # get topography information for each location
         for i_location, time_series_i in enumerate(
-            downscale.generate_unmask_time_series()):
+                downscale.generate_unmask_time_series()):
             coordinates = time_series_i.id
             for i_key, key in enumerate(topo_key):
                 self.gp_input[i_location, i_key] = (
                     topo_dic[key][coordinates[0], coordinates[1]])
-            #ensure time_series does not set from the posterior sample, these
-                #are set manually from the gp
+            # ensure time_series does not set from the posterior sample, these
+            # are set manually from the gp
             time_series_i.set_from_mcmc = False
 
-        #select random mcmc samples
+        # select random mcmc samples
         rng = downscale.rng
         mcmc_index_array = rng.choice(
             range(downscale.burn_in, downscale.n_sample), n_sample)
 
-        #extract parameters to fit onto
+        # extract parameters to fit onto
         for i_mcmc, mcmc_index in enumerate(mcmc_index_array):
-            #set mcmc sample
+            # set mcmc sample
             for time_series_i in downscale.generate_unmask_time_series():
                 time_series_i.read_memmap()
                 time_series_i.set_parameter_from_sample_i(mcmc_index)
                 time_series_i.del_memmap()
-            #extract parameter and save it to gp_output
+            # extract parameter and save it to gp_output
             parameter_vector = downscale.get_parameter_vector().copy()
             for i_parameter in range(downscale.n_parameter):
                 slice_index = slice(
@@ -305,30 +304,30 @@ class ForecasterGp(Forecaster):
                 parameter_i = parameter_vector[slice_index]
                 gp_output[i_parameter][:, i_mcmc] = parameter_i
 
-        #fit gp for each parameter
+        # fit gp for each parameter
         for i_parameter in range(downscale.n_parameter):
             gp = GaussianProcessRegressor()
             gp.fit(self.gp_input, gp_output[i_parameter])
-            #do not save x_train, this is set in forecasting, prevents saving
-                #duplicates of this variable onto disk
+            # do not save x_train, this is set in forecasting, prevents saving
+            # duplicates of this variable onto disk
             gp.delete_x_train()
             self.gp_array.append(gp)
 
-    #override
+    # override
     def simulate_forecasts(self, index_range):
-        #loop: get mcmc sample, forecast, ..etc
-        #the forecast is done in parallel
+        # loop: get mcmc sample, forecast, ..etc
+        # the forecast is done in parallel
         area_unmask = self.downscale.area_unmask
         n_parameter = self.downscale.n_parameter
 
-        #set x_train for each gp, they all point to self.gp_input, prevents
-            #deep copies
+        # set x_train for each gp, they all point to self.gp_input, prevents
+        # deep copies
         for gp_i in self.gp_array:
             gp_i.set_x_train(self.gp_input)
 
         for i_forecast in index_range:
 
-            #get the parameter and smooth it using GP
+            # get the parameter and smooth it using GP
             parameter_vector = np.zeros(area_unmask * n_parameter)
             for i_parameter in range(n_parameter):
                 slice_index = slice(
@@ -337,20 +336,22 @@ class ForecasterGp(Forecaster):
                     self.downscale.rng)
                 parameter_vector[slice_index] = parameter_i.flatten()
 
-            #set the smoothed parameter
+            # set the smoothed parameter
             self.downscale.set_parameter_vector(parameter_vector)
             self.downscale.update_all_cp_parameters()
-            #do one sample
-                #hack: set the member variable n_simulation to do only one
-                    #forecast (could be improved here)
+            # do one sample
+            #
+            # hack: set the member variable n_simulation to do only one
+            # forecast (could be improved here)
             self.n_simulation = i_forecast + 1
             super().simulate_forecasts([i_forecast], False)
 
             print("Predictive sample", i_forecast)
 
-        #remove x_train so that duplicates are not saved
+        # remove x_train so that duplicates are not saved
         for gp_i in self.gp_array:
             gp_i.delete_x_train()
+
 
 class GaussianProcessRegressor(gaussian_process.GaussianProcessRegressor):
     """Modification of sklearn.gaussian_process.GaussianProcessRegressor
@@ -386,7 +387,7 @@ class GaussianProcessRegressor(gaussian_process.GaussianProcessRegressor):
         super().__init__()
         self.copy_X_train = False
 
-    #override
+    # override
     def fit(self, X, y):
         super().fit(X, y)
         self.alpha_ = np.mean(self.alpha_, axis=1)
@@ -413,6 +414,7 @@ class GaussianProcessRegressor(gaussian_process.GaussianProcessRegressor):
             raise Exception("Must set X_train_")
         return super().sample_y(self.X_train_, random_state=rng)
 
+
 class TimeSeriesForecaster(time_series.Forecaster):
     """Used by TimeSeriesDownscale class
 
@@ -432,12 +434,13 @@ class TimeSeriesForecaster(time_series.Forecaster):
         self.memmap_path = memmap_path
         self.memmap_shape = None
 
-    #override
+    # override
     def start_forecast(self, n_simulation, model_field, memmap_shape):
         """Start forecast simulations, to be called initially
 
-        Override as a memmap does not need to be created to store the forecasts,
-            this has already been done by the corresponding Downscale object.
+        Override as a memmap does not need to be created to store the
+            forecasts, this has already been done by the corresponding
+            Downscale object.
 
         Args:
             n_simulation: number of simulations
@@ -447,18 +450,18 @@ class TimeSeriesForecaster(time_series.Forecaster):
         self.memmap_shape = memmap_shape
         super().start_forecast(n_simulation, model_field)
 
-    #override
+    # override
     def make_memmap_path(self):
         """Do nothing, memmap_path has already been provided
         """
         pass
 
-    #override
+    # override
     def simulate_forecasts(self, index_range):
-        #do not print progress
+        # do not print progress
         super().simulate_forecasts(index_range, False)
 
-    #override
+    # override
     def resume_forecast(self, n_simulation, memmap_shape):
         """Simulate more forecasts
 
@@ -475,11 +478,11 @@ class TimeSeriesForecaster(time_series.Forecaster):
             n_simulation_old = self.n_simulation
             self.n_simulation = n_simulation
             self.load_memmap("r+")
-            #False in argument to not print progress
+            # False in argument to not print progress
             self.simulate_forecasts(range(n_simulation_old, self.n_simulation))
             self.del_memmap()
 
-    #override
+    # override
     def load_memmap(self, mode):
         """Load the memmap file for forecast_array
 
@@ -494,9 +497,11 @@ class TimeSeriesForecaster(time_series.Forecaster):
         super().load_memmap(mode, self.memmap_shape)
         self.forecast_array = self.forecast_array[self.i_space]
 
+
 class ForecastMessage(object):
     """Message to forecast all spatial points in parallel
     """
+
     def __init__(self,
                  time_series,
                  model_field,
@@ -514,7 +519,8 @@ class ForecastMessage(object):
         self.is_print = is_print
 
     def forecast(self):
-        self.time_series.forecast(self.model_field, self.n_simulation,
+        self.time_series.forecast(
+            self.model_field, self.n_simulation,
             self.memmap_path, self.memmap_shape, self.i_space)
         if self.is_print:
             print("Predictive location", self.i_space)

@@ -14,7 +14,6 @@ TimeSeries <- Downscale
 
 import numpy as np
 
-from compound_poisson.forecast import time_segmentation
 
 class TimeSeries(object):
     """For analysising credible interval widths and coverage for TimeSeries
@@ -69,11 +68,11 @@ class TimeSeries(object):
                 dim 0: for each credible level
                 dim 1: for each time point
         """
-        #in this method only, coverage_array and spread_array has dimensions:
-            #dim 0: for each time
-            #dim 1: for each credible interval
-        #the returned coverage_array is transposed (dimensions swapped)
-        #same with spread_array
+        # in this method only, coverage_array and spread_array has dimensions:
+        #     dim 0: for each time
+        #     dim 1: for each credible interval
+        # the returned coverage_array is transposed (dimensions swapped)
+        # same with spread_array
         coverage_array = []
         spread_array = []
         for date, index in self.time_segmentator:
@@ -86,14 +85,14 @@ class TimeSeries(object):
             upper_error_array = np.quantile(
                 forecast_slice.forecast_array, upper_p, 0)
 
-            #array of coverage and spread for this time, each elemenet
-                #correspond to different credible levels
+            # array of coverage and spread for this time, each elemenet
+            # correspond to different credible levels
             coverage_i = []
             spread_i = []
-            #for each credible level, evaluate the mean spread and coverage
+            # for each credible level, evaluate the mean spread and coverage
             for lower_error_j, upper_error_j in zip(
-                lower_error_array, upper_error_array):
-                #equality required to compare with 0 mm
+                    lower_error_array, upper_error_array):
+                # equality required to compare with 0 mm
                 coverage_ij = np.mean(
                     np.logical_and(observed_slice >= lower_error_j,
                                    observed_slice <= upper_error_j))
@@ -102,10 +101,11 @@ class TimeSeries(object):
                 spread_i.append(spread_ij)
             coverage_array.append(coverage_i)
             spread_array.append(spread_i)
-        #transpose which swap the dimensions
+        # transpose which swap the dimensions
         coverage_array = np.asarray(coverage_array).T
         spread_array = np.asarray(spread_array).T
         return (coverage_array, spread_array)
+
 
 class Downscale(TimeSeries):
     """For analysising credible interval widths and coverage for Downscale
@@ -114,7 +114,7 @@ class Downscale(TimeSeries):
     def __init__(self, time_segmentator):
         super().__init__(time_segmentator)
 
-    #override
+    # override
     def add_data(self, forecaster):
         """Add a TimeSeries data, update the member variables coverage_array
             and spread_array
@@ -122,13 +122,13 @@ class Downscale(TimeSeries):
         Args:
             forecaster: compound_poisson.forecast.downscale.Forecaster object
         """
-        #coverage_array and spread_array at the start of this method:
-            #dim 0: for each location
-            #dim 1: for each credible interval
-            #dim 2: for each time
+        # coverage_array and spread_array at the start of this method:
+        #     dim 0: for each location
+        #     dim 1: for each credible interval
+        #     dim 2: for each time
         self.coverage_array = []
         self.spread_array = []
-        #for each location, work out coverage and mean spread
+        # for each location, work out coverage and mean spread
         iter_rain = zip(forecaster.generate_time_series_forecaster(),
                         forecaster.data.generate_unmask_rain())
         for forecaster_i, observed_rain_i in iter_rain:
@@ -137,7 +137,7 @@ class Downscale(TimeSeries):
             self.coverage_array.append(coverage_i)
             self.spread_array.append(spread_i)
             forecaster_i.del_memmap()
-        #average over locations
+        # average over locations
         self.coverage_array = np.asarray(self.coverage_array)
         self.spread_array = np.asarray(self.spread_array)
         self.coverage_array = np.mean(self.coverage_array, 0)
