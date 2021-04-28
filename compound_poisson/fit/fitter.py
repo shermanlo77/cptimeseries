@@ -3,6 +3,7 @@ from os import path
 
 import joblib
 
+
 class Fitter(object):
     """Wrapper class for fitting models onto data and check-pointing
 
@@ -22,7 +23,7 @@ class Fitter(object):
                 allows for a non-default .gz file to be loaded or saved.
         """
         self.name = model_class.__name__
-        if not suffix is None:
+        if suffix is not None:
             self.name += "_" + suffix
         self.model_class = model_class
         self.result_dir = path.join(directory, "result")
@@ -45,9 +46,9 @@ class Fitter(object):
     def fit(self, dataset, seed, n_sample=None, pool=None, is_print=True):
         """Fit model onto data
 
-        Call to do MCMC, call again to resume. Reproducible if forecast() is not
-            called between fit() calls. The argument n_sample is designed for
-            debugging purposes.
+        Call to do MCMC, call again to resume. Reproducible if forecast() is
+            not called between fit() calls. The argument n_sample is designed
+            for debugging purposes.
 
         Args:
             dataset: object containing training (and/or test) data (exact class
@@ -58,16 +59,16 @@ class Fitter(object):
             is_print: boolean, True if to print out MCMC trace plots
         """
         result_file = self.get_result_path()
-        #check if this is the initial fit() call by checking the results files
+        # check if this is the initial fit() call by checking the results files
         if not path.isfile(result_file):
-            #fit the model
+            # fit the model
             model = self.initial_fit(dataset, seed, n_sample, pool)
-            #save results
+            # save results
             joblib.dump(model, result_file)
-        #else this is not an initial call, resume the MCMC fit
+        # else this is not an initial call, resume the MCMC fit
         else:
             model = joblib.load(result_file)
-            if not n_sample is None:
+            if n_sample is not None:
                 if pool is None:
                     model.resume_fitting(n_sample)
                 else:
@@ -88,13 +89,13 @@ class Fitter(object):
             n_sample: number of samples, default value used if None is passed
             pool: required by downscale
         """
-        #pool is required by downscale
+        # pool is required by downscale
         raise NotImplementedError
 
     def print_mcmc(self, model, dataset=None, pool=None):
         """Print mcmc chain of the fitted model
         """
-        #dataset is required by time_series for plotting true values
+        # dataset is required by time_series for plotting true values
         raise NotImplementedError
 
     def forecast(self,
@@ -122,17 +123,18 @@ class Fitter(object):
         model = joblib.load(result_file)
         self.initalise_model_for_forecast(model)
 
-        #set default n_simulation if this is the initial forecast() call
+        # set default n_simulation if this is the initial forecast() call
         if (model.forecaster is None) and (n_simulation is None):
             n_simulation = 1000
-        if not burn_in is None:
+        if burn_in is not None:
             model.set_burn_in(burn_in)
 
-        #call do_forecast() if this is the initial do_forecast() call or this is
-            #further do_forecast() calls and a n_simulation is provided
-        is_do_forecast = ((model.forecaster is None)
-            or ((not model.forecaster is None)
-            and (not n_simulation is None)))
+        # call do_forecast() if this is the initial do_forecast() call or this
+        # is further do_forecast() calls and a n_simulation is provided
+        is_do_forecast = (
+            (model.forecaster is None)
+            or ((model.forecaster is not None) and (n_simulation is not None))
+            )
         if is_do_forecast:
             self.do_forecast(model, dataset, n_simulation, pool)
             joblib.dump(model, result_file)
@@ -148,11 +150,11 @@ class Fitter(object):
     def do_forecast(self, model, dataset, n_simulation, pool=None):
         """Make forecasts for the model
         """
-        #pool required by downscale
+        # pool required by downscale
         raise NotImplementedError
 
     def print_forecast(self, model, dataset, pool=None):
         """Print forecast figures for this model
         """
-        #pool required by downscale
+        # pool required by downscale
         raise NotImplementedError

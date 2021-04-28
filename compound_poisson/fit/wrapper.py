@@ -11,11 +11,13 @@ For argparse parameters, see get_fit_parser() and get_forecast_parser()
 
 import argparse
 
+
 def time_series_fit(fitter, data, seed):
     """Do a fit for a given Fitter (for time series)
     """
     n_sample, is_print, n_thread = get_fit_parser()
     fitter.fit(data, seed, n_sample, is_print=is_print)
+
 
 def time_series_forecast(fitter, training, test, default_burn_in):
     """Do a forecast for a given fitted Fitter (for time series)
@@ -24,6 +26,7 @@ def time_series_forecast(fitter, training, test, default_burn_in):
     if burn_in is None:
         burn_in = default_burn_in
     fitter.forecast((training, test), n_simulation, burn_in)
+
 
 def downscale_fit(fitter, data, seed, Pool):
     """Do a fit for a given Fitter (for multiple locations)
@@ -36,6 +39,7 @@ def downscale_fit(fitter, data, seed, Pool):
         pool = Pool(n_thread)
     fitter.fit(data, seed, n_sample, pool, is_print)
     pool.join()
+
 
 def downscale_forecast(fitter, test, default_burn_in, Pool):
     """Do a forecast for a given fitted Fitter (for multiple locations)
@@ -51,6 +55,7 @@ def downscale_forecast(fitter, test, default_burn_in, Pool):
     fitter.forecast(test, n_simulation, burn_in, pool, is_print)
     pool.join()
 
+
 def get_fit_parser():
     """Extract argparse parameters provided by the user for fitting
     """
@@ -65,6 +70,7 @@ def get_fit_parser():
     is_print = not parser.parse_args().noprint
     n_thread = parser.parse_args().core
     return (n_sample, is_print, n_thread)
+
 
 def get_forecast_parser():
     """Extract argparse parameters provided by the user for forecasting

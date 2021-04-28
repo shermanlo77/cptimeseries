@@ -1,5 +1,5 @@
-"""Base abstract superclass is Mcmc. Given a Target distribution, it can get and
-    store MCMC samples in a memmap. Memmap are chosen to reduce memory
+"""Base abstract superclass is Mcmc. Given a Target distribution, it can get
+    and store MCMC samples in a memmap. Memmap are chosen to reduce memory
     consumption.
 
 Also contains the class ReadOnlyFromSlice. Instances are dummy objects which
@@ -8,8 +8,8 @@ Also contains the class ReadOnlyFromSlice. Instances are dummy objects which
     reference to the Python slice object, not to be confused with slice
     sampling.
 
-The function do_gibbs_sampling() does Gibbs sampling when given an array of Mcmc
-    objects.
+The function do_gibbs_sampling() does Gibbs sampling when given an array of
+    Mcmc objects.
 
 Mcmc
     <- mcmc_parameter.Rwmh
