@@ -17,15 +17,15 @@ class Downscale(multiseries.MultiSeries):
     """Collection of multiple TimeSeries objects
 
     Fit a compound Poisson time series on multiple locations in 2d space.
-        Parameters have a Gaussian process (GP) prior, each location has a
-        log precision parameter with iid Normal prior. The GP precision
-        has an inverse Gamma prior.
+        Parameters have a Gaussian process (GP) prior (see parameter_target),
+        parameterised by futher hyperparameters such as precision scales and
+        the kernel parameter (called gp precision) (see parameter_gp_target).
 
     Attributes:
         topography_normalise: dictonary of topography information normalised,
             mean 0, std 1
         parameter_target: TargetParameter object
-        parameter_log_precision_target: TargetLogPrecisionGp object
+        parameter_log_precision_target: TargetLogPrecision object
         parameter_gp_target: TargetGp object
         parameter_mcmc: Mcmc object wrapping around parameter_target
         parameter_log_precision_mcmc: Mcmc object wrapping around
@@ -50,7 +50,7 @@ class Downscale(multiseries.MultiSeries):
         self.parameter_log_precision_mcmc = None
         self.parameter_gp_mcmc = None
         self.z_mcmc = None
-        self.gibbs_weight = [0.003*len(self), 1, 0.2, 0.2]
+        self.gibbs_weight = [0.01*len(self), 1, 0.2, 0.5]
         self.square_error = np.zeros((self.area_unmask, self.area_unmask))
 
         if data.model_field is not None:
@@ -71,10 +71,11 @@ class Downscale(multiseries.MultiSeries):
 
         if data.model_field is not None:
             # set target
-            self.parameter_target = target_downscale.TargetParameter(self)
+            self.parameter_gp_target = target_downscale.TargetGp(self)
             self.parameter_log_precision_target = (
                 target_downscale.TargetLogPrecision(self))
-            self.parameter_gp_target = target_downscale.TargetGp(self)
+            self.parameter_target = target_downscale.TargetParameter(self)
+            self.parameter_target.update_cov_chol()
 
         for time_series_i in self.generate_unmask_time_series():
             time_series_i.memmap_dir = self.memmap_dir
@@ -137,12 +138,13 @@ class Downscale(multiseries.MultiSeries):
             self.memmap_dir)
         self.parameter_gp_mcmc = mcmc.Rwmh(
             self.parameter_gp_target, self.rng, self.n_sample, self.memmap_dir)
+        self.parameter_gp_mcmc.proposal_covariance_small = (
+            1e-4 / self.parameter_gp_mcmc.n_dim)
         # all time series objects instantiate mcmc objects to store the z chain
         for time_series in self.generate_unmask_time_series():
             time_series.n_sample = self.n_sample
             time_series.instantiate_mcmc()
         self.z_mcmc = mcmc.ZMcmcArray(self)
-        self.parameter_gp_target.save_cov_chol()
 
     def get_mcmc_array(self):
         """Return array of all mcmc objects
@@ -154,6 +156,21 @@ class Downscale(multiseries.MultiSeries):
             self.parameter_gp_mcmc,
         ]
         return mcmc_array
+
+    # override
+    def instantiate_forecaster(self, use_gp=False, topo_key=None):
+        """Instantiate a Forecaster object and return it
+
+        Args:
+            All unused
+
+        Return:
+            instantiated Forecaster object
+        """
+        # forecaster.downscale.Forecaster may be used instead for asynch
+        # version
+        forecaster = forecast.downscale.ForecasterSynch(self, self.memmap_dir)
+        return forecaster
 
     # override
     def print_mcmc(self, directory, pool):
@@ -184,24 +201,18 @@ class Downscale(multiseries.MultiSeries):
             plt.savefig(path.join(directory, "parameter_" + str(i) + ".pdf"))
             plt.close()
 
-        chain = np.asarray(self.parameter_log_precision_mcmc[:])
-        area_unmask = self.area_unmask
-        parameter_name = list(self.parameter_log_precision_target.prior.keys())
-        for i, parameter_name_i in enumerate(parameter_name):
-            chain_i = []
-            for position_index in position_index_array:
-                chain_i.append(chain[:, i*area_unmask + position_index])
-            plt.plot(np.asarray(chain_i).T)
-            plt.xlabel("sample number")
-            plt.ylabel(parameter_name_i)
-            plt.savefig(path.join(directory, parameter_name_i + ".pdf"))
-            plt.close()
+        plt.figure()
+        plt.plot(self.parameter_log_precision_mcmc[:])
+        plt.xlabel("sample number")
+        plt.ylabel("log_precision")
+        plt.savefig(path.join(directory, "log_precision.pdf"))
+        plt.close()
 
         plt.figure()
         plt.plot(self.parameter_gp_mcmc[:])
         plt.xlabel("sample number")
-        plt.ylabel("gp_precision")
-        plt.savefig(path.join(directory, "gp_precision.pdf"))
+        plt.ylabel("gp_scale")
+        plt.savefig(path.join(directory, "gp_scale.pdf"))
         plt.close()
 
         chain = []
