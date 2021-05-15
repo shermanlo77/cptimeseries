@@ -22,7 +22,7 @@ def time_series_fit(fitter, data, seed):
 def time_series_forecast(fitter, training, test, default_burn_in):
     """Do a forecast for a given fitted Fitter (for time series)
     """
-    n_simulation, is_print, burn_in = get_forecast_parser()
+    n_simulation, is_print, burn_in, n_thread = get_forecast_parser()
     if burn_in is None:
         burn_in = default_burn_in
     fitter.forecast((training, test), n_simulation, burn_in)

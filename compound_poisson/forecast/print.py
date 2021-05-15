@@ -48,7 +48,9 @@ class Printer(object):
     Attributes:
         forecaster: compound_poisson.forecast.forecast_abstract.Forecaster
             object
-        directory: where to save the figures
+        directory: base directory where to save the figures and extra
+            directories
+        directory_assess: sub directory where to save figures
         prefix: what to put as a prefix for the file names for the figures
     """
 
@@ -62,7 +64,12 @@ class Printer(object):
         """
         self.forecaster = forecaster
         self.directory = directory
+        self.directory_assess = None
         self.prefix = prefix
+
+        self.directory_assess = path.join(self.directory, "forecast_assess")
+        if not path.isdir(self.directory_assess):
+            os.mkdir(self.directory_assess)
 
     def print(self):
         """Print out all of the figures, these include:
@@ -97,12 +104,13 @@ class Printer(object):
         # main forecasts plot
         self.print_forecast()
 
+        directory = self.directory_assess
+
         # -----BIAS VARIANCE ANALYSIS-----
         bias_var_analyser = self.get_bias_var_analyser()
         bias_var_analyser.analyse()
         bias_var_analyser.plot(
-            path.join(
-                self.directory, self.prefix + "bias_var.pdf"), monochrome)
+            path.join(directory, self.prefix + "bias_var.pdf"), monochrome)
 
         # -----ROC ANALYSIS-----
 
@@ -131,7 +139,7 @@ class Printer(object):
                 auc_array[RAIN_THRESHOLD_ARRAY[i_rain]].append(auc)
             plt.legend(loc="lower right")
             plt.savefig(
-                path.join(self.directory,
+                path.join(directory,
                           self.prefix + "roc_" + str(year) + ".pdf"),
                 bbox_inches="tight")
             plt.close()
@@ -151,7 +159,7 @@ class Printer(object):
         plt.xlabel("year")
         plt.xticks(rotation=45)
         plt.ylabel("area under curve")
-        plt.savefig(path.join(self.directory, self.prefix + "auc.pdf"),
+        plt.savefig(path.join(directory, self.prefix + "auc.pdf"),
                     bbox_inches="tight")
         plt.close()
 
@@ -165,7 +173,7 @@ class Printer(object):
             if roc_curve is not None:
                 roc_curve.plot()
         plt.legend(loc="lower right")
-        plt.savefig(path.join(self.directory, self.prefix + "roc_all.pdf"),
+        plt.savefig(path.join(directory, self.prefix + "roc_all.pdf"),
                     bbox_inches="tight")
         plt.close()
 
@@ -181,7 +189,7 @@ class Printer(object):
         comparer.adjust_survival_plot()
         plt.legend()
         plt.savefig(
-            path.join(self.directory, self.prefix + "distribution.pdf"),
+            path.join(directory, self.prefix + "distribution.pdf"),
             bbox_inches="tight")
         plt.close()
 
@@ -192,7 +200,7 @@ class Printer(object):
         comparer.plot_pp()
         comparer.adjust_pp_plot()
         plt.savefig(
-            path.join(self.directory, self.prefix + "distribution_pp.pdf"),
+            path.join(directory, self.prefix + "distribution_pp.pdf"),
             bbox_inches="tight")
         plt.close()
 
@@ -203,7 +211,7 @@ class Printer(object):
         comparer.plot_qq()
         comparer.adjust_qq_plot()
         plt.savefig(
-            path.join(self.directory, self.prefix + "distribution_qq.pdf"),
+            path.join(directory, self.prefix + "distribution_qq.pdf"),
             bbox_inches="tight")
         plt.close()
 
@@ -212,32 +220,32 @@ class Printer(object):
         loss_segmentator = self.get_loss_segmentator()
         loss_segmentator.evaluate_loss(year_segmentator)
         loss_segmentator.plot_loss(
-            self.directory, self.prefix+"yearly_", monochrome)
+            directory, self.prefix+"yearly_", monochrome)
         loss_segmentator.evaluate_loss(spring_segmentator)
         loss_segmentator.plot_loss(
-            self.directory, self.prefix+"spring_", monochrome)
+            directory, self.prefix+"spring_", monochrome)
         loss_segmentator.evaluate_loss(summer_segmentator)
         loss_segmentator.plot_loss(
-            self.directory, self.prefix+"summer_", monochrome)
+            directory, self.prefix+"summer_", monochrome)
         loss_segmentator.evaluate_loss(autumn_segmentator)
         loss_segmentator.plot_loss(
-            self.directory, self.prefix+"autumn_", monochrome)
+            directory, self.prefix+"autumn_", monochrome)
         loss_segmentator.evaluate_loss(winter_segmentator)
         loss_segmentator.plot_loss(
-            self.directory, self.prefix+"winter_", monochrome)
+            directory, self.prefix+"winter_", monochrome)
 
         # -----RESIDUAL ANLYSIS-----
         residual_plot = self.get_residual_analyser()
 
         # residual vs observed
         residual_plot.plot_heatmap(cmap="Greys")
-        plt.savefig(path.join(self.directory,
+        plt.savefig(path.join(directory,
                               self.prefix + "residual_hist.pdf"),
                     bbox_inches="tight")
         plt.close()
 
         residual_plot.plot_scatter()
-        plt.savefig(path.join(self.directory,
+        plt.savefig(path.join(directory,
                               self.prefix + "residual_scatter.png"),
                     bbox_inches="tight")
         plt.close()
@@ -245,13 +253,13 @@ class Printer(object):
         # forecast vs observed
         residual_plot = residual_analysis.ResidualLnqqPlotter(residual_plot)
         residual_plot.plot_heatmap(cmap="Greys")
-        plt.savefig(path.join(self.directory,
+        plt.savefig(path.join(directory,
                               self.prefix + "residual_qq_hist.pdf"),
                     bbox_inches="tight")
         plt.close()
 
         residual_plot.plot_scatter()
-        plt.savefig(path.join(self.directory,
+        plt.savefig(path.join(directory,
                               self.prefix + "residual_qq_scatter.png"),
                     bbox_inches="tight")
         plt.close()
@@ -272,7 +280,7 @@ class Printer(object):
         plt.ylabel("coverage of HDI")
         plt.legend()
         plt.plot()
-        plt.savefig(path.join(self.directory, self.prefix + "coverage.pdf"),
+        plt.savefig(path.join(directory, self.prefix + "coverage.pdf"),
                     bbox_inches="tight")
         plt.close()
 
@@ -286,7 +294,7 @@ class Printer(object):
         plt.xlabel("mean width of HDI (mm)")
         plt.ylabel("coverage of HDI")
         plt.plot()
-        plt.savefig(path.join(self.directory, self.prefix + "spread.pdf"),
+        plt.savefig(path.join(directory, self.prefix + "spread.pdf"),
                     bbox_inches="tight")
         plt.close()
 
@@ -396,6 +404,16 @@ class TimeSeries(Printer):
         segmentator_array.append(
             time_segmentation.Q34Segmentator(self.forecaster.time_array))
 
+        directory_forecast = path.join(self.directory, "forecast")
+        directory_residual = path.join(self.directory, "residual")
+        directory_prob = path.join(self.directory, "prob")
+        if not path.isdir(directory_forecast):
+            os.mkdir(directory_forecast)
+        if not path.isdir(directory_residual):
+            os.mkdir(directory_residual)
+        if not path.isdir(directory_prob):
+            os.mkdir(directory_prob)
+
         for i_segmentator, segmentator in enumerate(segmentator_array):
 
             for date, index in segmentator:
@@ -440,7 +458,7 @@ class TimeSeries(Printer):
                 plt.ylabel("precipitation (mm)")
                 plt.legend()
                 plt.savefig(
-                    path.join(self.directory,
+                    path.join(directory_forecast,
                               self.prefix+"forecast_"+label+".pdf"),
                     bbox_inches="tight")
                 plt.close()
@@ -460,7 +478,7 @@ class TimeSeries(Printer):
                 plt.ylabel("precipitation (mm)")
                 plt.legend()
                 plt.savefig(
-                    path.join(self.directory,
+                    path.join(directory_forecast,
                               self.prefix+"forecast_median_"+label+".pdf"),
                     bbox_inches="tight")
                 plt.close()
@@ -487,7 +505,7 @@ class TimeSeries(Printer):
                 plt.ylabel("precipitation (mm)")
                 plt.legend()
                 plt.savefig(
-                    path.join(self.directory,
+                    path.join(directory_forecast,
                               self.prefix+"forecast_only_"+label+".pdf"),
                     bbox_inches="tight")
                 plt.close()
@@ -501,7 +519,7 @@ class TimeSeries(Printer):
                 plt.xlabel("time")
                 plt.ylabel("residual (mm)")
                 plt.savefig(
-                    path.join(self.directory,
+                    path.join(directory_residual,
                               self.prefix+"residual_"+label+".pdf"),
                     bbox_inches="tight")
                 plt.close()
@@ -517,7 +535,7 @@ class TimeSeries(Printer):
                     plt.ylabel("forecasted probability of > "+str(rain)+" mm")
                     plt.savefig(
                         path.join(
-                            self.directory,
+                            directory_prob,
                             self.prefix+"prob_"+str(rain)+"_"+label+".pdf"),
                         bbox_inches="tight")
                     plt.close()
@@ -653,7 +671,7 @@ class Downscale(Printer):
                 plt.colorbar(im)
                 ax.set_aspect("auto", adjustable=None)
                 plt.savefig(
-                    path.join(self.directory,
+                    path.join(self.directory_assess,
                               self.prefix+Loss.get_short_name()+"_"+metric
                               + "_map.pdf"),
                     bbox_inches="tight")

@@ -1,3 +1,6 @@
+import os
+from os import path
+
 import compound_poisson
 from compound_poisson.fit import fitter
 from compound_poisson import forecast
@@ -28,7 +31,10 @@ class Fitter(fitter.Fitter):
         else:
             true_parameter = dataset.time_series.get_parameter_vector()
         # print results
-        time_series.print_mcmc(self.figure_dir, true_parameter)
+        directory = path.join(self.figure_dir, "chain")
+        if not path.isdir(directory):
+            os.mkdir(directory)
+        time_series.print_mcmc(directory, true_parameter)
 
     def initalise_model_for_forecast(self, time_series):
         time_series.forecaster_memmap_dir = self.result_dir
