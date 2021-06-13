@@ -7,6 +7,7 @@ from compound_poisson import parameter
 import dataset
 from dataset import location
 
+
 class LondonTraining(location.Location):
 
     def __init__(self):
@@ -15,6 +16,7 @@ class LondonTraining(location.Location):
     def load_data(self):
         self.load_data_from_city(dataset.ana.AnaDual10Training(), "London")
 
+
 class LondonTest(location.Location):
 
     def __init__(self):
@@ -22,6 +24,7 @@ class LondonTest(location.Location):
 
     def load_data(self):
         self.load_data_from_city(dataset.ana.AnaDual10Test(), "London")
+
 
 class LondonSimulatedTraining(LondonTraining):
 
@@ -39,6 +42,7 @@ class LondonSimulatedTraining(LondonTraining):
         self.time_series = time_series
         self.rain = self.time_series.y_array[training_slice]
 
+
 def get_simulated_time_series():
     """Return a simulated time_series object and 2 slice objec
 
@@ -49,8 +53,8 @@ def get_simulated_time_series():
         -slice object indicating the test set
     """
 
-    #concatenate the model fields together so that both the training and test
-        #times are simulated
+    # concatenate the model fields together so that both the training and test
+    # times are simulated
     data_training = LondonTraining()
     data_test = LondonTest()
     model_field = pd.concat(

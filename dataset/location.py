@@ -3,6 +3,7 @@ import pathlib
 
 import joblib
 
+
 class Location(object):
     """For storing model fields and precipitation for a single location
 
@@ -23,9 +24,9 @@ class Location(object):
         self.model_field_units = None
         self.time_series = None
 
-        #load the .gz file if one exist, otherwise load the data and save it
+        # load the .gz file if one exist, otherwise load the data and save it
         path_to_storage = pathlib.Path(__file__).parent.absolute()
-        storage_file =  path.join(
+        storage_file = path.join(
             path_to_storage, self.__class__.__name__+".gz")
         if path.isfile(storage_file):
             print("Loading", storage_file)
@@ -36,14 +37,14 @@ class Location(object):
             joblib.dump(self, storage_file)
 
     def copy_from(self, other):
-        #required for loading .gz in constructor
+        # required for loading .gz in constructor
         self.model_field = other.model_field
         self.rain = other.rain
         self.time_array = other.time_array
         self.model_field_units = other.model_field_units
 
     def load_data(self):
-        #to be implemented, to load data from a data.Data object
+        # to be implemented, to load data from a data.Data object
         raise NotImplementedError
 
     def load_data_from_city(self, data, city):
