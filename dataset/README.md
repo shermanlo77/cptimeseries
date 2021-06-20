@@ -2,7 +2,7 @@
 * Copyright (c) 2020 Sherman Lo
 * MIT LICENSE
 
-Under the hood code for handling `.nc` and `.grib` files and formatting it for `compound_poisson`. This package is not designed to generalise for other datasets, for example, longitude and latitude ranges are hard coded in as constants.
+Under the hood code for handling `.nc` and `.grib` files and formatting it for `compound_poisson`. This package is not designed to generalise to other datasets, for example, longitude and latitude ranges are hard coded in as constants.
 
 The main superclass is `data.DataDualGrid`. It reads precipitation, model fields and tomography data from `.nc` and `.grib` files and converts them into custom `.gz` files which are saved onto a drive using `joblib`. At least 16 GB of RAM is required to do this.
 
