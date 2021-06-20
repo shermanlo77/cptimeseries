@@ -1,5 +1,17 @@
 """Contains the class DataDualGrid, a wrapper class for model fields,
-     precipitation adn topography data.
+     precipitation and topography data.
+
+Note that coordinates for each file used in the dataset is hard coded and is
+    not designed to generalise to other datasets (eg see the list of global
+    constants).
+Coordinates are not read from .grib files to avoid using the GPL pupygrib
+    package. Commits such as 716c02 use pupygrib to retrive coordinates and
+    check if they are consistent with LATITUDE_COARSE_ARRAY and
+    LONGITUDE_COARSE_ARRAY. Obtaining the coordinates from the .grib file
+    using gdal was too difficult, perhaps the projection in the .grib file
+    was not as expected. Below maybe of use:
+        https://gis.stackexchange.com/questions/57834/how-to-get-raster-corner-coordinates-using-python-gdal-bindings
+        https://pyproj4.github.io/pyproj/stable/installation.html
 """
 
 import datetime
@@ -13,7 +25,6 @@ import netCDF4
 import numpy as np
 from numpy import ma
 import pandas as pd
-import pupygrib
 from scipy import interpolate
 
 CITY_LOCATION = {
@@ -136,10 +147,7 @@ class DataDualGrid(object):
             file_name: name of the .grib file to read from
         """
         file = open(file_name, "rb")
-        message_array = pupygrib.read(file)
         raster_array = gdal.Open(file_name)
-        longitude_coarse_grid, latitude_coarse_grid = np.meshgrid(
-            LONGITUDE_COARSE_ARRAY, LATITUDE_COARSE_ARRAY)
 
         # grib comment is model field name
         time_array_all = {}  # dictionary of datetime, keys: model field names
@@ -147,14 +155,7 @@ class DataDualGrid(object):
         # dictionary, array of pointers for GetRasterBand, keys: grib comments
         raster_pointer = {}
         # go through data, get model field names and times
-        for i, message in enumerate(message_array):
-
-            # check coordinates are as expected
-            coordinates = message.get_coordinates()
-            assert(
-                np.all(np.isclose(coordinates[0], longitude_coarse_grid)))
-            assert(
-                np.all(np.isclose(coordinates[1], latitude_coarse_grid)))
+        for i in range(raster_array.RasterCount):
 
             # get model field name
             raster = raster_array.GetRasterBand(i+1)

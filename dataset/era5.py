@@ -9,7 +9,6 @@ import gdal
 import netCDF4
 import numpy as np
 import pandas as pd
-import pupygrib
 
 from dataset import ana
 from dataset import data
@@ -40,26 +39,14 @@ class Era5(data.DataDualGrid):
     def load_rain(self, file_name):
         # override to read from grib file
         file = open(file_name, "rb")
-        message_array = pupygrib.read(file)
         raster_array = gdal.Open(file_name)
-        longitude_grid, latitude_grid = np.meshgrid(
-            data.LONGITUDE_ARRAY, data.LATITUDE_ARRAY)
 
         # store precipitation in rain_array_file for now then append to
         # self.rain
         # self.rain may be None, or already instantiated as a numpy array
         rain_array_file = []
 
-        for i, message in enumerate(message_array):
-
-            # check coordinates are as expected
-            coordinates = message.get_coordinates()
-            assert(
-                np.all(
-                    np.isclose(coordinates[0][TRIM_INDEX], longitude_grid)))
-            assert(
-                np.all(
-                    np.isclose(coordinates[1][TRIM_INDEX], latitude_grid)))
+        for i in range(raster_array.RasterCount):
 
             raster = raster_array.GetRasterBand(i+1)
 
