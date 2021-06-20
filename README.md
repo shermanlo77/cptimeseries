@@ -2,13 +2,15 @@
 * Copyright (c) 2020 Sherman Lo
 * MIT LICENSE
 
-Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle. A Bayesian inference was used to quantify uncertainity in the forecasting.
+Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle. A Bayesian inference was used to quantify uncertainty in the forecasting.
+
+The documentation is designed for Linux users only.
 
 Please see LICENCE for further information on how you can use and modify this repository for your own purpose.
 
 ![A time series forecast in bold with 1 sigma error as a shaded area](frontcover.png)
 
-Keywords: *Compound Poisson, MCMC sampling, downscale, time series, Gaussian process, downscaling, precipitation, weather forecasting*
+Keywords: *Compound Poisson, MCMC sampling, time series, downscale, downscaling, precipitation, weather forecasting*
 
 ## Requirements (Python 3, Linux Recommended)
 * At least 16 GB of RAM
@@ -18,7 +20,6 @@ Keywords: *Compound Poisson, MCMC sampling, downscale, time series, Gaussian pro
 * `matplotlib`
 * `statsmodels`
 * `joblib`
-* `pupygrib`
 * `cartopy`
     * [Installation instructions](https://scitools.org.uk/cartopy/docs/latest/installing.html)
     * [Possible help when installing](https://stackoverflow.com/questions/1099981/why-cant-python-find-shared-objects-that-are-in-directories-in-sys-path)
@@ -42,7 +43,22 @@ The data is available on [FigShare](https://figshare.com/s/c881cb81eff6942a61ac)
 - `Data/topo/`
 
 ## Summary of the Repository
-All code which reads the data are stored in the package `dataset`. All statistical code are in the package `compound_poisson`. Scripts to reproduce results or to play with a toy model are in the directory `script`. The packages `dataset` and `compound_poisson` will need to be `import`-ed in order to run scripts.
+All code which reads and processes the data are stored in the package `dataset`. All statistical code are in the package `compound_poisson`. Scripts to reproduce results or to play with a toy model are in the directory `script`.
+
+The packages `dataset` and `compound_poisson` will need to be `import`-ed and accessible in order to run scripts. This can be done, for example, by adding to the `~/.bashrc` file
+```
+PYTHONPATH=[path to repository]:$PYTHONPATH
+export PYTHONPATH
+```
+where `[path to repository]` is to be replaced with the path to a local copy of this repository. This makes the repository accessible by Python on start up of the computer.
+
+It is recommended to run scripts from the location of the scripts, eg
+```
+cd script
+cd cardiff_5_20
+python3 hyper_slice.py
+```
+so that all relevant results and figures are stored in `script/cardiff_5_20/`.
 
 Please see `README.md` files in the packages for further information.
 
@@ -124,7 +140,7 @@ to
 ```
 pool = multiprocess.MPIPoolExecutor
 ```
-so that [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) is used. In addition, the module `-m mpi4py.futures` and the script should be run using MPI, for example `mpiexec` and `sbatch`.
+so that [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) is used. In addition, the module `-m mpi4py.futures` and the script should be run using MPI, for example `mpiexec` or `sbatch`.
 
 Options are provided which may be useful for development, debugging or check-pointing purposes.
 
@@ -160,20 +176,18 @@ The following examples are provided:
 ## Other Multiple Locations Scripts
 * `script/wales_era5/era5.py`
     * IFS prediction on the test set: 2000-2019 inclusive
-* `script/wales_plot/plot.py`
+* `script/wales_5_20/multiseries_compare.py`
     * Compare the AUC, bias loss and residuals of the MCMC forecast with IFS.
-* `script/wales_plot/plot_dist.py`
     * Compare the distribution of the MCMC forecast with IFS.
-* `script/wales_plot/plot_spatial.py`
     * Compare the cross correlation of the MCMC and IFS forecast as well as the observed.
 
 ## Further Documentation
 * Please see the packages [`compound_poisson`](./compound_poisson/) and [`dataset`](./dataset/) for further documentations.
 
 ## Notes on Development and Sustainability
+- Legacy copy where the parameters have a Gaussain process prior are left in here (see for example `compound_poisson/downscale.py`).
 - The author has a background in Java so there is a frequent use of classes and inheritance structure.
 - The author attempted to keep to the [Google Python style guide](https://google.github.io/styleguide/pyguide.html). There are a few omission such as underscores for denoting private and protected methods, variables and classes.
 - `TODO` list:
-  - Documentation suitable for `pydoc`
-  - Provide a simpler example as an introduction
+  - Provide a simpler example as an introduction, see `examples/`
   - Testing

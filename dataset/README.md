@@ -2,9 +2,9 @@
 * Copyright (c) 2020 Sherman Lo
 * MIT LICENSE
 
-Under the hood code for handling `.nc` and `.grib` files and formatting it for `compound_poisson`.
+Under the hood code for handling `.nc` and `.grib` files and formatting it for `compound_poisson`. This package is not designed to generalise for other datasets, for example, longitude and latitude ranges are hard coded in as constants.
 
-The main superclasses are `data.Data` and `data.DataDualGrid`. It reads precipitation, model fields and tomography data from `.nc` and `.grib` files and converts them into custom `.gz` files which are saved onto a drive using `joblib`. At least 16 GB of RAM is required to do this.
+The main superclass is `data.DataDualGrid`. It reads precipitation, model fields and tomography data from `.nc` and `.grib` files and converts them into custom `.gz` files which are saved onto a drive using `joblib`. At least 16 GB of RAM is required to do this.
 
 Once the `.gz` file has been saved, data is read straight from the `.gz` file without the `.nc` and `.grib` files. This enables the entire data to be loaded onto RAM. This should be noted for developers who finds insufficient memory for larger datasets.
 
@@ -13,6 +13,8 @@ For a single location, the superclass `location.Location` is used.
 See or modify the global constants in `ana` to specify the location where the `.nc` and `.grib` files should be read. The `.gz` files are saved in this package.
 
 Implementations of these superclasses are found in the remaining modules and listed below.
+
+The use of `pupygrib` has been removed to avoid the use of GPL code. This means the package does not read longitude and latitude from `.grib` files.
 
 ## List of Datasets
 
