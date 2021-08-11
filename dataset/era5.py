@@ -5,9 +5,9 @@ import datetime
 from os import path
 import pathlib
 
-import gdal
 import netCDF4
 import numpy as np
+from osgeo import gdal
 import pandas as pd
 
 from dataset import ana

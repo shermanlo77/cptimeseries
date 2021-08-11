@@ -19,11 +19,11 @@ import math
 from os import path
 import pathlib
 
-import gdal
 import joblib
 import netCDF4
 import numpy as np
 from numpy import ma
+from osgeo import gdal
 import pandas as pd
 from scipy import interpolate
 
@@ -355,7 +355,7 @@ class DataDualGrid(object):
         self.mask = rain[0].mask
         # remove time points not covered by the model fields
         for i, time in enumerate(time_array):
-            time = time.date()
+            time = datetime.datetime(time.year, time.month, time.day)
             if time in self.time_array:
                 self.rain.append(rain[i])
                 assert(np.array_equal(self.mask, rain[i].mask))
