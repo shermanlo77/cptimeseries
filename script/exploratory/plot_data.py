@@ -34,6 +34,7 @@ from statsmodels.tsa import stattools
 import compound_poisson.forecast.print
 import dataset
 
+
 def plot_data(data):
     """For plotting figures given the dataset
 
@@ -47,8 +48,8 @@ def plot_data(data):
         data: dataset.data object
     """
 
-    #required so that python datetime can be converted and can be plotted on a
-        #graph
+    # required so that python datetime can be converted and can be plotted on a
+    # graph
     pd.plotting.register_matplotlib_converters()
 
     path_here = pathlib.Path(__file__).parent.absolute()
@@ -99,10 +100,10 @@ def plot_rain(data, figure_dir, pool):
     latitude_grid = data.topography["latitude"] + angle_resolution / 2
     longitude_grid = data.topography["longitude"] - angle_resolution / 2
 
-    #get the mean rainfall (mean over time) for each point in space
+    # get the mean rainfall (mean over time) for each point in space
     mean_rainfall = np.mean(data.rain, 0)
 
-    #heatmap plot the mean rainfall
+    # heatmap plot the mean rainfall
     plt.figure()
     ax = plt.axes(projection=crs.PlateCarree())
     im = ax.pcolor(longitude_grid, latitude_grid, mean_rainfall)
@@ -113,16 +114,17 @@ def plot_rain(data, figure_dir, pool):
     plt.savefig(path.join(series_dir, "rainfall_mean.pdf"))
     plt.close()
 
-    #plot the rainfall as a time series for each city
+    # plot the rainfall as a time series for each city
     for city in data.generate_city():
 
-        #get the time series for this city
+        # get the time series for this city
         rainfall_series = data.get_rain_city(city)
-        #get the autocorrelation and partial autocorrelation of the time series
+        # get the autocorrelation and partial autocorrelation of the time
+        # series
         acf = stattools.acf(rainfall_series, nlags=20, fft=True)
         pacf = stattools.pacf(rainfall_series, nlags=20)
 
-        #plot the time series
+        # plot the time series
         plt.figure()
         plt.plot(time, rainfall_series)
         plt.title(city+": precipitation")
@@ -131,7 +133,7 @@ def plot_rain(data, figure_dir, pool):
         plt.savefig(path.join(series_dir, "rainfall_" + city + ".pdf"))
         plt.close()
 
-        #plot cdf
+        # plot cdf
         n = len(rainfall_series)
         rain_sorted = np.sort(rainfall_series)
         cdf = np.asarray(range(n))
@@ -146,7 +148,7 @@ def plot_rain(data, figure_dir, pool):
         plt.savefig(path.join(series_dir, "rainfall_cdf_" + city + ".pdf"))
         plt.close()
 
-        #plot the acf
+        # plot the acf
         plt.figure()
         plt.bar(np.asarray(range(acf.size)), acf)
         plt.axhline(1/math.sqrt(len(time)), linestyle="--")
@@ -156,7 +158,7 @@ def plot_rain(data, figure_dir, pool):
         plt.savefig(path.join(series_dir, "rainfall_acf_" + city + ".pdf"))
         plt.close()
 
-        #plot the pacf
+        # plot the pacf
         plt.figure()
         plt.bar(np.asarray(range(pacf.size)), pacf)
         plt.axhline(1/math.sqrt(len(time)), linestyle="--")
@@ -166,8 +168,8 @@ def plot_rain(data, figure_dir, pool):
         plt.savefig(path.join(series_dir, "rainfall_pacf_" + city + ".pdf"))
         plt.close()
 
-        #plot correlation between pair of locations
-            #choose a city, then work out correlation with every point
+        # plot correlation between pair of locations
+        # choose a city, then work out correlation with every point
         cross_correlation = spatial_cross_correlation(
             rainfall_series, data.rain)
         figure_title = "Precipitation cross correlation with " + city
@@ -179,16 +181,16 @@ def plot_rain(data, figure_dir, pool):
                                      figure_path)
         message.print()
 
-    #plot cdf for all rain
-        #evaluate the cdf at RAIN_THRESHOLD_EXTREME_ARRAY using interpolation
+    # plot cdf for all rain
+    # evaluate the cdf at RAIN_THRESHOLD_EXTREME_ARRAY using interpolation
     rain_threshold_array = (
         compound_poisson.forecast.print.RAIN_THRESHOLD_EXTREME_ARRAY)
     rainfall_all = data.rain[np.logical_not(data.rain.mask)].flatten()
     n = len(rainfall_all)
     rain_sorted = np.sort(rainfall_all)
     cdf = np.linspace(0, 1, n)
-    #interpolation does not support step function at 0 mm, will need to keep
-        #the cdf at 0 mm as a seperate case
+    # interpolation does not support step function at 0 mm, will need to keep
+    # the cdf at 0 mm as a seperate case
     cdf_0 = np.sum(rainfall_all == 0) / n
     cdf_function = scipy.interpolate.interp1d(rain_sorted, cdf)
     cdf_evaluated = cdf_function(rain_threshold_array)
@@ -199,11 +201,12 @@ def plot_rain(data, figure_dir, pool):
         non_zero_index = np.nonzero(rain_sorted)[0][0] - 1
         plt.scatter(0, cdf[non_zero_index])
     for rain_threshold, cdf_threshold in zip(
-        rain_threshold_array, cdf_evaluated):
+            rain_threshold_array, cdf_evaluated):
         if rain_threshold == 0:
             cdf_threshold = cdf_0
         survival = 1 - cdf_threshold
-        plt.vlines(rain_threshold, 0, cdf_threshold, label=str(rain_threshold)+" mm < : " + str(survival*100) + "%")
+        plt.vlines(rain_threshold, 0, cdf_threshold, label=str(
+            rain_threshold)+" mm < : " + str(survival*100) + "%")
     plt.title("cdf precipitation")
     plt.ylabel("precipitation (" + data.rain_units + ")")
     plt.ylabel("cumulative density")
@@ -211,13 +214,13 @@ def plot_rain(data, figure_dir, pool):
     plt.savefig(path.join(series_dir, "rainfall_cdf_all.pdf"))
     plt.close()
 
-    #plot the rain (spatial map for each time step)
+    # plot the rain (spatial map for each time step)
     message_array = []
     for i in range(len(data)):
         rain_plot = data.rain[i].copy()
         rain_plot.mask[rain_plot == 0] = True
         figure_title = ("precipitation (" + data.rain_units + ") : "
-            + str(data.time_array[i]))
+                        + str(data.time_array[i]))
         path_to_figure = path.join(map_dir, str(i) + ".png")
 
         message = HeatmapPlotMessage(longitude_grid,
@@ -228,10 +231,11 @@ def plot_rain(data, figure_dir, pool):
         message_array.append(message)
     pool.map(HeatmapPlotMessage.print, message_array)
 
+
 class HeatmapPlotMessage(object):
 
     def __init__(
-        self, longitude_grid, latitude_grid, value, title, path_to_figure):
+            self, longitude_grid, latitude_grid, value, title, path_to_figure):
         self.longitude_grid = longitude_grid
         self.latitude_grid = latitude_grid
         self.value = value
@@ -303,18 +307,18 @@ def plot_model_fields(data, figure_dir, pool):
     if not path.isdir(coarse_mean_dir):
         os.mkdir(coarse_mean_dir)
 
-    #create array to loop over different grids (fine grid then coarse grid)
+    # create array to loop over different grids (fine grid then coarse grid)
     latitude_array = [latitude_grid, latitude_coarse_grid]
     longitude_array = [longitude_grid, longitude_coarse_grid]
     model_field_array = [data.model_field, data.model_field_coarse]
     dir_array = [fine_mean_dir, coarse_mean_dir]
 
-    #for fine grid, then coarse grid
+    # for fine grid, then coarse grid
     for i, dir in enumerate(dir_array):
-        #for each model field
+        # for each model field
         for model_field, value in model_field_array[i].items():
             model_field_mean = np.mean(value, 0)
-            #plot the mean model field (over time) as a heat map
+            # plot the mean model field (over time) as a heat map
             plt.figure()
             ax = plt.axes(projection=crs.PlateCarree())
             im = ax.pcolor(longitude_array[i],
@@ -333,18 +337,18 @@ def plot_model_fields(data, figure_dir, pool):
     coarse_map_dir = path.join(coarse_dir, "map")
     if not path.isdir(coarse_map_dir):
         os.mkdir(coarse_map_dir)
-    dir_array  = [fine_map_dir, coarse_map_dir]
+    dir_array = [fine_map_dir, coarse_map_dir]
 
-    #for each grid (eg coarse and fine)
+    # for each grid (eg coarse and fine)
     for i, dir in enumerate(dir_array):
-        #for each model field
+        # for each model field
         for model_field, value in model_field_array[i].items():
-            #plot model field for each day in parallel
+            # plot model field for each day in parallel
             message_array = []
             for i_time in range(365):
-                #heatmap plot
-                figure_title = (model_field + " (" + units[model_field] + ") : "
-                    + str(data.time_array[i_time]))
+                # heatmap plot
+                figure_title = (model_field + " (" + units[model_field]
+                                + ") : " + str(data.time_array[i_time]))
                 path_to_figure = path.join(
                     dir, model_field + "_" + str(i_time) + ".png")
                 message = HeatmapPlotMessage(longitude_array[i],
@@ -355,10 +359,10 @@ def plot_model_fields(data, figure_dir, pool):
                 message_array.append(message)
             pool.map(HeatmapPlotMessage.print, message_array)
 
-    #for each city time series
+    # for each city time series
     for city in data.generate_city():
 
-        #get the time series
+        # get the time series
         model_field_time_series = data.get_model_field_city(city)
 
         for model_field, time_series in model_field_time_series.items():
@@ -368,13 +372,13 @@ def plot_model_fields(data, figure_dir, pool):
             cross_correlation = spatial_cross_correlation(
                 time_series, data.model_field[model_field])
 
-            #get the acf and pacf
-            #in the model fields, 4 readings per day, want to have 1.5 years of
-                #lag to look for seasonality
+            # get the acf and pacf
+            # in the model fields, 4 readings per day, want to have 1.5 years
+            # of lag to look for seasonality
             acf = stattools.acf(time_series, nlags=10, fft=True)
             pacf = stattools.pacf(time_series, nlags=10)
 
-            #plot the model field as a time series
+            # plot the model field as a time series
             plt.figure()
             plt.plot(time, time_series)
             plt.title(city + ": " + model_field)
@@ -384,7 +388,7 @@ def plot_model_fields(data, figure_dir, pool):
                 path.join(series_dir, model_field + "_" + city + ".pdf"))
             plt.close()
 
-            #plot the autocorrelation of the time series
+            # plot the autocorrelation of the time series
             plt.figure()
             plt.bar(np.array(range(acf.size)), acf)
             plt.title(city + ": autocorrelation of " + model_field)
@@ -394,7 +398,7 @@ def plot_model_fields(data, figure_dir, pool):
                 path.join(series_dir, model_field + "_acf_" + city + ".pdf"))
             plt.close()
 
-            #plot the partial autocorrelation of the time series
+            # plot the partial autocorrelation of the time series
             plt.figure()
             plt.bar(np.array(range(pacf.size)), pacf)
             plt.title(city + ": partial autocorrelation of " + model_field)
@@ -404,7 +408,7 @@ def plot_model_fields(data, figure_dir, pool):
                 path.join(series_dir, model_field + "_pacf_" + city + ".pdf"))
             plt.close()
 
-            #plot correlation between pairs of locations
+            # plot correlation between pairs of locations
             figure_title = model_field + " cross correlation with " + city
             figure_path = path.join(
                 cross_dir, model_field+"_cross_"+city+".pdf")
@@ -414,6 +418,7 @@ def plot_model_fields(data, figure_dir, pool):
                                          figure_title,
                                          figure_path)
             message.print()
+
 
 def plot_matrix(data, figure_dir):
     """Plot figures for the topography
@@ -427,7 +432,9 @@ def plot_matrix(data, figure_dir):
     figure_dir = path.join(figure_dir, "matrix")
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
-    #for each city, do matrix plot of all the variables
+    import pdb
+    pdb.set_trace()
+    # for each city, do matrix plot of all the variables
     for city in data.generate_city():
 
         data_frame = {}
@@ -436,17 +443,19 @@ def plot_matrix(data, figure_dir):
 
         model_field = data.get_model_field_city(city)
         data_frame = data_frame.join(model_field)
-        #matrix plot
+        # matrix plot
         plt.figure(figsize=(12, 10))
         ax = plt.gca()
         pd.plotting.scatter_matrix(data_frame, s=5, ax=ax)
         plt.savefig(path.join(figure_dir, city + ".png"))
         plt.close()
 
+
 def plot_topography(data, figure_dir):
     """Matrix plot for the precipitation and model fields for each city
 
-    Both on fine grid and coarse grid, interpolate from fine grid to coarse grid
+    Both on fine grid and coarse grid, interpolate from fine grid to coarse
+        grid
 
     Args:
         data: dataset.data object
@@ -473,7 +482,7 @@ def plot_topography(data, figure_dir):
     topo_array = [data.topography, data.topography_coarse]
     dir_array = [fine_dir, coarse_dir]
 
-    #topography
+    # topography
     for i, topo in enumerate(topo_array):
         for key, value in topo.items():
             plt.figure()
@@ -486,13 +495,14 @@ def plot_topography(data, figure_dir):
             plt.savefig(path.join(dir_array[i], "topo_" + key + ".pdf"))
             plt.close()
 
+
 def spatial_cross_correlation(reference_series, value_map):
     """Corrleation of one location with every other location
 
     Args:
         reference_series: the time series of a location to be comapred with
-        value_map: dim 0: time, dim 1 and 2: 2d map, values of each location and
-            time
+        value_map: dim 0: time, dim 1 and 2: 2d map, values of each location
+            and time
 
     Return:
         2d array, same shape as value_map[0, :, :], contains correlations
