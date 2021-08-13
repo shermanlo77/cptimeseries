@@ -355,7 +355,7 @@ class DataDualGrid(object):
         self.mask = rain[0].mask
         # remove time points not covered by the model fields
         for i, time in enumerate(time_array):
-            time = datetime.datetime(time.year, time.month, time.day)
+            time = datetime.date(time.year, time.month, time.day)
             if time in self.time_array:
                 self.rain.append(rain[i])
                 assert(np.array_equal(self.mask, rain[i].mask))
@@ -558,8 +558,8 @@ class DataDualGrid(object):
         for city, coordinates in CITY_LOCATION.items():
             if ((coordinates[0] <= latitude_max)
                     and (latitude_min <= coordinates[0])):
-                if ((coordinates[1] <= longitude_min)
-                        and (longitude_max <= coordinates[1])):
+                if ((coordinates[1] <= longitude_max)
+                        and (longitude_min <= coordinates[1])):
                     yield city
 
     def generate_unmask_rain(self):
