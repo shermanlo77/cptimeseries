@@ -432,13 +432,14 @@ def plot_matrix(data, figure_dir):
     figure_dir = path.join(figure_dir, "matrix")
     if not path.isdir(figure_dir):
         os.mkdir(figure_dir)
-    import pdb
-    pdb.set_trace()
     # for each city, do matrix plot of all the variables
+
     for city in data.generate_city():
 
+        rain_array = np.asarray(data.get_rain_city(city))
+
         data_frame = {}
-        data_frame["rain"] = np.asarray(data.get_rain_city(city))
+        data_frame["rain"] = rain_array
         data_frame = pd.DataFrame(data_frame)
 
         model_field = data.get_model_field_city(city)
@@ -449,6 +450,17 @@ def plot_matrix(data, figure_dir):
         pd.plotting.scatter_matrix(data_frame, s=5, ax=ax)
         plt.savefig(path.join(figure_dir, city + ".png"))
         plt.close()
+
+        model_field_keys = model_field.columns
+        for key in model_field_keys:
+            model_field_array = np.asarray(model_field[key])
+            units = data.model_field_units[key]
+            plt.figure()
+            plt.scatter(model_field_array, rain_array)
+            plt.xlabel(key + " (" + units + ")")
+            plt.ylabel("precipitation (" + data.rain_units + ")")
+            plt.savefig(path.join(figure_dir, city + "_" + key + ".png"))
+            plt.close()
 
 
 def plot_topography(data, figure_dir):
