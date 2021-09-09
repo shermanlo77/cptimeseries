@@ -45,7 +45,7 @@ def main():
 
     plt.rcParams.update({'font.size': 14})
 
-    #where to save the figures
+    # where to save the figures
     directory = "figure"
     if not path.isdir(directory):
         os.mkdir(directory)
@@ -70,10 +70,10 @@ def main():
     for i, dir_i in enumerate(script_dir_array):
         script_dir_array[i] = path.join("..", dir_i)
 
-    time_series_name_array = [] #time series for each training set
+    time_series_name_array = []  # time series for each training set
     time_series_array = []
-    #will need to update the location of each time series memmap_path because
-        #they would be using relative paths
+    # will need to update the location of each time series memmap_path because
+    # they would be using relative paths
     for i, dir_i in enumerate(script_dir_array):
         time_series = joblib.load(
             path.join(dir_i, "result", "TimeSeriesHyperSlice.gz"))
@@ -84,10 +84,10 @@ def main():
         time_series_name_array.append(
             "CP-MCMC ("+str(training_size_array[i])+")")
 
-    #plot auc for varying precipitation
+    # plot auc for varying precipitation
 
-    #array of array:
-        #for each training set, then for each value in rain_array
+    # array of array:
+    # for each training set, then for each value in rain_array
     auc_array = []
     bootstrap_error_array = []
     n_bootstrap = 32
@@ -110,7 +110,7 @@ def main():
             bootstrap_error_array[i_training_size].append(
                 math.sqrt(np.mean(bootstrap_i_array)))
 
-    #figure format
+    # figure format
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(monochrome)
@@ -125,11 +125,11 @@ def main():
     plt.savefig(path.join(directory, "auc.pdf"), bbox_inches="tight")
     plt.close()
 
-    #table format
+    # table format
     rain_label_array = []
     for rain in rain_array:
         rain_label_array.append(str(rain)+" mm")
-    #table format with uncertainity values
+    # table format with uncertainity values
     auc_table = []
     for auc_i, error_i in zip(auc_array, bootstrap_error_array):
         auc_table.append([])
@@ -141,12 +141,12 @@ def main():
         np.asarray(auc_table).T, rain_label_array, time_series_name_array)
     data_frame.to_latex(path.join(directory, "auc.txt"), escape=False)
 
-    #add era5 (for loss evaluation)
-    #roc unavailable for era5
+    # add era5 (for loss evaluation)
+    # roc unavailable for era5
     time_series_array.append(era5)
     time_series_name_array.append("IFS")
 
-    #yearly plot of the bias losses
+    # yearly plot of the bias losses
     time_segmentator = time_segmentation.YearSegmentator(time_array)
     loss_segmentator_array = []
     for time_series_i in time_series_array:
@@ -158,8 +158,8 @@ def main():
     pandas.plotting.register_matplotlib_converters()
     for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
 
-        #array of arrays, one for each time_series in time_series_array
-            #for each array, contains array of loss for each time point
+        # array of arrays, one for each time_series in time_series_array
+        # for each array, contains array of loss for each time point
         bias_loss_plot_array = []
         bias_median_loss_plot_array = []
 
@@ -174,7 +174,7 @@ def main():
         ax.set_prop_cycle(monochrome2)
 
         for time_series_label, bias_plot_array in zip(
-            time_series_name_array, bias_loss_plot_array):
+                time_series_name_array, bias_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
                      bias_plot_array,
                      label=time_series_label)
@@ -194,7 +194,7 @@ def main():
         ax = plt.gca()
         ax.set_prop_cycle(monochrome2)
         for time_series_label, bias_plot_array in zip(
-            time_series_name_array, bias_median_loss_plot_array):
+                time_series_name_array, bias_median_loss_plot_array):
             plt.plot(loss_segmentator_i.time_array,
                      bias_plot_array,
                      label=time_series_label)
@@ -210,7 +210,7 @@ def main():
             bbox_inches="tight")
         plt.close()
 
-    #plot table of test set bias loss
+    # plot table of test set bias loss
     time_segmentator_array = {
         "all_years": time_segmentation.AllInclusive(time_array),
         "spring": time_segmentation.SpringSegmentator(time_array),
@@ -220,12 +220,12 @@ def main():
     }
     time_segmentator_names = list(time_segmentator_array.keys())
 
-    #array of loss_segmentator objects, for each time series
-        #dim 0: for each time series
-        #dim 1: for each time segmentator
+    # array of loss_segmentator objects, for each time series
+    # dim 0: for each time series
+    # dim 1: for each time segmentator
     loss_array = []
 
-    #plot the table (for mean, the median bias)
+    # plot the table (for mean, the median bias)
     for i, time_series_i in enumerate(time_series_array):
         loss_array.append([])
         for time_segmentator_k in time_segmentator_array.values():
@@ -234,21 +234,20 @@ def main():
             loss_i.evaluate_loss(time_segmentator_k)
             loss_array[i].append(loss_i)
 
-
     for i_loss, Loss in enumerate(loss_segmentation.LOSS_CLASSES):
 
-        #using training set size 5 years to get bootstrap variance, this is used
-            #to guide the number of decimial places to use
+        # using training set size 5 years to get bootstrap variance, this is
+        # used to guide the number of decimial places to use
         n_decimial = 3
         float_format = ("{:."+str(n_decimial)+"f}").format
 
-        #table of losses
-            #columns: for each time segmentator
-            #rows: for each time series
+        # table of losses
+        # columns: for each time segmentator
+        # rows: for each time series
         loss_mean_array = []
         loss_median_array = []
 
-        #plot the table (for mean, the median bias)
+        # plot the table (for mean, the median bias)
         for i_time_series, time_series_i in enumerate(time_series_array):
             loss_mean_array.append([])
             loss_median_array.append([])
@@ -259,7 +258,7 @@ def main():
                     loss.get_bias_median_loss())
 
         for prefix, loss_table in zip(
-            ["mean", "median"], [loss_mean_array, loss_median_array]):
+                ["mean", "median"], [loss_mean_array, loss_median_array]):
             data_frame = pd.DataFrame(
                 loss_table, time_series_name_array, time_segmentator_names)
             path_to_table = path.join(
@@ -270,10 +269,10 @@ def main():
     for i, time_series_i in enumerate(time_series_array):
         residual_plot = residual_analysis.ResidualLnqqPlotter()
 
-        #add residuals data
+        # add residuals data
         residual_plot.add_data(time_series_i.forecaster, observed_rain)
 
-        #plot residual data
+        # plot residual data
         residual_plot.plot_heatmap([[0, 3.8], [0, 3.8]], 1.8, 5.3, 'Greys')
         plt.savefig(
             path.join(directory,
@@ -284,8 +283,9 @@ def main():
     for time_series_i in time_series_array:
         time_series_i.forecaster.del_memmap()
 
+
 def number_of_decimial_places(
-    time_series, observed_rain, Loss, n_bootstrap, rng):
+        time_series, observed_rain, Loss, n_bootstrap, rng):
     """Return the recommend number of decimial places by using the variance of
         the bootstrapped forecats
 
@@ -305,14 +305,15 @@ def number_of_decimial_places(
     loss = Loss(time_series.forecaster.n_simulation)
     forecaster = time_series.forecaster
     loss_array = []
-    #bootstrap
+    # bootstrap
     for i in range(n_bootstrap):
         bootstrap = forecaster.bootstrap(rng)
         loss.add_data(bootstrap, observed_rain)
         loss_array.append(loss.get_bias_loss())
     loss_std = np.std(loss_array, ddof=1)
-    #round to the nearest magnitiude
+    # round to the nearest magnitiude
     return -round(math.log10(loss_std))
+
 
 if __name__ == "__main__":
     main()

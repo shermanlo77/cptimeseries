@@ -6,6 +6,7 @@ TODO: Suggestion, rewrite the methods get_parameter_3d(),
 import os
 from os import path
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
@@ -15,6 +16,9 @@ from compound_poisson import forecast
 from compound_poisson import mcmc
 from compound_poisson import multiprocess
 from compound_poisson import time_series_mcmc
+
+matplotlib.use('Agg')  # required so that matplotlib can be used in parallel
+# see https://stackoverflow.com/questions/28903969/python-multiprocessingsavefig-leads-to-error-or-system-lockup
 
 
 class MultiSeries(object):
@@ -73,7 +77,7 @@ class MultiSeries(object):
         self.area_unmask = np.sum(np.logical_not(self.mask))
         self.seed_seq = None
         self.rng = None
-        self.n_sample = 10000
+        self.n_sample = 20000
         self.burn_in = 0
         self.pool = None
         self.memmap_dir = ""

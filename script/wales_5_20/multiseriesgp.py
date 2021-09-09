@@ -7,9 +7,9 @@ import dataset
 
 
 def main():
-    fitter = fit.downscale.FitterDownscale()
+    fitter = fit.downscale.FitterMultiSeries(suffix="gp")
     data = dataset.Wales5Training()
-    seed = random.SeedSequence(135973542338678598285681473918294488781)
+    seed = random.SeedSequence(336116686577838597869553922167649360230)
     Pool = multiprocess.Pool
     wrapper.downscale_fit(fitter, data, seed, Pool)
 

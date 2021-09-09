@@ -13,6 +13,7 @@ import dataset
 
 RAIN_ARRAY = [0, 1, 2, 3, 4, 5, 10, 15, 20, 25]
 
+
 def main():
 
     directory = "figure_roc_compare"
@@ -33,7 +34,7 @@ def main():
         null_array = np.logical_not(alt_array)
 
         true_positive_rate = (np.sum(np.logical_and(positive_array, alt_array))
-            / np.sum(alt_array))
+                             / np.sum(alt_array))
         false_positive_rate = (np.sum(
             np.logical_and(positive_array, null_array))
             / np.sum(null_array))
@@ -47,6 +48,7 @@ def main():
         plt.close()
 
     time_series.forecaster.del_memmap()
+
 
 if __name__ == "__main__":
     main()

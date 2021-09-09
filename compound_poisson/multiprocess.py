@@ -1,10 +1,8 @@
 """Wrapper classes for different multiprocess objects such as MPI.
 """
 
-import multiprocessing
-
-from abcpy import backends
 from mpi4py import futures
+import multiprocessing
 
 
 class Serial(object):
@@ -63,25 +61,6 @@ class Pool(Serial):
     def join(self):
         self.pool.close()
         self.pool.join()
-
-
-class BackendMPI(Serial):
-    """Uses abcpy.backends.BackendMPI
-
-    To call, use, for example,: mpiexec -np 8 python3 script.py
-    """
-
-    def __init__(self):
-        self.pool = backends.BackendMPI()
-
-    def map(self, function, parameters):
-        pds = self.pool.parallelize(parameters)
-        pds_map = self.pool.map(function, pds)
-        results = self.pool.collect(pds_map)
-        return results
-
-    def broadcast(self, value):
-        return self.pool.broadcast(value)
 
 
 class Broadcast(object):

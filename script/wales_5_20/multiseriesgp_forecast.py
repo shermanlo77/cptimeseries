@@ -5,7 +5,8 @@ import dataset
 
 
 def main():
-    fitter = fit.downscale.FitterMultiSeries()
+    fitter = fit.downscale.FitterMultiSeries(suffix="gp")
+    fitter.set_post_gp(True)
     test = dataset.WalesTest()
     default_burn_in = 15000
     Pool = multiprocess.Pool

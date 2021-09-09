@@ -1,5 +1,5 @@
-#a quick script to bootstrap the forecasts and suggest the number of decimial
-    #places to use for the area uncer the ROC curve
+# a quick script to bootstrap the forecasts and suggest the number of decimial
+# places to use for the area uncer the ROC curve
 
 import math
 
@@ -9,6 +9,7 @@ from numpy import random
 import pandas as pd
 
 import dataset
+
 
 def main():
     time_series = joblib.load("result/TimeSeriesHyperSlice.gz")

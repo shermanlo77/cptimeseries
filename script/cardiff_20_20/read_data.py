@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import compound_poisson
 import dataset
 
+
 def main():
 
     path_here = pathlib.Path(__file__).parent.absolute()
@@ -28,6 +29,7 @@ def main():
         plt.ylabel(time_series.model_field_name[i])
         plt.savefig(path.join(figure_dir, "model_field_" + str(i) + ".pdf"))
         plt.close()
+
 
 if __name__ == "__main__":
     main()

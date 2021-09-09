@@ -4,23 +4,20 @@ from os import path
 import cycler
 import joblib
 from matplotlib import pyplot as plt
-import numpy as np
-from numpy import random
-import pandas as pd
-import pandas.plotting
 
 import compound_poisson
 import dataset
 
 LINESTYLE = ['-', '--', '-.', ':']
 
+
 def main():
 
     monochrome = (cycler.cycler('color', ['k'])
-        * cycler.cycler('linestyle', LINESTYLE))
+                  * cycler.cycler('linestyle', LINESTYLE))
     plt.rcParams.update({'font.size': 14})
 
-    #where to save the figures
+    # where to save the figures
     directory = "figure"
     if not path.isdir(directory):
         os.mkdir(directory)
@@ -46,7 +43,7 @@ def main():
     era5_comparer = era5.forecaster.compare_dist_with_observed(
         observed_rain)
 
-    #survival plot
+    # survival plot
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(monochrome)
@@ -58,7 +55,7 @@ def main():
     plt.savefig(path.join(directory, "survival.pdf"), bbox_inches="tight")
     plt.close()
 
-    #pp plot
+    # pp plot
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(monochrome)
@@ -69,7 +66,7 @@ def main():
     plt.savefig(path.join(directory, "pp.pdf"), bbox_inches="tight")
     plt.close()
 
-    #qq plot
+    # qq plot
     plt.figure()
     ax = plt.gca()
     ax.set_prop_cycle(monochrome)
@@ -81,6 +78,7 @@ def main():
     plt.close()
 
     time_series.forecaster.del_memmap()
+
 
 if __name__ == "__main__":
     main()

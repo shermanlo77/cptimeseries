@@ -5,6 +5,7 @@ import dataset
 import compound_poisson
 from compound_poisson import multiprocess
 
+
 def main():
 
     pool = multiprocess.Pool()
@@ -18,6 +19,7 @@ def main():
     downscale.fit(data, test_set)
     compound_poisson.forecast.print.downscale(
         downscale.forecaster, test_set, directory, pool)
+
 
 if __name__ == "__main__":
     main()

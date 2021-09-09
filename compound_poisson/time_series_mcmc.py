@@ -43,7 +43,7 @@ class TimeSeriesMcmc(time_series.TimeSeries):
                          poisson_rate_n_arma,
                          gamma_mean_n_arma,
                          cp_parameter_array)
-        self.n_sample = 100000
+        self.n_sample = 50000
         self.parameter_target = target_time_series.TargetParameter(self)
         self.parameter_mcmc = None
         self.z_target = target_time_series.TargetZ(self)

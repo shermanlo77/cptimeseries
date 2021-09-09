@@ -5,6 +5,7 @@ import dataset
 import compound_poisson
 from compound_poisson import multiprocess
 
+
 def main():
 
     directory = "figure"
@@ -21,6 +22,7 @@ def main():
     printer = compound_poisson.forecast.print.Downscale(
         downscale.forecaster, directory, pool)
     printer.print()
+
 
 if __name__ == "__main__":
     main()

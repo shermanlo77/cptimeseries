@@ -1,5 +1,5 @@
 # Precipitation Forecasting using Compound Poisson Time Series
-* Copyright (c) 2020 Sherman Lo
+* Copyright (c) 2019-2021 Sherman Lo
 * MIT LICENSE
 
 Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle. A Bayesian inference was used to quantify uncertainty in the forecasting.
@@ -10,7 +10,7 @@ Please see LICENCE for further information on how you can use and modify this re
 
 ![A time series forecast in bold with 1 sigma error as a shaded area](frontcover.png)
 
-Keywords: *Compound Poisson, MCMC sampling, time series, downscale, downscaling, precipitation, weather forecasting*
+Keywords: *Compound Poisson, MCMC sampling, time series, precipitation, weather forecasting*
 
 ## Requirements (Python 3, Linux Recommended)
 * At least 16 GB of RAM
@@ -26,13 +26,11 @@ Keywords: *Compound Poisson, MCMC sampling, time series, downscale, downscaling,
 * `netCDF4`
     * [Installation instructions](https://unidata.github.io/netcdf4-python/netCDF4/index.html)
 * `cftime`
-    * Must be *version 1.0.4.2* because future releases change the use of num2date, see the [change log](https://github.com/Unidata/cftime/blob/master/Changelog) for further details.
+    * ~~Must be *version 1.0.4.2* because future releases change the use of num2date, see the [change log](https://github.com/Unidata/cftime/blob/master/Changelog) for further details.~~
 * `gdal`
     * [Installation instructions](https://mothergeo-py.readthedocs.io/en/latest/development/how-to/gdal-ubuntu-pkg.html)
     * [Possible help when installing](https://gis.stackexchange.com/questions/28966/python-gdal-package-missing-header-file-when-installing-via-pip)
 * `mpi4py`
-    * Requires [MPICH](https://www.mpich.org/)
-* `abcpy`
     * Requires [MPICH](https://www.mpich.org/)
 
 ## Download the Data
@@ -128,7 +126,9 @@ The following examples are provided:
     * Training set: 1995-1999 inclusive
     * Test set: 2000-2019 inclusive
 
-To reproduce the results, run the script `multiseries.py` to do MCMC sampling. 20,000 MCMC samples are required to reproduce the results, this is not programmed to be the default. Afterwards, run the script `multiseries_forecast.py` to do forecasting. Figures are plotted and saved in the `figure` directory.
+To reproduce the results, run the script `multiseries.py` to do MCMC sampling. 20,000 MCMC samples are required to reproduce the results. This is programmed to be the default but should be noted if one wants to checkpoint during a run. Afterwards, run the script `multiseries_forecast.py` to do forecasting. Figures are plotted and saved in the `figure` directory.
+
+The scripts `multiseriesgp.py` and `multiseriesgp_forecast.gp` are versions with GP smoothing when forecasting.
 
 Results are saved in the `result` directory. When results from previous runs are detected, it will resume the run up to the provided number of samples. Delete the directory if you wish to restart the sampling process from the start.
 
@@ -140,19 +140,19 @@ to
 ```
 pool = multiprocess.MPIPoolExecutor
 ```
-so that [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) is used. In addition, the module `-m mpi4py.futures` and the script should be run using MPI, for example `mpiexec` or `sbatch`.
+so that [`mpi4py.futures.MPIPoolExecutor`](https://mpi4py.readthedocs.io/en/stable/mpi4py.futures.html) is used. In addition, the module `-m mpi4py.futures` and the script should be run using MPI, for example `mpiexec` or `srun`.
 
 Options are provided which may be useful for development, debugging or check-pointing purposes.
 
-- `python3 [-m mpi4py.futures] multiseries.py [--sample [nsample]]`
+- `[mpiexec] python3 [-m mpi4py.futures] multiseries.py [--sample [nsample]]`
     - `--sample nsample`: Run MCMC until `nsample` posterior samples are obtained.
-    - `-m mpi4py.futures` required only if using `MPIPoolExecutor`
+    - `[mpiexec]` and `-m mpi4py.futures` required only if using `MPIPoolExecutor`
 
-- `python3 [-m mpi4py.futures] multiseries_forecast.py [--sample [nsample]] [--burnin [burnin]] [--noprint]`
+- `[mpiexec] python3 [-m mpi4py.futures] multiseries_forecast.py [--sample [nsample]] [--burnin [burnin]] [--noprint]`
     - `--sample nsample`: Run posterior predictions until `nsample` predictive samples are obtained.
     - `--burnin burnin`: Set the burn-in to `burnin`. Otherwise, uses the default value.
     - `--noprint`: Do not print figures.
-    - `-m mpi4py.futures` required only if using `MPIPoolExecutor`
+    - `[mpiexec]` and `-m mpi4py.futures` required only if using `MPIPoolExecutor`
 
 The following examples are provided:
 
@@ -185,9 +185,7 @@ The following examples are provided:
 * Please see the packages [`compound_poisson`](./compound_poisson/) and [`dataset`](./dataset/) for further documentations.
 
 ## Notes on Development and Sustainability
+- The code shall be lightly maintained with more small examples added.
 - Legacy copy where the parameters have a Gaussain process prior are left in here (see for example `compound_poisson/downscale.py`).
 - The author has a background in Java so there is a frequent use of classes and inheritance structure.
 - The author attempted to keep to the [Google Python style guide](https://google.github.io/styleguide/pyguide.html). There are a few omission such as underscores for denoting private and protected methods, variables and classes.
-- `TODO` list:
-  - Provide a simpler example as an introduction, see `examples/`
-  - Testing
