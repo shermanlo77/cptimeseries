@@ -1,6 +1,7 @@
 # Precipitation Forecasting using Compound Poisson Time Series
 * Copyright (c) 2019-2021 Sherman Lo
 * MIT LICENSE
+
 [![DOI](https://zenodo.org/badge/301799941.svg)](https://zenodo.org/badge/latestdoi/301799941)
 
 Concept code for predicting precipitation using model fields (temperature, geopotential, wind velocity, etc.) as predictors for sub-areas across the British Isle. A Bayesian inference was used to quantify uncertainty in the forecasting.
